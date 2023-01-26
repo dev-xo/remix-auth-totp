@@ -55,7 +55,7 @@ In this example we'll use Prisma ORM with a Sqlite database. As long as the data
 // prisma/schema.prisma
 
 /**
- * The OTP model only requires 2 fields: code and active.
+ * The OTP model only requires 3 fields: code, active and attempts.
  *
  * The `code` field will be a String and will be unique.
  * The `active` field will be a Boolean and will be set to false by default.
