@@ -387,7 +387,7 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
           }
         }
 
-        if (isGet && this.magicLinkGeneration.enabled)) {
+        if (isGet && this.magicLinkGeneration.enabled) {
           // Handles magic link.
           const url = new URL(request.url)
           if (url.pathname !== this.magicLinkGeneration.callbackPath) {
