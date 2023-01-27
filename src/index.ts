@@ -1,6 +1,6 @@
-import { SessionStorage, redirect } from '@remix-run/server-runtime'
-import { AuthenticateOptions, Strategy, StrategyVerifyCallback } from 'remix-auth'
-import { encrypt, decrypt, generateOtp } from './utils'
+import { type SessionStorage, redirect } from '@remix-run/server-runtime'
+import { type AuthenticateOptions, Strategy, type StrategyVerifyCallback } from 'remix-auth'
+import { encrypt, decrypt, generateOtp, generateMagicLink } from './utils'
 
 /**
  * A function that validates the email address.
@@ -60,6 +60,28 @@ export interface CodeGenerationOptions {
 }
 
 /**
+ * The magic link configuration.
+ */
+export interface MagicLinkGenerationOptions {
+  /**
+   * Whether to enable the magic link feature.
+   */
+  enabled?: boolean;
+
+  /**
+   * The base Url for building the magic link url. If omitted, the baseUrl will be inferred from the request.
+   * @default ''
+   */
+  baseUrl?: string
+
+  /**
+   * The path for the magic link callback.
+   * @default '/magic-link'
+   */
+  callbackPath?: string
+}
+
+/**
  * A function that stores the OTP code into database.
  * @param code The encrypted OTP code.
  */
@@ -82,6 +104,11 @@ export interface SendCodeOptions<User> {
   code: string
 
   /**
+   * The magic link url.
+   */
+  magicLink: string | null
+
+  /**
    * The user object.
    */
   user?: User | null
@@ -90,6 +117,11 @@ export interface SendCodeOptions<User> {
    * The formData object.
    */
   form?: FormData
+
+  /**
+   * The request object.
+   */
+  request: Request
 }
 
 /**
@@ -145,6 +177,11 @@ export interface OTPStrategyOptions<User> {
    * The code generation configuration.
    */
   codeGeneration?: CodeGenerationOptions
+
+  /**
+   * The magic link configuration.
+   */
+  magicLinkGeneration?: MagicLinkGenerationOptions
 
   /**
    * The validate email function.
@@ -204,6 +241,16 @@ export interface OTPVerifyParams {
    * used to trigger the authentication.
    */
   form?: FormData
+
+  /**
+   * The magic link url used to trigger the authentication.
+   */
+  magicLink?: string
+
+  /**
+   * The Request object.
+   */
+  request: Request
 }
 
 export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
@@ -213,6 +260,7 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
   private readonly emailField: string
   private readonly codeField: string
   private readonly codeGeneration: CodeGenerationOptions
+  private readonly magicLinkGeneration: MagicLinkGenerationOptions
   private readonly validateEmail: ValidateEmailFunction
   private readonly storeCode: StoreCodeFunction
   private readonly sendCode: SendCodeFunction<User>
@@ -231,6 +279,12 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
     upperCaseAlphabets: true,
   }
 
+  private readonly magicLinkGenerationDefaults = {
+    enabled: false,
+    baseUrl: '',
+    callbackPath: '/magic-link',
+  }
+
   constructor(
     options: OTPStrategyOptions<User>,
     verify: StrategyVerifyCallback<User, OTPVerifyParams>,
@@ -240,6 +294,7 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
     this.emailField = options.emailField ?? 'email'
     this.codeField = options.codeField ?? 'code'
     this.codeGeneration = options.codeGeneration ?? this.codeGenerationDefaults
+    this.magicLinkGeneration = options.magicLinkGeneration ?? this.magicLinkGenerationDefaults
     this.validateEmail = options.validateEmail ?? this.validateEmailDefaults
     this.storeCode = options.storeCode
     this.sendCode = options.sendCode
@@ -258,70 +313,94 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
       throw new Error('Missing required secret option.')
     }
 
+    const isPost = request.method === 'POST'
+    const isGet = request.method === 'GET'
+
     // Initializes Session.
     const session = await sessionStorage.getSession(request.headers.get('Cookie'))
+    const sessionEmail = session.get(this.sessionEmailKey)
+    const sessionOtpEncrypted = session.get(this.sessionOtpKey)
 
     // Initializes user variable.
     let user: User | null = session.get(options.sessionKey) ?? null
 
     try {
-      if (!user && request.method === 'POST') {
+      if (!user) {
+        let email: string | undefined
+        let code: string | undefined
+        let magicLink: string | undefined
+        let formData: FormData | undefined
+
         if (!options.successRedirect) {
           throw new Error('Missing required successRedirect option.')
         }
 
-        const formData = await request.formData()
-        const form = Object.fromEntries(formData)
+        if (isPost) {
+          formData = await request.formData()
+          const form = Object.fromEntries(formData)
 
-        // Email will be re-assigned if user requests a new OTP code.
-        let email = form[this.emailField] && String(form[this.emailField])
-        const code = form[this.codeField] && String(form[this.codeField])
+          // Email will be re-assigned if user requests a new OTP code.
+          email = form[this.emailField] && String(form[this.emailField])
+          code = form[this.codeField] && String(form[this.codeField])
 
-        const sessionEmail = session.get(this.sessionEmailKey)
-        const sessionOtpEncrypted = session.get(this.sessionOtpKey)
+          // Requests a new OTP code.
+          if (!code && sessionEmail && sessionOtpEncrypted) {
+            // Invalidates previous OTP code.
+            await this.invalidateOtp(sessionOtpEncrypted, false)
 
-        // Requests a new OTP code.
-        if (!code && sessionEmail && sessionOtpEncrypted) {
-          // Invalidates previous OTP code.
-          await this.invalidateOtp(sessionOtpEncrypted, false)
+            // Reassigns email. (Required for OTP code generation.)
+            email = sessionEmail
+          }
 
-          // Reassigns email. (Required for OTP code generation.)
-          email = sessionEmail
+          // First Authentication part.
+          // OTP code is encrypted, stored in database and sent to the user via email.
+          if (!code) {
+            if (!email) {
+              throw new Error('Missing required email field.')
+            }
+            await this.validateEmail(email)
+
+            // Encrypts OTP code.
+            const otp = generateOtp({ ...this.codeGeneration })
+            const otpEncrypted = await encrypt(JSON.stringify({ email, ...otp }), this.secret)
+            const magicLink = generateMagicLink({
+              ...this.magicLinkGeneration,
+              param: this.codeField,
+              code: otpEncrypted,
+              request,
+            })
+
+            // Stores and sends OTP code.
+            await this.saveOtp(otpEncrypted)
+            await this.sendOtp(email, otp.code, magicLink, formData, request)
+
+            session.set(this.sessionEmailKey, email)
+            session.set(this.sessionOtpKey, otpEncrypted)
+            session.unset(options.sessionErrorKey)
+
+            throw redirect(options.successRedirect, {
+              headers: {
+                'Set-Cookie': await sessionStorage.commitSession(session),
+              },
+            })
+          }
         }
 
-        // First Authentication part.
-        // OTP code is encrypted, stored in database and sent to the user via email.
-        if (!code) {
-          if (!email) {
-            throw new Error('Missing required email field.')
+        if (isGet && this.magicLinkGeneration.enabled)) {
+          // Handles magic link.
+          const url = new URL(request.url)
+          if (url.pathname !== this.magicLinkGeneration.callbackPath) {
+            throw new Error('Magic link does not match expected URL.')
           }
-          await this.validateEmail(email)
 
-          // Encrypts OTP code.
-          const otp = generateOtp({ ...this.codeGeneration })
-          const otpEncrypted = await encrypt(
-            JSON.stringify({ email, ...otp }),
-            this.secret,
-          )
-
-          // Stores and sends OTP code.
-          await this.saveOtp(otpEncrypted)
-          await this.sendOtp(email, otp.code, formData)
-
-          session.set(this.sessionEmailKey, email)
-          session.set(this.sessionOtpKey, otpEncrypted)
-          session.unset(options.sessionErrorKey)
-
-          throw redirect(options.successRedirect, {
-            headers: {
-              'Set-Cookie': await sessionStorage.commitSession(session),
-            },
-          })
+          magicLink = decodeURIComponent(url.searchParams.get(this.codeField) ?? '')
         }
 
         // Second Authentication part.
+        // Either via Magic Link or OTP code submission.
+
         // OTP code is decrypted, validated and user will be authenticated.
-        if (code) {
+        if ((isPost && code) || (isGet && magicLink)) {
           if (!session.has(this.sessionEmailKey)) {
             throw new Error('Missing required email from Session.')
           }
@@ -330,11 +409,18 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
           }
 
           // Handles code validation.
-          await this.validateOtp(code, sessionOtpEncrypted)
+          if (isPost && code) {
+            await this.validateOtp(code, sessionOtpEncrypted)
+          }
+
+          if (isGet && magicLink) {
+            await this.validateMagicLink(magicLink, sessionOtpEncrypted)
+          }
+
           await this.invalidateOtp(sessionOtpEncrypted, false)
 
           // Gets and sets user data.
-          user = await this.verify({ email: sessionEmail, form: formData })
+          user = await this.verify({ email: sessionEmail, form: formData, magicLink, request })
 
           session.set(options.sessionKey, user)
           session.unset(this.sessionEmailKey)
@@ -393,22 +479,25 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
     await this.storeCode(code)
   }
 
-  private async sendOtp(email: string, code: string, form: FormData) {
+  private async sendOtp(email: string, code: string, magicLink: string | null, form: FormData, request: Request) {
     const user = await this.verify({
       email,
       code,
       form,
+      request,
     }).catch(() => null)
 
     await this.sendCode({
       email,
       code,
+      magicLink,
       user,
       form,
+      request,
     })
   }
 
-  private async validateOtp(code: string, sessionOtpEncrypted: string) {
+  private async validateOtpEncrypted(sessionOtpEncrypted: string) {
     // Retrieves encrypted OTP code from database.
     const dbPayload = await this.validateCode(sessionOtpEncrypted)
 
@@ -446,6 +535,13 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
       throw new Error('Code has expired.')
     }
 
+    return { otp, sessionOtp, dbPayload }
+  }
+
+  private async validateOtp(code: string, sessionOtpEncrypted: string) {
+    const validateOtpEncrypted = await this.validateOtpEncrypted(sessionOtpEncrypted)
+    const { otp, sessionOtp, dbPayload } = validateOtpEncrypted
+
     if (otp.code !== code) {
       // Updates the attempts count.
       await this.invalidateCode(
@@ -455,6 +551,19 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
       )
       throw new Error('Code is not valid.')
     }
+
+    if (otp.email !== sessionOtp.email) {
+      throw new Error('Code does not match provided email address.')
+    }
+  }
+
+  private async validateMagicLink(magicLink: string, sessionOtpEncrypted: string) {
+    if (magicLink !== sessionOtpEncrypted) {
+      throw new Error('Magic link does not match the expected signature.')
+    }
+
+    const validateOtpEncrypted = await this.validateOtpEncrypted(magicLink)
+    const { otp, sessionOtp } = validateOtpEncrypted
 
     if (otp.email !== sessionOtp.email) {
       throw new Error('Code does not match provided email address.')

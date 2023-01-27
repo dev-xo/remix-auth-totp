@@ -19,6 +19,7 @@
 - **🥳 Easy to Setup**. The Strategy will handle the entire Authentication flow for you.
 - **🔐 Secure**. The OTP code is encrypted and signed with a Secret Key.
 - **📚 One Source of Truth**. The database of your choice.
+- **📧 Magic Link built-in**. You can send a Magic Link to the user to authenticate with a simple click.
 - **🛡 Bulletproof**. Written in strict TypeScript with a high test coverage.
 - **🗂 Typed**. Ships with types included.
 - **🚀 Built on top of Remix Auth**. An amazing authentication library for Remix.
