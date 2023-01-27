@@ -164,7 +164,7 @@ authenticator.use(
     {
       secret: 'STRONG_SECRET_PLEASE_CHANGE_ME',
       storeCode: async (code) => {},
-      sendCode: async ({ email, code, user, ,magicLink, form, request }) => {},
+      sendCode: async ({ email, code, magicLink, user, form, request }) => {},
       validateCode: async (code) => {},
       invalidateCode: async (code, active, attempts) => {},
     },
