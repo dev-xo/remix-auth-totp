@@ -16,7 +16,7 @@
 
 ## Features
 
-- **🥳 Easy to Setup**. The Strategy will handle the entire Authentication flow for you.
+- **🥳 Easy to Setup**. The Strategy will handle the entire Authentication Flow for you.
 - **🔐 Secure**. The OTP code is encrypted and signed with a Secret Key.
 - **📚 One Source of Truth**. The database of your choice.
 - **🛡 Bulletproof**. Written in strict TypeScript with a high test coverage.
@@ -76,7 +76,7 @@ model Otp {
 
 ### Email Service
 
-We'll require an Email Service to send the OTP code to the user. I'll recommend [Sendinblue](https://www.sendinblue.com), it's free and does not require Credit Card for registration, either use. Feel free to use any Email Service of your choice like [Mailgun](https://www.mailgun.com/), [Sendgrid](https://sendgrid.com/), etc.
+We'll require an Email Service to send the OTP code to the user. I'll recommend [Sendinblue](https://www.sendinblue.com), it's free and does not require Credit Card for registration, either use. Feel free to use any other Email Service of your choice like [Mailgun](https://www.mailgun.com/), [Sendgrid](https://sendgrid.com/), etc.
 
 The goal is to have a sender function similar to the following one.
 
@@ -111,7 +111,7 @@ export async function sendEmail(body: SendEmailBody) {
 ### Session Storage
 
 We'll require to initialize a new Cookie Session Storage to work with.<br />
-The Session will be used to store the user data and everything related to the Authentication flow.
+The Session will be used to store the user data and everything related to the Authentication Flow.
 
 Create a file called `session.server.ts` wherever you want.<br />
 Paste the following code and replace the `secrets` property with a strong string into your `.env` file.
@@ -136,9 +136,9 @@ export const { getSession, commitSession, destroySession } = sessionStorage
 
 ### Creating the Strategy Instance
 
-Now that we have Database, Email Service and Session Storage ready, we can create the OTP Strategy instance. I'll divide this in a few small steps.
+Now that we have the Database, Email Service and Session Storage ready, we can create the OTP Strategy Instance. I'll divide this in a few small steps.
 
-**Step 1: Creating the Strategy instance.**
+**Step 1: Creating the Strategy Instance.**
 
 Create a file called `auth.server.ts` wherever you want.<br />
 Paste the following code and replace the `secret` property with a strong string into your `.env` file.
@@ -177,7 +177,7 @@ authenticator.use(
 The Strategy Instance requires the following options.
 It's important to note that `storeCode`, `sendCode`, `validateCode` and `invalidateCode` are all required.
 
-> Each of these functions can be extracted to a separate file, but for the sake of simplicity, we'll keep them in the same file.
+> Each of these functions can be extracted to a separate file, but for the sake of simplicity, we'll keep them in the same one.
 
 ```ts
 // app/services/auth.server.ts
@@ -222,7 +222,7 @@ authenticator.use(
 
     /**
      * Validates the OTP code.
-     * It should return a Promise<{ code: string, active: boolean }>.
+     * It should return a Promise<{ code: string, active: boolean, attempts: number }>.
      */
     validateCode: async (code) => {
       const otp = await db.otp.findUnique({
@@ -305,13 +305,11 @@ authenticator.use(
 )
 ```
 
-And that's it!
-
-Feel free to check the [Example Code](https://github.com/dev-xo/remix-auth-otp-stack) implementation, in case you wanna use it as a reference.
+And that's it! Feel free to check the [Example Code](https://github.com/dev-xo/remix-auth-otp-stack) implementation, in case you wanna use it as a reference.
 
 ### Auth Routes
 
-Last but not least, we'll need to create the routes that will handle the Authentication flow.
+Last but not least, we'll need to create the routes that will handle the Authentication Flow.
 Create the following files inside the `app/routes` folder.
 
 ```tsx
