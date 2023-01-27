@@ -71,7 +71,7 @@ export interface MagicLinkGenerationOptions {
 
   /**
    * The base Url for building the magic link url. If omitted, the baseUrl will be inferred from the request.
-   * @default ''
+   * @default undefined
    */
   baseUrl?: string
 
@@ -282,7 +282,7 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
 
   private readonly magicLinkGenerationDefaults = {
     enabled: true,
-    baseUrl: '',
+    baseUrl: undefined,
     callbackPath: '/magic-link',
   }
 
@@ -295,7 +295,7 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
     this.emailField = options.emailField ?? 'email'
     this.codeField = options.codeField ?? 'code'
     this.codeGeneration = options.codeGeneration ?? this.codeGenerationDefaults
-    this.magicLinkGeneration = options.magicLinkGeneration ?? this.magicLinkGenerationDefaults
+    this.magicLinkGeneration = { ...this.magicLinkGenerationDefaults, ...options.magicLinkGeneration }
     this.validateEmail = options.validateEmail ?? this.validateEmailDefaults
     this.storeCode = options.storeCode
     this.sendCode = options.sendCode

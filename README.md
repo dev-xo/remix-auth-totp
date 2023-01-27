@@ -589,7 +589,7 @@ export interface MagicLinkGenerationOptions {
 
   /**
    * The base Url for building the magic link url. If omitted, the baseUrl will be inferred from the request.
-   * @default ''
+   * @default undefined
    */
   baseUrl?: string
 

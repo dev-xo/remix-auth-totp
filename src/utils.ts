@@ -35,7 +35,7 @@ export function generateMagicLink(
     return undefined
   }
 
-  const url = new URL(options.callbackPath ?? '/', getBaseUrl(options.request))
+  const url = new URL(options.callbackPath ?? '/', options.baseUrl ?? getBaseUrl(options.request))
   url.searchParams.set(options.param, options.code)
 
   return url.toString()
