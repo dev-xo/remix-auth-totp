@@ -32,7 +32,7 @@ export function generateMagicLink(
   options: MagicLinkGenerationOptions & { param: string; code: string; request: Request }
 ) {
   if (!options.enabled) {
-    return null;
+    return undefined
   }
 
   const url = new URL(options.callbackPath ?? '/', getBaseUrl(options.request))

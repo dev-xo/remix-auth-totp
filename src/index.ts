@@ -65,8 +65,9 @@ export interface CodeGenerationOptions {
 export interface MagicLinkGenerationOptions {
   /**
    * Whether to enable the magic link feature.
+   * @default true
    */
-  enabled?: boolean;
+  enabled?: boolean
 
   /**
    * The base Url for building the magic link url. If omitted, the baseUrl will be inferred from the request.
@@ -106,7 +107,7 @@ export interface SendCodeOptions<User> {
   /**
    * The magic link url.
    */
-  magicLink: string | null
+  magicLink: string | undefined
 
   /**
    * The user object.
@@ -280,7 +281,7 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
   }
 
   private readonly magicLinkGenerationDefaults = {
-    enabled: false,
+    enabled: true,
     baseUrl: '',
     callbackPath: '/magic-link',
   }
@@ -479,10 +480,11 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
     await this.storeCode(code)
   }
 
-  private async sendOtp(email: string, code: string, magicLink: string | null, form: FormData, request: Request) {
+  private async sendOtp(email: string, code: string, magicLink: string | undefined, form: FormData, request: Request) {
     const user = await this.verify({
       email,
       code,
+      magicLink,
       form,
       request,
     }).catch(() => null)
