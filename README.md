@@ -19,6 +19,7 @@
 - **🥳 Easy to Setup**. The Strategy will handle the entire Authentication Flow for you.
 - **🔐 Secure**. The OTP code is encrypted and signed with a Secret Key.
 - **📚 One Source of Truth**. The database of your choice.
+- **📧 Magic Link Built-In**. Send a Magic Link to the user and authenticate it with a simple click.
 - **🛡 Bulletproof**. Written in strict TypeScript with a high test coverage.
 - **🗂 Typed**. Ships with types included.
 - **🚀 Built on top of Remix Auth**. An amazing authentication library for Remix.
@@ -33,7 +34,7 @@ Feel free to check and test it at [Remix Auth OTP Stack](https://remix-auth-otp.
 This Strategy uses a Passwordless Authentication Flow based on Email-Code validation.<br />
 
 The user will receive an email with a code that will be used to authenticate itself.<br />
-The code has just one use and it's valid for a short period of time, which makes it very secure.<br />
+The code has just a single use and it's valid for a short period of time, which makes it very secure.<br />
 
 Let's see how we can implement this Strategy for our Remix App.
 
@@ -163,11 +164,11 @@ authenticator.use(
     {
       secret: 'STRONG_SECRET_PLEASE_CHANGE_ME',
       storeCode: async (code) => {},
-      sendCode: async ({ email, code, user, form }) => {},
+      sendCode: async ({ email, code, magicLink, user, form, request }) => {},
       validateCode: async (code) => {},
-      invalidateCode: async (code) => {},
+      invalidateCode: async (code, active, attempts) => {},
     },
-    async ({ email, code, form }) => {},
+    async ({ email, code, form, magicLink, request }) => {},
   ),
 )
 ```
@@ -200,7 +201,7 @@ authenticator.use(
      * Sends the OTP code to the user.
      * It should return a Promise<void>.
      */
-    sendCode: async ({ email, code, user, form }) => {
+    sendCode: async ({ email, code, magicLink, user, form, request }) => {
       const sender = { name: 'Remix Auth', email: 'localhost@example.com' }
       const to = [{ email }]
       const subject = `Here's your OTP Code.`
@@ -212,6 +213,7 @@ authenticator.use(
             </head>
             <body>
               <h1>Code: ${code}</h1>
+              ${magicLink && `<p>Alternatively, you can click the Magic Link: ${magicLink}</p>`}
             </body>
           </html>
           `
@@ -258,7 +260,7 @@ authenticator.use(
         },
       })
     },
-    async ({ email, code, form }) => {},
+    async ({ email, code, magicLink, form, request }) => {},
   }),
 )
 ```
@@ -278,7 +280,17 @@ authenticator.use(
       // storeCode: async (code) => {},
       // ...
     },
-    async ({ email, code, form }) => {
+    async ({ email, code, magicLink, form, request }) => {
+      // You can determine whether the user is authenticating
+      // via OTP submission or Magic Link and run your own logic.
+      if (form) {
+        console.log('OTP code form submission.')
+      }
+
+      if (magicLink) {
+        console.log('Magic Link clicked.')
+      }
+
       // Gets user from database.
       // This is the right place to create a new user (if not exists).
       const user = await db.user.findFirst({
@@ -451,6 +463,25 @@ export async function action({ request }: DataFunctionArgs) {
 }
 ```
 
+```tsx
+// app/routes/magic-link.tsx
+import type { DataFunctionArgs } from '@remix-run/node'
+import { authenticator } from '~/services/auth.server'
+
+export async function loader({ request, params }: DataFunctionArgs) {
+  const user = await authenticator.isAuthenticated(request, {
+    successRedirect: '/account',
+  })
+
+  if (!user) {
+    await authenticator.authenticate('OTP', request, {
+      successRedirect: '/account',
+      failureRedirect: '/login',
+    })
+  }
+}
+```
+
 ## Options and Customization
 
 The Strategy includes a few options that can be customized.
@@ -469,7 +500,7 @@ authenticator.use(
       // Do something with the email.
     },
     // storeCode: async (code) => {},
-    // sendCode: async ({ email, code, user, form }) => {},
+    // sendCode: async ({ email, ... }) => {},
     // ...
   }),
 )
@@ -531,11 +562,45 @@ authenticator.use(
       // ... other options.
     },
     // storeCode: async (code) => {},
-    // sendCode: async ({ email, code, user, form }) => {},
+    // sendCode: async ({ email, ... }) => {},
     // ...
   }),
 )
 ```
+
+### Magic Link Generation
+
+The Magic Link is optional and enabled by default. You can decide to opt-out by setting the `enabled` option to `false`. Furthermore, the Magic Link can be customized via the `magicLinkGeneration` object in the OTPStrategy instance.
+
+The link generated will be in the format of `https://{baseUrl}{callbackPath}?{codeField}=<magic-link-code>`.
+
+```ts
+/**
+ * The Magic Link configuration.
+ */
+export interface MagicLinkGenerationOptions {
+  /**
+   * Whether to enable the Magic Link feature.
+   * @default true
+   */
+  enabled?: boolean
+
+  /**
+   * The base URL for building the Magic Link URL.
+   * If omitted, the `baseUrl` will be inferred from the request.
+   * @default undefined
+   */
+  baseUrl?: string
+
+  /**
+   * The path for the Magic Link callback.
+   * @default '/magic-link'
+   */
+  callbackPath?: string
+}
+```
+
+> **Note:** Just enabling the Magic Link feature is not enough, you will need to also [implement the `callbackPath` route](#auth-routes).
 
 ### More Options
 
@@ -579,6 +644,10 @@ export interface OTPStrategyOptions<User> {
 
 If you find this module useful, support it with a [Star ⭐](https://github.com/dev-xo/remix-auth-otp)<br />
 It helps the repository grow and gives me motivation to keep working on it. Thank you!
+
+### Acknowledgments
+
+Big thanks to [@w00fz](https://github.com/w00fz) for its amazing implementation of the Magic Link feature!
 
 ## License
 

@@ -1,4 +1,4 @@
-import type { CodeGenerationOptions } from './index'
+import type { CodeGenerationOptions, MagicLinkGenerationOptions } from './index'
 import crypto from 'crypto-js'
 import otpGenerator from 'otp-generator'
 
@@ -15,7 +15,7 @@ export async function decrypt(value: string, secret: string): Promise<string> {
 }
 
 /**
- * OTP.
+ * OTP Generation.
  */
 export function generateOtp(options: CodeGenerationOptions) {
   const code = otpGenerator.generate(options.length, { ...options })
@@ -25,4 +25,43 @@ export function generateOtp(options: CodeGenerationOptions) {
     code,
     createdAt,
   }
+}
+
+/**
+ * Magic Link Generation.
+ */
+export function generateMagicLink(
+  options: MagicLinkGenerationOptions & {
+    param: string
+    code: string
+    request: Request
+  },
+) {
+  if (!options.enabled) {
+    return undefined
+  }
+
+  const url = new URL(
+    options.callbackPath ?? '/',
+    options.baseUrl ?? getBaseUrl(options.request),
+  )
+  url.searchParams.set(options.param, options.code)
+
+  return url.toString()
+}
+
+export function getBaseUrl(request: Request) {
+  const host = request.headers.get('X-Forwarded-Host') ?? request.headers.get('host')
+
+  if (!host) {
+    throw new Error('Could not determine host.')
+  }
+
+  // If the host is localhost or ends with .local, use http.
+  const protocol =
+    ['localhost', '127.0.0.1'].includes(host) || host.match(/\.local(:?:\d+)?$/)
+      ? 'http'
+      : 'https'
+
+  return `${protocol}://${host}`
 }
