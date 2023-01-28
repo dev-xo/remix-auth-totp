@@ -46,6 +46,8 @@
     "remix-auth": "^3.4.0"
   },
   "devDependencies": {
+    "@commitlint/cli": "^17.4.2",
+    "@commitlint/config-conventional": "^17.4.2",
     "@remix-run/node": "^1.10.0",
     "@remix-run/server-runtime": "^1.10.0",
     "@types/crypto-js": "^4.1.1",
