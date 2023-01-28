@@ -64,24 +64,24 @@ export interface CodeGenerationOptions {
 }
 
 /**
- * The magic link configuration.
+ * The Magic Link configuration.
  */
 export interface MagicLinkGenerationOptions {
   /**
-   * Whether to enable the magic link feature.
+   * Whether to enable the Magic Link feature.
    * @default true
    */
   enabled?: boolean
 
   /**
-   * The base Url for building the magic link url.
+   * The base Url for building the Magic Link url.
    * If omitted, the baseUrl will be inferred from the request.
    * @default undefined
    */
   baseUrl?: string
 
   /**
-   * The path for the magic link callback.
+   * The path for the Magic Link callback.
    * @default '/magic-link'
    */
   callbackPath?: string
@@ -110,7 +110,7 @@ export interface SendCodeOptions<User> {
   code: string
 
   /**
-   * The magic link URL.
+   * The Magic Link URL.
    */
   magicLink?: string
 
@@ -185,7 +185,7 @@ export interface OTPStrategyOptions<User> {
   codeGeneration?: CodeGenerationOptions
 
   /**
-   * The magic link configuration.
+   * The Magic Link configuration.
    */
   magicLinkGeneration?: MagicLinkGenerationOptions
 
@@ -243,7 +243,7 @@ export interface OTPVerifyParams {
   code?: string
 
   /**
-   * The magic link URL used to trigger the authentication.
+   * The Magic Link URL used to trigger the authentication.
    */
   magicLink?: string
 
