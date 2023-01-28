@@ -74,7 +74,7 @@ export interface MagicLinkGenerationOptions {
   enabled?: boolean
 
   /**
-   * The base Url for building the Magic Link url.
+   * The base URL for building the Magic Link URL.
    * If omitted, the baseUrl will be inferred from the request.
    * @default undefined
    */
