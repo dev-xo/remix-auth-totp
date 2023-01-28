@@ -325,8 +325,8 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
       throw new Error('Missing required secret option.')
     }
 
-    const isPost = request.method === 'POST'
-    const isGet = request.method === 'GET'
+    const isPOST = request.method === 'POST'
+    const isGET = request.method === 'GET'
 
     // Initializes Session.
     const session = await sessionStorage.getSession(request.headers.get('Cookie'))
@@ -338,16 +338,17 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
 
     try {
       if (!user) {
-        if (!options.successRedirect) {
-          throw new Error('Missing required successRedirect option.')
-        }
-
         let email: string | undefined
         let code: string | undefined
         let magicLink: string | undefined
         let formData: FormData | undefined
 
-        if (isPost) {
+        if (!options.successRedirect) {
+          throw new Error('Missing required successRedirect option.')
+        }
+
+        // 1st Authentication phase.
+        if (isPOST) {
           formData = await request.formData()
           const form = Object.fromEntries(formData)
 
@@ -363,7 +364,6 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
             email = sessionEmail
           }
 
-          // 1st Authentication phase.
           if (!code) {
             if (!email) {
               throw new Error('Missing required email field.')
@@ -399,9 +399,10 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
           }
         }
 
-        if (isGet && this.magicLinkGeneration.enabled) {
+        // 2nd Authentication phase.
+        // Either via Magic Link or OTP code submission.
+        if (isGET && this.magicLinkGeneration.enabled) {
           const url = new URL(request.url)
-
           if (url.pathname !== this.magicLinkGeneration.callbackPath) {
             throw new Error('Magic link does not match expected URL.')
           }
@@ -409,9 +410,7 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
           magicLink = decodeURIComponent(url.searchParams.get(this.codeField) ?? '')
         }
 
-        // 2nd Authentication phase.
-        // Either via Magic Link or OTP code submission.
-        if ((isPost && code) || (isGet && magicLink)) {
+        if ((isPOST && code) || (isGET && magicLink)) {
           if (!session.has(this.sessionEmailKey)) {
             throw new Error('Missing required email from Session.')
           }
@@ -420,10 +419,10 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
           }
 
           // Handles validations.
-          if (isPost && code) {
+          if (isPOST && code) {
             await this.validateOtp(code, sessionOtpEncrypted)
           }
-          if (isGet && magicLink) {
+          if (isGET && magicLink) {
             await this.validateMagicLink(magicLink, sessionOtpEncrypted)
           }
 
