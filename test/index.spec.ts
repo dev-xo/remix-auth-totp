@@ -6,7 +6,7 @@ import { OTPStrategy } from '../src/index'
 import { encrypt, generateOtp } from '../src/utils'
 
 // Constants.
-const BASE_URL = 'localhost:3000'
+const HOST_URL = 'localhost:3000'
 const SECRET_ENV = 'SECRET'
 const OTP_DEFAULTS = {
   expiresAt: 1000 * 60 * 15,
@@ -56,7 +56,7 @@ describe('OTP Strategy', () => {
 
     test('Should throw an Error on missing required secret option.', async () => {
       // Creates Request.
-      const request = new Request(`${BASE_URL}`, {
+      const request = new Request(`${HOST_URL}`, {
         method: 'POST',
       })
 
@@ -85,7 +85,7 @@ describe('OTP Strategy', () => {
       formData.append('email', 'example@gmail.com')
 
       // Creates Request.
-      const request = new Request(`${BASE_URL}`, {
+      const request = new Request(`${HOST_URL}`, {
         method: 'POST',
         body: formData,
       })
@@ -136,11 +136,11 @@ describe('OTP Strategy', () => {
       // formData.append('code', otp.code)
 
       // Creates Request.
-      const request = new Request(`${BASE_URL}`, {
+      const request = new Request(`${HOST_URL}`, {
         method: 'POST',
         headers: {
           cookie: await sessionStorage.commitSession(session),
-          host: BASE_URL,
+          host: HOST_URL,
         },
         body: formData,
       })
@@ -188,11 +188,11 @@ describe('OTP Strategy', () => {
       // formData.append('code', otp.code)
 
       // Creates Request.
-      const request = new Request(`${BASE_URL}`, {
+      const request = new Request(`${HOST_URL}`, {
         method: 'POST',
         headers: {
           cookie: await sessionStorage.commitSession(session),
-          host: BASE_URL,
+          host: HOST_URL,
         },
         body: formData,
       })
@@ -221,17 +221,17 @@ describe('OTP Strategy', () => {
     })
   })
 
-  describe('[ Authentication 1st - Without OTP Code ]', () => {
+  describe('[ 1st Authentication Phase ]', () => {
     test('Should throw an Error on missing email.', async () => {
       // Sets up testing data.
       const formData = new FormData()
       formData.append('email', '')
 
       // Creates Request.
-      const request = new Request(`${BASE_URL}`, {
+      const request = new Request(`${HOST_URL}`, {
         method: 'POST',
         headers: {
-          host: BASE_URL,
+          host: HOST_URL,
         },
         body: formData,
       })
@@ -260,10 +260,10 @@ describe('OTP Strategy', () => {
       formData.append('email', 'invalid-email')
 
       // Creates Request.
-      const request = new Request(`${BASE_URL}`, {
+      const request = new Request(`${HOST_URL}`, {
         method: 'POST',
         headers: {
-          host: BASE_URL,
+          host: HOST_URL,
         },
         body: formData,
       })
@@ -294,10 +294,10 @@ describe('OTP Strategy', () => {
       formData.append('email', 'example@gmail.com')
 
       // Creates Request.
-      const request = new Request(`${BASE_URL}`, {
+      const request = new Request(`${HOST_URL}`, {
         method: 'POST',
         headers: {
-          host: BASE_URL,
+          host: HOST_URL,
         },
         body: formData,
       })
@@ -328,10 +328,10 @@ describe('OTP Strategy', () => {
       formData.append('email', 'example@gmail.com')
 
       // Creates Request.
-      const request = new Request(`${BASE_URL}`, {
+      const request = new Request(`${HOST_URL}`, {
         method: 'POST',
         headers: {
-          host: BASE_URL,
+          host: HOST_URL,
         },
         body: formData,
       })
@@ -362,10 +362,10 @@ describe('OTP Strategy', () => {
       formData.append('email', 'example@gmail.com')
 
       // Creates Request.
-      const request = new Request(`${BASE_URL}`, {
+      const request = new Request(`${HOST_URL}`, {
         method: 'POST',
         headers: {
-          host: BASE_URL,
+          host: HOST_URL,
         },
         body: formData,
       })
@@ -401,10 +401,10 @@ describe('OTP Strategy', () => {
       formData.append('email', 'example@gmail.com')
 
       // Creates Request.
-      const request = new Request(`${BASE_URL}`, {
+      const request = new Request(`${HOST_URL}`, {
         method: 'POST',
         headers: {
-          host: BASE_URL,
+          host: HOST_URL,
         },
         body: formData,
       })
@@ -427,7 +427,7 @@ describe('OTP Strategy', () => {
     })
   })
 
-  describe('[ Authentication 2nd - With OTP Code ]', () => {
+  describe('[ 2nd Authentication Phase ]', () => {
     test('Should throw an Error on missing email from Session.', async () => {
       verify.mockImplementation(() => Promise.resolve())
 
@@ -439,11 +439,11 @@ describe('OTP Strategy', () => {
       formData.append('code', otp.code)
 
       // Creates Request.
-      const request = new Request(`${BASE_URL}`, {
+      const request = new Request(`${HOST_URL}`, {
         method: 'POST',
         headers: {
           cookie: await sessionStorage.commitSession(session),
-          host: BASE_URL,
+          host: HOST_URL,
         },
         body: formData,
       })
@@ -487,11 +487,11 @@ describe('OTP Strategy', () => {
       formData.append('code', otp.code)
 
       // Creates Request.
-      const request = new Request(`${BASE_URL}`, {
+      const request = new Request(`${HOST_URL}`, {
         method: 'POST',
         headers: {
           cookie: await sessionStorage.commitSession(session),
-          host: BASE_URL,
+          host: HOST_URL,
         },
         body: formData,
       })
@@ -534,11 +534,11 @@ describe('OTP Strategy', () => {
       formData.append('code', otp.code)
 
       // Creates Request.
-      const request = new Request(`${BASE_URL}`, {
+      const request = new Request(`${HOST_URL}`, {
         method: 'POST',
         headers: {
           cookie: await sessionStorage.commitSession(session),
-          host: BASE_URL,
+          host: HOST_URL,
         },
         body: formData,
       })
@@ -585,11 +585,11 @@ describe('OTP Strategy', () => {
       formData.append('code', otp.code)
 
       // Creates Request.
-      const request = new Request(`${BASE_URL}`, {
+      const request = new Request(`${HOST_URL}`, {
         method: 'POST',
         headers: {
           cookie: await sessionStorage.commitSession(session),
-          host: BASE_URL,
+          host: HOST_URL,
         },
         body: formData,
       })
@@ -636,11 +636,11 @@ describe('OTP Strategy', () => {
       formData.append('code', 'invalid-code')
 
       // Creates Request.
-      const request = new Request(`${BASE_URL}`, {
+      const request = new Request(`${HOST_URL}`, {
         method: 'POST',
         headers: {
           cookie: await sessionStorage.commitSession(session),
-          host: BASE_URL,
+          host: HOST_URL,
         },
         body: formData,
       })
@@ -691,11 +691,11 @@ describe('OTP Strategy', () => {
       formData.append('code', otp.code)
 
       // Creates Request.
-      const request = new Request(`${BASE_URL}`, {
+      const request = new Request(`${HOST_URL}`, {
         method: 'POST',
         headers: {
           cookie: await sessionStorage.commitSession(session),
-          host: BASE_URL,
+          host: HOST_URL,
         },
         body: formData,
       })
@@ -742,11 +742,11 @@ describe('OTP Strategy', () => {
       formData.append('code', 'invalid-code')
 
       // Creates Request.
-      const request = new Request(`${BASE_URL}`, {
+      const request = new Request(`${HOST_URL}`, {
         method: 'POST',
         headers: {
           cookie: await sessionStorage.commitSession(session),
-          host: BASE_URL,
+          host: HOST_URL,
         },
         body: formData,
       })
@@ -798,11 +798,11 @@ describe('OTP Strategy', () => {
       formData.append('code', otp.code)
 
       // Creates Request.
-      const request = new Request(`${BASE_URL}`, {
+      const request = new Request(`${HOST_URL}`, {
         method: 'POST',
         headers: {
           cookie: await sessionStorage.commitSession(session),
-          host: BASE_URL,
+          host: HOST_URL,
         },
         body: formData,
       })
@@ -851,11 +851,11 @@ describe('OTP Strategy', () => {
       formData.append('code', otp.code)
 
       // Creates Request.
-      const request = new Request(`${BASE_URL}`, {
+      const request = new Request(`${HOST_URL}`, {
         method: 'POST',
         headers: {
           cookie: await sessionStorage.commitSession(session),
-          host: BASE_URL,
+          host: HOST_URL,
         },
         body: formData,
       })
@@ -901,11 +901,11 @@ describe('OTP Strategy', () => {
       formData.append('code', 'invalid-code')
 
       // Creates Request.
-      const request = new Request(`${BASE_URL}`, {
+      const request = new Request(`${HOST_URL}`, {
         method: 'POST',
         headers: {
           cookie: await sessionStorage.commitSession(session),
-          host: BASE_URL,
+          host: HOST_URL,
         },
         body: formData,
       })
@@ -951,11 +951,11 @@ describe('OTP Strategy', () => {
       formData.append('code', otp.code)
 
       // Creates Request.
-      const request = new Request(`${BASE_URL}`, {
+      const request = new Request(`${HOST_URL}`, {
         method: 'POST',
         headers: {
           cookie: await sessionStorage.commitSession(session),
-          host: BASE_URL,
+          host: HOST_URL,
         },
         body: formData,
       })
@@ -1007,11 +1007,11 @@ describe('OTP Strategy', () => {
       formData.append('code', otp.code)
 
       // Creates Request.
-      const request = new Request(`${BASE_URL}`, {
+      const request = new Request(`${HOST_URL}`, {
         method: 'POST',
         headers: {
           cookie: await sessionStorage.commitSession(session),
-          host: BASE_URL,
+          host: HOST_URL,
         },
         body: formData,
       })
