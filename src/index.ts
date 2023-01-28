@@ -403,8 +403,9 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
         // Either via Magic Link or OTP code submission.
         if (isGET && this.magicLinkGeneration.enabled) {
           const url = new URL(request.url)
+
           if (url.pathname !== this.magicLinkGeneration.callbackPath) {
-            throw new Error('Magic link does not match expected URL.')
+            throw new Error('Magic Link does not match expected path.')
           }
 
           magicLink = decodeURIComponent(url.searchParams.get(this.codeField) ?? '')
@@ -584,7 +585,7 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
 
   private async validateMagicLink(magicLink: string, sessionOtpEncrypted: string) {
     if (magicLink !== sessionOtpEncrypted) {
-      throw new Error('Magic Link does not match the expected signature.')
+      throw new Error('Magic Link does not match the expected Signature.')
     }
 
     const { otp, sessionOtp } = await this.validateOtpEncrypted(magicLink)

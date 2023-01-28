@@ -3,7 +3,7 @@ import { describe, afterEach, test, expect, vi } from 'vitest'
 import { createCookieSessionStorage } from '@remix-run/node'
 import { AuthenticateOptions, AuthorizationError } from 'remix-auth'
 import { OTPStrategy } from '../src/index'
-import { encrypt, generateOtp } from '../src/utils'
+import { encrypt, generateOtp, generateMagicLink } from '../src/utils'
 
 // Constants.
 const HOST_URL = 'localhost:3000'
@@ -15,6 +15,11 @@ const OTP_DEFAULTS = {
   lowerCaseAlphabets: false,
   upperCaseAlphabets: true,
   specialChars: false,
+}
+const MAGIC_LINK_DEFAULTS = {
+  enabled: true,
+  baseUrl: undefined,
+  callbackPath: '/magic-link',
 }
 
 // Authenticate Options.
@@ -78,964 +83,1097 @@ describe('OTP Strategy', () => {
         new AuthorizationError('Missing required secret option.'),
       )
     })
-
-    test('Should throw an Error on missing required successRedirect option.', async () => {
-      // Sets up testing data.
-      const formData = new FormData()
-      formData.append('email', 'example@gmail.com')
-
-      // Creates Request.
-      const request = new Request(`${HOST_URL}`, {
-        method: 'POST',
-        body: formData,
-      })
-
-      // Initializes Strategy.
-      const strategy = new OTPStrategy(
-        { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
-        verify,
-      )
-
-      const result = await strategy
-        .authenticate(request, sessionStorage, {
-          ...BASE_OPTIONS,
-          throwOnError: true,
-        })
-        .catch((error) => error)
-
-      // Asserts.
-      expect(result).toEqual(
-        new AuthorizationError('Missing required successRedirect option.'),
-      )
-    })
-  })
-
-  describe('[ Request new OTP Code ]', () => {
-    test('Should call invalidateCode function.', async () => {
-      verify.mockImplementation(() => Promise.resolve({ name: 'John Doe' }))
-
-      // Sets up testing data.
-      const email = 'example@gmail.com'
-      const otp = generateOtp({ ...OTP_DEFAULTS })
-      const otpEncrypted = await encrypt(
-        JSON.stringify({ email, ...otp }),
-        SECRET_ENV,
-      )
-
-      const session = await sessionStorage.getSession()
-      session.set('auth:email', email)
-      session.set('auth:otp', otpEncrypted)
-
-      // Updates mocked function.
-      validateCode.mockImplementation(() =>
-        Promise.resolve({ code: otpEncrypted, active: true }),
-      )
-
-      const formData = new FormData()
-      // OTP Code is not present in the form data.
-      // formData.append('code', otp.code)
-
-      // Creates Request.
-      const request = new Request(`${HOST_URL}`, {
-        method: 'POST',
-        headers: {
-          cookie: await sessionStorage.commitSession(session),
-          host: HOST_URL,
-        },
-        body: formData,
-      })
-
-      // Initializes Strategy.
-      const strategy = new OTPStrategy(
-        { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
-        verify,
-      )
-
-      await strategy
-        .authenticate(request, sessionStorage, {
-          ...BASE_OPTIONS,
-          successRedirect: '/',
-        })
-        .catch((error) => error)
-
-      // Asserts.
-      expect(invalidateCode).toHaveBeenCalledTimes(1)
-    })
-
-    test('Should reassign form email with the one stored in Session.', async () => {
-      verify.mockImplementation(() => Promise.resolve())
-
-      // Sets up testing data.
-      const email = 'reassigned@gmail.com'
-      const otp = generateOtp({ ...OTP_DEFAULTS })
-      const otpEncrypted = await encrypt(
-        JSON.stringify({ email, ...otp }),
-        SECRET_ENV,
-      )
-
-      let session = await sessionStorage.getSession()
-      session.set('auth:email', email)
-      session.set('auth:otp', otpEncrypted)
-
-      // Updates mocked function.
-      validateCode.mockImplementation(() =>
-        Promise.resolve({ code: otpEncrypted, active: true }),
-      )
-
-      const formData = new FormData()
-      formData.append('email', 'example@gmail.com')
-      // OTP Code is not present in the form data.
-      // formData.append('code', otp.code)
-
-      // Creates Request.
-      const request = new Request(`${HOST_URL}`, {
-        method: 'POST',
-        headers: {
-          cookie: await sessionStorage.commitSession(session),
-          host: HOST_URL,
-        },
-        body: formData,
-      })
-
-      // Initializes Strategy.
-      const strategy = new OTPStrategy(
-        { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
-        verify,
-      )
-
-      const result = (await strategy
-        .authenticate(request, sessionStorage, {
-          ...BASE_OPTIONS,
-          throwOnError: true,
-          successRedirect: '/',
-        })
-        .catch((error) => error)) as Response
-
-      // Gets values from Session.
-      session = await sessionStorage.getSession(
-        result.headers.get('Set-Cookie') ?? '',
-      )
-
-      // Asserts.
-      expect(email).toMatch(session.data['auth:email'])
-    })
   })
 
   describe('[ 1st Authentication Phase ]', () => {
-    test('Should throw an Error on missing email.', async () => {
-      // Sets up testing data.
-      const formData = new FormData()
-      formData.append('email', '')
+    describe('[ New OTP Request ]', () => {
+      test('Should call invalidateCode function.', async () => {
+        verify.mockImplementation(() => Promise.resolve({ name: 'John Doe' }))
 
-      // Creates Request.
-      const request = new Request(`${HOST_URL}`, {
-        method: 'POST',
-        headers: {
-          host: HOST_URL,
-        },
-        body: formData,
+        // Sets up testing data.
+        const email = 'example@gmail.com'
+        const otp = generateOtp({ ...OTP_DEFAULTS })
+        const otpEncrypted = await encrypt(
+          JSON.stringify({ email, ...otp }),
+          SECRET_ENV,
+        )
+
+        // Updates mocked function.
+        validateCode.mockImplementation(() =>
+          Promise.resolve({ code: otpEncrypted, active: true }),
+        )
+
+        const session = await sessionStorage.getSession()
+        session.set('auth:email', email)
+        session.set('auth:otp', otpEncrypted)
+
+        const formData = new FormData()
+        // OTP Code is not present in the form data.
+        // formData.append('code', otp.code)
+
+        // Creates Request.
+        const request = new Request(`${HOST_URL}`, {
+          method: 'POST',
+          headers: {
+            cookie: await sessionStorage.commitSession(session),
+            host: HOST_URL,
+          },
+          body: formData,
+        })
+
+        // Initializes Strategy.
+        const strategy = new OTPStrategy(
+          { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
+          verify,
+        )
+
+        await strategy
+          .authenticate(request, sessionStorage, {
+            ...BASE_OPTIONS,
+            successRedirect: '/',
+          })
+          .catch((error) => error)
+
+        // Asserts.
+        expect(invalidateCode).toHaveBeenCalledTimes(1)
       })
 
-      // Initializes Strategy.
-      const strategy = new OTPStrategy(
-        { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
-        verify,
-      )
+      test('Should reassign form email with the one stored in Session.', async () => {
+        verify.mockImplementation(() => Promise.resolve())
 
-      const result = await strategy
-        .authenticate(request, sessionStorage, {
-          ...BASE_OPTIONS,
-          throwOnError: true,
-          successRedirect: '/',
+        // Sets up testing data.
+        const email = 'reassigned@gmail.com'
+        const otp = generateOtp({ ...OTP_DEFAULTS })
+        const otpEncrypted = await encrypt(
+          JSON.stringify({ email, ...otp }),
+          SECRET_ENV,
+        )
+
+        // Updates mocked function.
+        validateCode.mockImplementation(() =>
+          Promise.resolve({ code: otpEncrypted, active: true }),
+        )
+
+        let session = await sessionStorage.getSession()
+        session.set('auth:email', email)
+        session.set('auth:otp', otpEncrypted)
+
+        const formData = new FormData()
+        formData.append('email', 'example@gmail.com')
+        // OTP Code is not present in the form data.
+        // formData.append('code', otp.code)
+
+        // Creates Request.
+        const request = new Request(`${HOST_URL}`, {
+          method: 'POST',
+          headers: {
+            cookie: await sessionStorage.commitSession(session),
+            host: HOST_URL,
+          },
+          body: formData,
         })
-        .catch((error) => error)
 
-      // Asserts.
-      expect(result).toEqual(new AuthorizationError('Missing required email field.'))
+        // Initializes Strategy.
+        const strategy = new OTPStrategy(
+          { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
+          verify,
+        )
+
+        const result = (await strategy
+          .authenticate(request, sessionStorage, {
+            ...BASE_OPTIONS,
+            throwOnError: true,
+            successRedirect: '/',
+          })
+          .catch((error) => error)) as Response
+
+        // Gets values from Session.
+        session = await sessionStorage.getSession(
+          result.headers.get('Set-Cookie') ?? '',
+        )
+
+        // Asserts.
+        expect(email).toMatch(session.data['auth:email'])
+      })
     })
 
-    test('Should throw an Error on invalid email.', async () => {
-      // Sets up testing data.
-      const formData = new FormData()
-      formData.append('email', 'invalid-email')
+    describe('[ OTP Generation ]', () => {
+      test('Should throw an Error on missing required successRedirect option.', async () => {
+        // Sets up testing data.
+        const formData = new FormData()
+        formData.append('email', 'example@gmail.com')
 
-      // Creates Request.
-      const request = new Request(`${HOST_URL}`, {
-        method: 'POST',
-        headers: {
-          host: HOST_URL,
-        },
-        body: formData,
+        // Creates Request.
+        const request = new Request(`${HOST_URL}`, {
+          method: 'POST',
+          body: formData,
+        })
+
+        // Initializes Strategy.
+        const strategy = new OTPStrategy(
+          { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
+          verify,
+        )
+
+        const result = await strategy
+          .authenticate(request, sessionStorage, {
+            ...BASE_OPTIONS,
+            throwOnError: true,
+          })
+          .catch((error) => error)
+
+        // Asserts.
+        expect(result).toEqual(
+          new AuthorizationError('Missing required successRedirect option.'),
+        )
       })
 
-      // Initializes Strategy.
-      const strategy = new OTPStrategy(
-        { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
-        verify,
-      )
+      test('Should throw an Error on missing email.', async () => {
+        // Sets up testing data.
+        const formData = new FormData()
+        formData.append('email', '')
 
-      const result = await strategy
-        .authenticate(request, sessionStorage, {
-          ...BASE_OPTIONS,
-          throwOnError: true,
-          successRedirect: '/',
+        // Creates Request.
+        const request = new Request(`${HOST_URL}`, {
+          method: 'POST',
+          headers: {
+            host: HOST_URL,
+          },
+          body: formData,
         })
-        .catch((error) => error)
 
-      // Asserts.
-      expect(result).toEqual(new AuthorizationError('Invalid email address.'))
-    })
+        // Initializes Strategy.
+        const strategy = new OTPStrategy(
+          { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
+          verify,
+        )
 
-    test('Should call storeCode function.', async () => {
-      verify.mockImplementation(() => Promise.resolve({}))
+        const result = await strategy
+          .authenticate(request, sessionStorage, {
+            ...BASE_OPTIONS,
+            throwOnError: true,
+            successRedirect: '/',
+          })
+          .catch((error) => error)
 
-      // Sets up testing data.
-      const formData = new FormData()
-      formData.append('email', 'example@gmail.com')
-
-      // Creates Request.
-      const request = new Request(`${HOST_URL}`, {
-        method: 'POST',
-        headers: {
-          host: HOST_URL,
-        },
-        body: formData,
+        // Asserts.
+        expect(result).toEqual(
+          new AuthorizationError('Missing required email field.'),
+        )
       })
 
-      // Initializes Strategy.
-      const strategy = new OTPStrategy(
-        { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
-        verify,
-      )
+      test('Should throw an Error on invalid email.', async () => {
+        // Sets up testing data.
+        const formData = new FormData()
+        formData.append('email', 'invalid-email')
 
-      await strategy
-        .authenticate(request, sessionStorage, {
-          ...BASE_OPTIONS,
-          throwOnError: true,
-          successRedirect: '/',
+        // Creates Request.
+        const request = new Request(`${HOST_URL}`, {
+          method: 'POST',
+          headers: {
+            host: HOST_URL,
+          },
+          body: formData,
         })
-        .catch((error) => error)
 
-      // Asserts.
-      expect(storeCode).toHaveBeenCalledTimes(1)
-    })
+        // Initializes Strategy.
+        const strategy = new OTPStrategy(
+          { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
+          verify,
+        )
 
-    test('Should call sendCode function.', async () => {
-      verify.mockImplementation(() => Promise.resolve({}))
+        const result = await strategy
+          .authenticate(request, sessionStorage, {
+            ...BASE_OPTIONS,
+            throwOnError: true,
+            successRedirect: '/',
+          })
+          .catch((error) => error)
 
-      // Sets up testing data.
-      const formData = new FormData()
-      formData.append('email', 'example@gmail.com')
-
-      // Creates Request.
-      const request = new Request(`${HOST_URL}`, {
-        method: 'POST',
-        headers: {
-          host: HOST_URL,
-        },
-        body: formData,
+        // Asserts.
+        expect(result).toEqual(new AuthorizationError('Invalid email address.'))
       })
 
-      // Initializes Strategy.
-      const strategy = new OTPStrategy(
-        { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
-        verify,
-      )
+      test('Should call storeCode function.', async () => {
+        verify.mockImplementation(() => Promise.resolve({}))
 
-      await strategy
-        .authenticate(request, sessionStorage, {
-          ...BASE_OPTIONS,
-          throwOnError: true,
-          successRedirect: '/',
+        // Sets up testing data.
+        const formData = new FormData()
+        formData.append('email', 'example@gmail.com')
+
+        // Creates Request.
+        const request = new Request(`${HOST_URL}`, {
+          method: 'POST',
+          headers: {
+            host: HOST_URL,
+          },
+          body: formData,
         })
-        .catch((error) => error)
 
-      // Asserts.
-      expect(sendCode).toHaveBeenCalledTimes(1)
-    })
+        // Initializes Strategy.
+        const strategy = new OTPStrategy(
+          { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
+          verify,
+        )
 
-    test('Should contain auth:email and auth:otp properties in Session.', async () => {
-      verify.mockImplementation(() => Promise.resolve({}))
+        await strategy
+          .authenticate(request, sessionStorage, {
+            ...BASE_OPTIONS,
+            throwOnError: true,
+            successRedirect: '/',
+          })
+          .catch((error) => error)
 
-      // Sets up testing data.
-      const formData = new FormData()
-      formData.append('email', 'example@gmail.com')
-
-      // Creates Request.
-      const request = new Request(`${HOST_URL}`, {
-        method: 'POST',
-        headers: {
-          host: HOST_URL,
-        },
-        body: formData,
+        // Asserts.
+        expect(storeCode).toHaveBeenCalledTimes(1)
       })
 
-      // Initializes Strategy.
-      const strategy = new OTPStrategy(
-        { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
-        verify,
-      )
+      test('Should call sendCode function.', async () => {
+        verify.mockImplementation(() => Promise.resolve({}))
 
-      const result = (await strategy
-        .authenticate(request, sessionStorage, {
-          ...BASE_OPTIONS,
-          successRedirect: '/',
+        // Sets up testing data.
+        const formData = new FormData()
+        formData.append('email', 'example@gmail.com')
+
+        // Creates Request.
+        const request = new Request(`${HOST_URL}`, {
+          method: 'POST',
+          headers: {
+            host: HOST_URL,
+          },
+          body: formData,
         })
-        .catch((error) => error)) as Response
 
-      // Gets values from Session.
-      const session = await sessionStorage.getSession(
-        result.headers.get('Set-Cookie') ?? '',
-      )
+        // Initializes Strategy.
+        const strategy = new OTPStrategy(
+          { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
+          verify,
+        )
 
-      // Asserts.
-      expect(session.data).toHaveProperty('auth:email')
-      expect(session.data).toHaveProperty('auth:otp')
-    })
+        await strategy
+          .authenticate(request, sessionStorage, {
+            ...BASE_OPTIONS,
+            throwOnError: true,
+            successRedirect: '/',
+          })
+          .catch((error) => error)
 
-    test('Should contain Location header pointing to provided successRedirect url.', async () => {
-      verify.mockImplementation(() => Promise.resolve({}))
-
-      // Sets up testing data.
-      const formData = new FormData()
-      formData.append('email', 'example@gmail.com')
-
-      // Creates Request.
-      const request = new Request(`${HOST_URL}`, {
-        method: 'POST',
-        headers: {
-          host: HOST_URL,
-        },
-        body: formData,
+        // Asserts.
+        expect(sendCode).toHaveBeenCalledTimes(1)
       })
 
-      // Initializes Strategy.
-      const strategy = new OTPStrategy(
-        { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
-        verify,
-      )
+      test('Should contain auth:email and auth:otp properties in Session.', async () => {
+        verify.mockImplementation(() => Promise.resolve({}))
 
-      const result = (await strategy
-        .authenticate(request, sessionStorage, {
-          ...BASE_OPTIONS,
-          successRedirect: '/verify',
+        // Sets up testing data.
+        const formData = new FormData()
+        formData.append('email', 'example@gmail.com')
+
+        // Creates Request.
+        const request = new Request(`${HOST_URL}`, {
+          method: 'POST',
+          headers: {
+            host: HOST_URL,
+          },
+          body: formData,
         })
-        .catch((error) => error)) as Response
 
-      // Asserts.
-      expect(result.headers.get('Location')).toMatch('/verify')
+        // Initializes Strategy.
+        const strategy = new OTPStrategy(
+          { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
+          verify,
+        )
+
+        const result = (await strategy
+          .authenticate(request, sessionStorage, {
+            ...BASE_OPTIONS,
+            successRedirect: '/',
+          })
+          .catch((error) => error)) as Response
+
+        // Gets values from Session.
+        const session = await sessionStorage.getSession(
+          result.headers.get('Set-Cookie') ?? '',
+        )
+
+        // Asserts.
+        expect(session.data).toHaveProperty('auth:email')
+        expect(session.data).toHaveProperty('auth:otp')
+      })
+
+      test('Should contain Location header pointing to provided successRedirect url.', async () => {
+        verify.mockImplementation(() => Promise.resolve({}))
+
+        // Sets up testing data.
+        const formData = new FormData()
+        formData.append('email', 'example@gmail.com')
+
+        // Creates Request.
+        const request = new Request(`${HOST_URL}`, {
+          method: 'POST',
+          headers: {
+            host: HOST_URL,
+          },
+          body: formData,
+        })
+
+        // Initializes Strategy.
+        const strategy = new OTPStrategy(
+          { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
+          verify,
+        )
+
+        const result = (await strategy
+          .authenticate(request, sessionStorage, {
+            ...BASE_OPTIONS,
+            successRedirect: '/verify',
+          })
+          .catch((error) => error)) as Response
+
+        // Asserts.
+        expect(result.headers.get('Location')).toMatch('/verify')
+      })
     })
   })
 
   describe('[ 2nd Authentication Phase ]', () => {
-    test('Should throw an Error on missing email from Session.', async () => {
-      verify.mockImplementation(() => Promise.resolve())
+    describe('[ GET Request ]', () => {
+      test('Should throw an Error on invalid OTP code for Magic Link.', async () => {
+        verify.mockImplementation(() => Promise.resolve())
 
-      // Sets up testing data.
-      const session = await sessionStorage.getSession()
-      const otp = generateOtp({ ...OTP_DEFAULTS })
+        // Sets up testing data.
+        const email = 'example@gmail.com'
+        const otp = generateOtp({ ...OTP_DEFAULTS })
+        const otpEncrypted = await encrypt(
+          JSON.stringify({ email, ...otp }),
+          SECRET_ENV,
+        )
+        const otpEncryptedTwo = await encrypt(
+          JSON.stringify({ email, ...otp }),
+          SECRET_ENV,
+        )
+        const magicLink = generateMagicLink({
+          ...MAGIC_LINK_DEFAULTS,
+          param: 'code',
+          code: otpEncryptedTwo,
+          request: new Request(HOST_URL, { headers: { host: HOST_URL } }),
+        })
 
-      const formData = new FormData()
-      formData.append('code', otp.code)
+        // Updates mocked function.
+        validateCode.mockImplementation(() =>
+          Promise.resolve({ code: otpEncrypted, active: true }),
+        )
 
-      // Creates Request.
-      const request = new Request(`${HOST_URL}`, {
-        method: 'POST',
-        headers: {
-          cookie: await sessionStorage.commitSession(session),
-          host: HOST_URL,
-        },
-        body: formData,
+        const session = await sessionStorage.getSession()
+        session.set('auth:email', email)
+        session.set('auth:otp', otpEncrypted)
+
+        // Creates Request.
+        const request = new Request(`${magicLink}`, {
+          method: 'GET',
+          headers: {
+            cookie: await sessionStorage.commitSession(session),
+          },
+        })
+
+        // Initializes Strategy.
+        const strategy = new OTPStrategy(
+          { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
+          verify,
+        )
+
+        const result = (await strategy
+          .authenticate(request, sessionStorage, {
+            ...BASE_OPTIONS,
+            throwOnError: true,
+            successRedirect: '/account',
+          })
+          .catch((error) => error)) as Response
+
+        // Asserts.
+        expect(result).toEqual(
+          new AuthorizationError(
+            'Magic Link does not match the expected Signature.',
+          ),
+        )
       })
 
-      // Initializes Strategy.
-      const strategy = new OTPStrategy(
-        { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
-        verify,
-      )
+      test('Should throw an Error on invalid OTP email.', async () => {
+        verify.mockImplementation(() => Promise.resolve())
 
-      const result = await strategy
-        .authenticate(request, sessionStorage, {
-          ...BASE_OPTIONS,
-          throwOnError: true,
-          successRedirect: '/',
+        // Sets up testing data.
+        const email = 'example@gmail.com'
+        const otp = generateOtp({ ...OTP_DEFAULTS })
+        const otpEncrypted = await encrypt(
+          JSON.stringify({ email, ...otp }),
+          SECRET_ENV,
+        )
+        const magicLink = generateMagicLink({
+          ...MAGIC_LINK_DEFAULTS,
+          param: 'code',
+          code: otpEncrypted,
+          request: new Request(HOST_URL, { headers: { host: HOST_URL } }),
         })
-        .catch((error) => error)
 
-      // Asserts.
-      expect(result).toEqual(
-        new AuthorizationError('Missing required email from Session.'),
-      )
+        const databaseOtpEncrypted = await encrypt(
+          JSON.stringify({ email: 'not-example@gmail.com', ...otp }),
+          SECRET_ENV,
+        )
+
+        // Updates mocked function.
+        validateCode.mockImplementation(() =>
+          Promise.resolve({ code: databaseOtpEncrypted, active: true }),
+        )
+
+        const session = await sessionStorage.getSession()
+        session.set('auth:email', email)
+        session.set('auth:otp', otpEncrypted)
+
+        // Creates Request.
+        const request = new Request(`${magicLink}`, {
+          method: 'GET',
+          headers: {
+            cookie: await sessionStorage.commitSession(session),
+          },
+        })
+
+        // Initializes Strategy.
+        const strategy = new OTPStrategy(
+          { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
+          verify,
+        )
+
+        const result = (await strategy
+          .authenticate(request, sessionStorage, {
+            ...BASE_OPTIONS,
+            throwOnError: true,
+            successRedirect: '/account',
+          })
+          .catch((error) => error)) as Response
+
+        // Asserts.
+        expect(result).toEqual(
+          new AuthorizationError('Code does not match provided email address.'),
+        )
+      })
+
+      test('Should contain Location header pointing to provided failureRedirect url.', async () => {
+        verify.mockImplementation(() => Promise.resolve())
+
+        // Sets up testing data.
+        const email = 'example@gmail.com'
+        const otp = generateOtp({ ...OTP_DEFAULTS })
+        const otpEncrypted = await encrypt(
+          JSON.stringify({ email, ...otp }),
+          SECRET_ENV,
+        )
+        const otpEncryptedTwo = await encrypt(
+          JSON.stringify({ email, ...otp }),
+          SECRET_ENV,
+        )
+        const magicLink = generateMagicLink({
+          ...MAGIC_LINK_DEFAULTS,
+          param: 'code',
+          code: otpEncryptedTwo,
+          request: new Request(HOST_URL, { headers: { host: HOST_URL } }),
+        })
+
+        // Updates mocked function.
+        validateCode.mockImplementation(() =>
+          Promise.resolve({ code: otpEncrypted, active: true }),
+        )
+
+        const session = await sessionStorage.getSession()
+        session.set('auth:email', email)
+        session.set('auth:otp', otpEncrypted)
+
+        // Creates Request.
+        const request = new Request(`${magicLink}`, {
+          method: 'GET',
+          headers: {
+            cookie: await sessionStorage.commitSession(session),
+          },
+        })
+
+        // Initializes Strategy.
+        const strategy = new OTPStrategy(
+          { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
+          verify,
+        )
+
+        const result = (await strategy
+          .authenticate(request, sessionStorage, {
+            ...BASE_OPTIONS,
+            successRedirect: '/account',
+            failureRedirect: '/login',
+          })
+          .catch((error) => error)) as Response
+
+        // Asserts.
+        expect(result.headers.get('Location')).toMatch('/login')
+      })
     })
 
-    test('Should call validateCode function.', async () => {
-      verify.mockImplementation(() => Promise.resolve())
+    describe('[ POST Request ]', () => {
+      test('Should throw an Error on missing email from Session.', async () => {
+        verify.mockImplementation(() => Promise.resolve())
 
-      // Sets up testing data.
-      const email = 'example@gmail.com'
-      const otp = generateOtp({ ...OTP_DEFAULTS })
-      const otpEncrypted = await encrypt(
-        JSON.stringify({ email, ...otp }),
-        SECRET_ENV,
-      )
+        // Sets up testing data.
+        const session = await sessionStorage.getSession()
+        const otp = generateOtp({ ...OTP_DEFAULTS })
 
-      const session = await sessionStorage.getSession()
-      session.set('auth:email', email)
-      session.set('auth:otp', otpEncrypted)
+        const formData = new FormData()
+        formData.append('code', otp.code)
 
-      const formData = new FormData()
-      formData.append('code', otp.code)
+        // Creates Request.
+        const request = new Request(`${HOST_URL}`, {
+          method: 'POST',
+          headers: {
+            cookie: await sessionStorage.commitSession(session),
+            host: HOST_URL,
+          },
+          body: formData,
+        })
 
-      // Creates Request.
-      const request = new Request(`${HOST_URL}`, {
-        method: 'POST',
-        headers: {
-          cookie: await sessionStorage.commitSession(session),
-          host: HOST_URL,
-        },
-        body: formData,
+        // Initializes Strategy.
+        const strategy = new OTPStrategy(
+          { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
+          verify,
+        )
+
+        const result = await strategy
+          .authenticate(request, sessionStorage, {
+            ...BASE_OPTIONS,
+            throwOnError: true,
+            successRedirect: '/',
+          })
+          .catch((error) => error)
+
+        // Asserts.
+        expect(result).toEqual(
+          new AuthorizationError('Missing required email from Session.'),
+        )
       })
 
-      // Initializes Strategy.
-      const strategy = new OTPStrategy(
-        { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
-        verify,
-      )
+      test('Should call validateCode function.', async () => {
+        verify.mockImplementation(() => Promise.resolve())
 
-      await strategy
-        .authenticate(request, sessionStorage, {
-          ...BASE_OPTIONS,
-          throwOnError: true,
-          successRedirect: '/',
+        // Sets up testing data.
+        const email = 'example@gmail.com'
+        const otp = generateOtp({ ...OTP_DEFAULTS })
+        const otpEncrypted = await encrypt(
+          JSON.stringify({ email, ...otp }),
+          SECRET_ENV,
+        )
+
+        const session = await sessionStorage.getSession()
+        session.set('auth:email', email)
+        session.set('auth:otp', otpEncrypted)
+
+        const formData = new FormData()
+        formData.append('code', otp.code)
+
+        // Creates Request.
+        const request = new Request(`${HOST_URL}`, {
+          method: 'POST',
+          headers: {
+            cookie: await sessionStorage.commitSession(session),
+            host: HOST_URL,
+          },
+          body: formData,
         })
-        .catch((error) => error)
 
-      // Asserts.
-      expect(validateCode).toHaveBeenCalledTimes(1)
-    })
+        // Initializes Strategy.
+        const strategy = new OTPStrategy(
+          { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
+          verify,
+        )
 
-    test('Should throw an Error on missing OTP code from database.', async () => {
-      verify.mockImplementation(() => Promise.resolve())
-      validateCode.mockImplementation(() => Promise.resolve(null))
+        await strategy
+          .authenticate(request, sessionStorage, {
+            ...BASE_OPTIONS,
+            throwOnError: true,
+            successRedirect: '/',
+          })
+          .catch((error) => error)
 
-      // Sets up testing data.
-      const email = 'example@gmail.com'
-      const otp = generateOtp({ ...OTP_DEFAULTS })
-      const otpEncrypted = await encrypt(
-        JSON.stringify({ email, ...otp }),
-        SECRET_ENV,
-      )
-
-      const session = await sessionStorage.getSession()
-      session.set('auth:email', email)
-      session.set('auth:otp', otpEncrypted)
-
-      const formData = new FormData()
-      formData.append('code', otp.code)
-
-      // Creates Request.
-      const request = new Request(`${HOST_URL}`, {
-        method: 'POST',
-        headers: {
-          cookie: await sessionStorage.commitSession(session),
-          host: HOST_URL,
-        },
-        body: formData,
+        // Asserts.
+        expect(validateCode).toHaveBeenCalledTimes(1)
       })
 
-      // Initializes Strategy.
-      const strategy = new OTPStrategy(
-        { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
-        verify,
-      )
+      test('Should throw an Error on missing OTP code from database.', async () => {
+        verify.mockImplementation(() => Promise.resolve())
+        validateCode.mockImplementation(() => Promise.resolve(null))
 
-      const result = await strategy
-        .authenticate(request, sessionStorage, {
-          ...BASE_OPTIONS,
-          throwOnError: true,
-          successRedirect: '/',
+        // Sets up testing data.
+        const email = 'example@gmail.com'
+        const otp = generateOtp({ ...OTP_DEFAULTS })
+        const otpEncrypted = await encrypt(
+          JSON.stringify({ email, ...otp }),
+          SECRET_ENV,
+        )
+
+        const session = await sessionStorage.getSession()
+        session.set('auth:email', email)
+        session.set('auth:otp', otpEncrypted)
+
+        const formData = new FormData()
+        formData.append('code', otp.code)
+
+        // Creates Request.
+        const request = new Request(`${HOST_URL}`, {
+          method: 'POST',
+          headers: {
+            cookie: await sessionStorage.commitSession(session),
+            host: HOST_URL,
+          },
+          body: formData,
         })
-        .catch((error) => error)
 
-      // Asserts.
-      expect(result).toEqual(new AuthorizationError('OTP code not found.'))
-    })
+        // Initializes Strategy.
+        const strategy = new OTPStrategy(
+          { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
+          verify,
+        )
 
-    test('Should throw an Error on inactive OTP code.', async () => {
-      verify.mockImplementation(() => Promise.resolve())
+        const result = await strategy
+          .authenticate(request, sessionStorage, {
+            ...BASE_OPTIONS,
+            throwOnError: true,
+            successRedirect: '/',
+          })
+          .catch((error) => error)
 
-      // Sets up testing data.
-      const email = 'example@gmail.com'
-      const otp = generateOtp({ ...OTP_DEFAULTS })
-      const otpEncrypted = await encrypt(
-        JSON.stringify({ email, ...otp }),
-        SECRET_ENV,
-      )
-
-      const session = await sessionStorage.getSession()
-      session.set('auth:email', email)
-      session.set('auth:otp', otpEncrypted)
-
-      // Updates mocked function.
-      validateCode.mockImplementation(() =>
-        Promise.resolve({ code: otpEncrypted, active: false }),
-      )
-
-      const formData = new FormData()
-      formData.append('code', otp.code)
-
-      // Creates Request.
-      const request = new Request(`${HOST_URL}`, {
-        method: 'POST',
-        headers: {
-          cookie: await sessionStorage.commitSession(session),
-          host: HOST_URL,
-        },
-        body: formData,
+        // Asserts.
+        expect(result).toEqual(new AuthorizationError('OTP code not found.'))
       })
 
-      // Initializes Strategy.
-      const strategy = new OTPStrategy(
-        { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
-        verify,
-      )
+      test('Should throw an Error on inactive OTP code.', async () => {
+        verify.mockImplementation(() => Promise.resolve())
 
-      const result = await strategy
-        .authenticate(request, sessionStorage, {
-          ...BASE_OPTIONS,
-          throwOnError: true,
-          successRedirect: '/',
+        // Sets up testing data.
+        const email = 'example@gmail.com'
+        const otp = generateOtp({ ...OTP_DEFAULTS })
+        const otpEncrypted = await encrypt(
+          JSON.stringify({ email, ...otp }),
+          SECRET_ENV,
+        )
+
+        // Updates mocked function.
+        validateCode.mockImplementation(() =>
+          Promise.resolve({ code: otpEncrypted, active: false }),
+        )
+
+        const session = await sessionStorage.getSession()
+        session.set('auth:email', email)
+        session.set('auth:otp', otpEncrypted)
+
+        const formData = new FormData()
+        formData.append('code', otp.code)
+
+        // Creates Request.
+        const request = new Request(`${HOST_URL}`, {
+          method: 'POST',
+          headers: {
+            cookie: await sessionStorage.commitSession(session),
+            host: HOST_URL,
+          },
+          body: formData,
         })
-        .catch((error) => error)
 
-      // Asserts.
-      expect(result).toEqual(new AuthorizationError('Code is not active.'))
-    })
+        // Initializes Strategy.
+        const strategy = new OTPStrategy(
+          { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
+          verify,
+        )
 
-    test('Should throw an Error on max OTP code attempts.', async () => {
-      verify.mockImplementation(() => Promise.resolve())
+        const result = await strategy
+          .authenticate(request, sessionStorage, {
+            ...BASE_OPTIONS,
+            throwOnError: true,
+            successRedirect: '/',
+          })
+          .catch((error) => error)
 
-      // Sets up testing data.
-      const email = 'example@gmail.com'
-      const otp = generateOtp({ ...OTP_DEFAULTS })
-      const otpEncrypted = await encrypt(
-        JSON.stringify({ email, ...otp }),
-        SECRET_ENV,
-      )
-
-      const session = await sessionStorage.getSession()
-      session.set('auth:email', email)
-      session.set('auth:otp', otpEncrypted)
-
-      // Updates mocked function.
-      validateCode.mockImplementation(() =>
-        Promise.resolve({ code: otpEncrypted, active: true, attempts: 4 }),
-      )
-
-      const formData = new FormData()
-      formData.append('code', 'invalid-code')
-
-      // Creates Request.
-      const request = new Request(`${HOST_URL}`, {
-        method: 'POST',
-        headers: {
-          cookie: await sessionStorage.commitSession(session),
-          host: HOST_URL,
-        },
-        body: formData,
+        // Asserts.
+        expect(result).toEqual(new AuthorizationError('Code is not active.'))
       })
 
-      // Initializes Strategy.
-      const strategy = new OTPStrategy(
-        { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
-        verify,
-      )
+      test('Should throw an Error on max OTP code attempts.', async () => {
+        verify.mockImplementation(() => Promise.resolve())
 
-      const result = await strategy
-        .authenticate(request, sessionStorage, {
-          ...BASE_OPTIONS,
-          throwOnError: true,
-          successRedirect: '/',
+        // Sets up testing data.
+        const email = 'example@gmail.com'
+        const otp = generateOtp({ ...OTP_DEFAULTS })
+        const otpEncrypted = await encrypt(
+          JSON.stringify({ email, ...otp }),
+          SECRET_ENV,
+        )
+
+        // Updates mocked function.
+        validateCode.mockImplementation(() =>
+          Promise.resolve({ code: otpEncrypted, active: true, attempts: 4 }),
+        )
+
+        const session = await sessionStorage.getSession()
+        session.set('auth:email', email)
+        session.set('auth:otp', otpEncrypted)
+
+        const formData = new FormData()
+        formData.append('code', 'invalid-code')
+
+        // Creates Request.
+        const request = new Request(`${HOST_URL}`, {
+          method: 'POST',
+          headers: {
+            cookie: await sessionStorage.commitSession(session),
+            host: HOST_URL,
+          },
+          body: formData,
         })
-        .catch((error) => error)
 
-      // Asserts.
-      expect(result).toEqual(
-        new AuthorizationError('Code has reached maximum attempts.'),
-      )
-    })
+        // Initializes Strategy.
+        const strategy = new OTPStrategy(
+          { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
+          verify,
+        )
 
-    test('Should throw an Error on expired OTP code.', async () => {
-      verify.mockImplementation(() => Promise.resolve())
+        const result = await strategy
+          .authenticate(request, sessionStorage, {
+            ...BASE_OPTIONS,
+            throwOnError: true,
+            successRedirect: '/',
+          })
+          .catch((error) => error)
 
-      // Sets up testing data.
-      const email = 'example@gmail.com'
-      const expiresAt = new Date(Date.now() - 1000 * 60 * 15)
-      const expiredCreatedAt = new Date(expiresAt).toISOString()
-      const otp = generateOtp({ ...OTP_DEFAULTS })
-      const otpEncrypted = await encrypt(
-        JSON.stringify({ email, code: otp.code, createdAt: expiredCreatedAt }),
-        SECRET_ENV,
-      )
-
-      const session = await sessionStorage.getSession()
-      session.set('auth:email', email)
-      session.set('auth:otp', otpEncrypted)
-
-      // Updates mocked function.
-      validateCode.mockImplementation(() =>
-        Promise.resolve({ code: otpEncrypted, active: true }),
-      )
-
-      const formData = new FormData()
-      formData.append('code', otp.code)
-
-      // Creates Request.
-      const request = new Request(`${HOST_URL}`, {
-        method: 'POST',
-        headers: {
-          cookie: await sessionStorage.commitSession(session),
-          host: HOST_URL,
-        },
-        body: formData,
+        // Asserts.
+        expect(result).toEqual(
+          new AuthorizationError('Code has reached maximum attempts.'),
+        )
       })
 
-      // Initializes Strategy.
-      const strategy = new OTPStrategy(
-        { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
-        verify,
-      )
+      test('Should throw an Error on expired OTP code.', async () => {
+        verify.mockImplementation(() => Promise.resolve())
 
-      const result = await strategy
-        .authenticate(request, sessionStorage, {
-          ...BASE_OPTIONS,
-          throwOnError: true,
-          successRedirect: '/',
+        // Sets up testing data.
+        const email = 'example@gmail.com'
+        const expiresAt = new Date(Date.now() - 1000 * 60 * 15)
+        const expiredCreatedAt = new Date(expiresAt).toISOString()
+        const otp = generateOtp({ ...OTP_DEFAULTS })
+        const otpEncrypted = await encrypt(
+          JSON.stringify({ email, code: otp.code, createdAt: expiredCreatedAt }),
+          SECRET_ENV,
+        )
+
+        // Updates mocked function.
+        validateCode.mockImplementation(() =>
+          Promise.resolve({ code: otpEncrypted, active: true }),
+        )
+
+        const session = await sessionStorage.getSession()
+        session.set('auth:email', email)
+        session.set('auth:otp', otpEncrypted)
+
+        const formData = new FormData()
+        formData.append('code', otp.code)
+
+        // Creates Request.
+        const request = new Request(`${HOST_URL}`, {
+          method: 'POST',
+          headers: {
+            cookie: await sessionStorage.commitSession(session),
+            host: HOST_URL,
+          },
+          body: formData,
         })
-        .catch((error) => error)
 
-      // Asserts.
-      expect(result).toEqual(new AuthorizationError('Code has expired.'))
-    })
+        // Initializes Strategy.
+        const strategy = new OTPStrategy(
+          { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
+          verify,
+        )
 
-    test('Should throw an Error on invalid OTP code.', async () => {
-      verify.mockImplementation(() => Promise.resolve())
+        const result = await strategy
+          .authenticate(request, sessionStorage, {
+            ...BASE_OPTIONS,
+            throwOnError: true,
+            successRedirect: '/',
+          })
+          .catch((error) => error)
 
-      // Sets up testing data.
-      const email = 'example@gmail.com'
-      const otp = generateOtp({ ...OTP_DEFAULTS })
-      const otpEncrypted = await encrypt(
-        JSON.stringify({ email, ...otp }),
-        SECRET_ENV,
-      )
-
-      const session = await sessionStorage.getSession()
-      session.set('auth:email', email)
-      session.set('auth:otp', otpEncrypted)
-
-      // Updates mocked function.
-      validateCode.mockImplementation(() =>
-        Promise.resolve({ code: otpEncrypted, active: true }),
-      )
-
-      const formData = new FormData()
-      formData.append('code', 'invalid-code')
-
-      // Creates Request.
-      const request = new Request(`${HOST_URL}`, {
-        method: 'POST',
-        headers: {
-          cookie: await sessionStorage.commitSession(session),
-          host: HOST_URL,
-        },
-        body: formData,
+        // Asserts.
+        expect(result).toEqual(new AuthorizationError('Code has expired.'))
       })
 
-      // Initializes Strategy.
-      const strategy = new OTPStrategy(
-        { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
-        verify,
-      )
+      test('Should throw an Error on invalid OTP code.', async () => {
+        verify.mockImplementation(() => Promise.resolve())
 
-      const result = await strategy
-        .authenticate(request, sessionStorage, {
-          ...BASE_OPTIONS,
-          throwOnError: true,
-          successRedirect: '/',
+        // Sets up testing data.
+        const email = 'example@gmail.com'
+        const otp = generateOtp({ ...OTP_DEFAULTS })
+        const otpEncrypted = await encrypt(
+          JSON.stringify({ email, ...otp }),
+          SECRET_ENV,
+        )
+
+        // Updates mocked function.
+        validateCode.mockImplementation(() =>
+          Promise.resolve({ code: otpEncrypted, active: true }),
+        )
+
+        const session = await sessionStorage.getSession()
+        session.set('auth:email', email)
+        session.set('auth:otp', otpEncrypted)
+
+        const formData = new FormData()
+        formData.append('code', 'invalid-code')
+
+        // Creates Request.
+        const request = new Request(`${HOST_URL}`, {
+          method: 'POST',
+          headers: {
+            cookie: await sessionStorage.commitSession(session),
+            host: HOST_URL,
+          },
+          body: formData,
         })
-        .catch((error) => error)
 
-      // Asserts.
-      expect(result).toEqual(new AuthorizationError('Code is not valid.'))
-    })
+        // Initializes Strategy.
+        const strategy = new OTPStrategy(
+          { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
+          verify,
+        )
 
-    test('Should throw an Error on invalid OTP emails', async () => {
-      verify.mockImplementation(() => Promise.resolve())
+        const result = await strategy
+          .authenticate(request, sessionStorage, {
+            ...BASE_OPTIONS,
+            throwOnError: true,
+            successRedirect: '/',
+          })
+          .catch((error) => error)
 
-      // Sets up testing data.
-      const email = 'example@gmail.com'
-      const otp = generateOtp({ ...OTP_DEFAULTS })
-      const otpEncrypted = await encrypt(
-        JSON.stringify({ email, ...otp }),
-        SECRET_ENV,
-      )
-
-      const databaseOtpEncrypted = await encrypt(
-        JSON.stringify({ email: 'not-example@gmail.com', ...otp }),
-        SECRET_ENV,
-      )
-
-      const session = await sessionStorage.getSession()
-      session.set('auth:email', email)
-      session.set('auth:otp', otpEncrypted)
-
-      // Updates mocked function.
-      validateCode.mockImplementation(() =>
-        Promise.resolve({ code: databaseOtpEncrypted, active: true }),
-      )
-
-      const formData = new FormData()
-      formData.append('code', otp.code)
-
-      // Creates Request.
-      const request = new Request(`${HOST_URL}`, {
-        method: 'POST',
-        headers: {
-          cookie: await sessionStorage.commitSession(session),
-          host: HOST_URL,
-        },
-        body: formData,
+        // Asserts.
+        expect(result).toEqual(new AuthorizationError('Code is not valid.'))
       })
 
-      // Initializes Strategy.
-      const strategy = new OTPStrategy(
-        { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
-        verify,
-      )
+      test('Should throw an Error on invalid OTP email.', async () => {
+        verify.mockImplementation(() => Promise.resolve())
 
-      const result = await strategy
-        .authenticate(request, sessionStorage, {
-          ...BASE_OPTIONS,
-          throwOnError: true,
-          successRedirect: '/',
+        // Sets up testing data.
+        const email = 'example@gmail.com'
+        const otp = generateOtp({ ...OTP_DEFAULTS })
+        const otpEncrypted = await encrypt(
+          JSON.stringify({ email, ...otp }),
+          SECRET_ENV,
+        )
+
+        const databaseOtpEncrypted = await encrypt(
+          JSON.stringify({ email: 'not-example@gmail.com', ...otp }),
+          SECRET_ENV,
+        )
+
+        // Updates mocked function.
+        validateCode.mockImplementation(() =>
+          Promise.resolve({ code: databaseOtpEncrypted, active: true }),
+        )
+
+        const session = await sessionStorage.getSession()
+        session.set('auth:email', email)
+        session.set('auth:otp', otpEncrypted)
+
+        const formData = new FormData()
+        formData.append('code', otp.code)
+
+        // Creates Request.
+        const request = new Request(`${HOST_URL}`, {
+          method: 'POST',
+          headers: {
+            cookie: await sessionStorage.commitSession(session),
+            host: HOST_URL,
+          },
+          body: formData,
         })
-        .catch((error) => error)
 
-      // Asserts.
-      expect(result).toEqual(
-        new AuthorizationError('Code does not match provided email address.'),
-      )
-    })
+        // Initializes Strategy.
+        const strategy = new OTPStrategy(
+          { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
+          verify,
+        )
 
-    test('Should call invalidateCode function.', async () => {
-      verify.mockImplementation(() => Promise.resolve({ name: 'John Doe' }))
+        const result = await strategy
+          .authenticate(request, sessionStorage, {
+            ...BASE_OPTIONS,
+            throwOnError: true,
+            successRedirect: '/',
+          })
+          .catch((error) => error)
 
-      // Sets up testing data.
-      const email = 'example@gmail.com'
-      const otp = generateOtp({ ...OTP_DEFAULTS })
-      const otpEncrypted = await encrypt(
-        JSON.stringify({ email, ...otp }),
-        SECRET_ENV,
-      )
-
-      const session = await sessionStorage.getSession()
-      session.set('auth:email', email)
-      session.set('auth:otp', otpEncrypted)
-
-      // Updates mocked function.
-      validateCode.mockImplementation(() =>
-        Promise.resolve({ code: otpEncrypted, active: true }),
-      )
-
-      const formData = new FormData()
-      formData.append('code', otp.code)
-
-      // Creates Request.
-      const request = new Request(`${HOST_URL}`, {
-        method: 'POST',
-        headers: {
-          cookie: await sessionStorage.commitSession(session),
-          host: HOST_URL,
-        },
-        body: formData,
+        // Asserts.
+        expect(result).toEqual(
+          new AuthorizationError('Code does not match provided email address.'),
+        )
       })
 
-      // Initializes Strategy.
-      const strategy = new OTPStrategy(
-        { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
-        verify,
-      )
+      test('Should call invalidateCode function.', async () => {
+        verify.mockImplementation(() => Promise.resolve({ name: 'John Doe' }))
 
-      await strategy
-        .authenticate(request, sessionStorage, {
-          ...BASE_OPTIONS,
-          successRedirect: '/account',
+        // Sets up testing data.
+        const email = 'example@gmail.com'
+        const otp = generateOtp({ ...OTP_DEFAULTS })
+        const otpEncrypted = await encrypt(
+          JSON.stringify({ email, ...otp }),
+          SECRET_ENV,
+        )
+
+        // Updates mocked function.
+        validateCode.mockImplementation(() =>
+          Promise.resolve({ code: otpEncrypted, active: true }),
+        )
+
+        const session = await sessionStorage.getSession()
+        session.set('auth:email', email)
+        session.set('auth:otp', otpEncrypted)
+
+        const formData = new FormData()
+        formData.append('code', otp.code)
+
+        // Creates Request.
+        const request = new Request(`${HOST_URL}`, {
+          method: 'POST',
+          headers: {
+            cookie: await sessionStorage.commitSession(session),
+            host: HOST_URL,
+          },
+          body: formData,
         })
-        .catch((error) => error)
 
-      // Asserts.
-      expect(invalidateCode).toHaveBeenCalledTimes(1)
-    })
+        // Initializes Strategy.
+        const strategy = new OTPStrategy(
+          { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
+          verify,
+        )
 
-    test('Should call invalidateCode function on invalid OTP code.', async () => {
-      verify.mockImplementation(() => Promise.resolve({ name: 'John Doe' }))
+        await strategy
+          .authenticate(request, sessionStorage, {
+            ...BASE_OPTIONS,
+            successRedirect: '/account',
+          })
+          .catch((error) => error)
 
-      // Sets up testing data.
-      const email = 'example@gmail.com'
-      const otp = generateOtp({ ...OTP_DEFAULTS })
-      const otpEncrypted = await encrypt(
-        JSON.stringify({ email, ...otp }),
-        SECRET_ENV,
-      )
-
-      const session = await sessionStorage.getSession()
-      session.set('auth:email', email)
-      session.set('auth:otp', otpEncrypted)
-
-      // Updates mocked function.
-      validateCode.mockImplementation(() =>
-        Promise.resolve({ code: otpEncrypted, active: true }),
-      )
-
-      const formData = new FormData()
-      formData.append('code', 'invalid-code')
-
-      // Creates Request.
-      const request = new Request(`${HOST_URL}`, {
-        method: 'POST',
-        headers: {
-          cookie: await sessionStorage.commitSession(session),
-          host: HOST_URL,
-        },
-        body: formData,
+        // Asserts.
+        expect(invalidateCode).toHaveBeenCalledTimes(1)
       })
 
-      // Initializes Strategy.
-      const strategy = new OTPStrategy(
-        { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
-        verify,
-      )
+      test('Should contain user property in Session.', async () => {
+        verify.mockImplementation(() => Promise.resolve({ name: 'John Doe' }))
 
-      await strategy
-        .authenticate(request, sessionStorage, {
-          ...BASE_OPTIONS,
-          successRedirect: '/account',
+        // Sets up testing data.
+        const email = 'example@gmail.com'
+        const otp = generateOtp({ ...OTP_DEFAULTS })
+        const otpEncrypted = await encrypt(
+          JSON.stringify({ email, ...otp }),
+          SECRET_ENV,
+        )
+
+        // Updates mocked function.
+        validateCode.mockImplementation(() =>
+          Promise.resolve({ code: otpEncrypted, active: true }),
+        )
+
+        let session = await sessionStorage.getSession()
+        session.set('auth:email', email)
+        session.set('auth:otp', otpEncrypted)
+
+        const formData = new FormData()
+        formData.append('code', otp.code)
+
+        // Creates Request.
+        const request = new Request(`${HOST_URL}`, {
+          method: 'POST',
+          headers: {
+            cookie: await sessionStorage.commitSession(session),
+            host: HOST_URL,
+          },
+          body: formData,
         })
-        .catch((error) => error)
 
-      // Asserts.
-      expect(invalidateCode).toHaveBeenCalledTimes(1)
-    })
+        // Initializes Strategy.
+        const strategy = new OTPStrategy(
+          { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
+          verify,
+        )
 
-    test('Should contain user property in Session.', async () => {
-      verify.mockImplementation(() => Promise.resolve({ name: 'John Doe' }))
+        const result = (await strategy
+          .authenticate(request, sessionStorage, {
+            ...BASE_OPTIONS,
+            throwOnError: true,
+            successRedirect: '/',
+          })
+          .catch((error) => error)) as Response
 
-      // Sets up testing data.
-      const email = 'example@gmail.com'
-      const otp = generateOtp({ ...OTP_DEFAULTS })
-      const otpEncrypted = await encrypt(
-        JSON.stringify({ email, ...otp }),
-        SECRET_ENV,
-      )
+        // Gets values from Session.
+        session = await sessionStorage.getSession(
+          result.headers.get('Set-Cookie') ?? '',
+        )
 
-      let session = await sessionStorage.getSession()
-      session.set('auth:email', email)
-      session.set('auth:otp', otpEncrypted)
-
-      // Updates mocked function.
-      validateCode.mockImplementation(() =>
-        Promise.resolve({ code: otpEncrypted, active: true }),
-      )
-
-      const formData = new FormData()
-      formData.append('code', otp.code)
-
-      // Creates Request.
-      const request = new Request(`${HOST_URL}`, {
-        method: 'POST',
-        headers: {
-          cookie: await sessionStorage.commitSession(session),
-          host: HOST_URL,
-        },
-        body: formData,
+        // Asserts.
+        expect(session.data).toHaveProperty('user')
       })
 
-      // Initializes Strategy.
-      const strategy = new OTPStrategy(
-        { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
-        verify,
-      )
+      test('Should contain Location header pointing to provided successRedirect url.', async () => {
+        verify.mockImplementation(() => Promise.resolve({ name: 'John Doe' }))
 
-      const result = (await strategy
-        .authenticate(request, sessionStorage, {
-          ...BASE_OPTIONS,
-          throwOnError: true,
-          successRedirect: '/',
+        // Sets up testing data.
+        const email = 'example@gmail.com'
+        const otp = generateOtp({ ...OTP_DEFAULTS })
+        const otpEncrypted = await encrypt(
+          JSON.stringify({ email, ...otp }),
+          SECRET_ENV,
+        )
+
+        // Updates mocked function.
+        validateCode.mockImplementation(() =>
+          Promise.resolve({ code: otpEncrypted, active: true }),
+        )
+
+        let session = await sessionStorage.getSession()
+        session.set('auth:email', email)
+        session.set('auth:otp', otpEncrypted)
+
+        const formData = new FormData()
+        formData.append('code', otp.code)
+
+        // Creates Request.
+        const request = new Request(`${HOST_URL}`, {
+          method: 'POST',
+          headers: {
+            cookie: await sessionStorage.commitSession(session),
+            host: HOST_URL,
+          },
+          body: formData,
         })
-        .catch((error) => error)) as Response
 
-      // Gets values from Session.
-      session = await sessionStorage.getSession(
-        result.headers.get('Set-Cookie') ?? '',
-      )
+        // Initializes Strategy.
+        const strategy = new OTPStrategy(
+          { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
+          verify,
+        )
 
-      // Asserts.
-      expect(session.data).toHaveProperty('user')
-    })
+        const result = (await strategy
+          .authenticate(request, sessionStorage, {
+            ...BASE_OPTIONS,
+            successRedirect: '/account',
+          })
+          .catch((error) => error)) as Response
 
-    test('Should contain Location header pointing to provided successRedirect url.', async () => {
-      verify.mockImplementation(() => Promise.resolve({ name: 'John Doe' }))
+        // Gets values from Session.
+        session = await sessionStorage.getSession(
+          result.headers.get('Set-Cookie') ?? '',
+        )
 
-      // Sets up testing data.
-      const email = 'example@gmail.com'
-      const otp = generateOtp({ ...OTP_DEFAULTS })
-      const otpEncrypted = await encrypt(
-        JSON.stringify({ email, ...otp }),
-        SECRET_ENV,
-      )
-
-      let session = await sessionStorage.getSession()
-      session.set('auth:email', email)
-      session.set('auth:otp', otpEncrypted)
-
-      // Updates mocked function.
-      validateCode.mockImplementation(() =>
-        Promise.resolve({ code: otpEncrypted, active: true }),
-      )
-
-      const formData = new FormData()
-      formData.append('code', otp.code)
-
-      // Creates Request.
-      const request = new Request(`${HOST_URL}`, {
-        method: 'POST',
-        headers: {
-          cookie: await sessionStorage.commitSession(session),
-          host: HOST_URL,
-        },
-        body: formData,
+        // Asserts.
+        expect(result.headers.get('Location')).toMatch('/account')
       })
-
-      // Initializes Strategy.
-      const strategy = new OTPStrategy(
-        { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
-        verify,
-      )
-
-      const result = (await strategy
-        .authenticate(request, sessionStorage, {
-          ...BASE_OPTIONS,
-          successRedirect: '/account',
-        })
-        .catch((error) => error)) as Response
-
-      // Gets values from Session.
-      session = await sessionStorage.getSession(
-        result.headers.get('Set-Cookie') ?? '',
-      )
-
-      // Asserts.
-      expect(result.headers.get('Location')).toMatch('/account')
     })
   })
 })
