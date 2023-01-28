@@ -6,7 +6,7 @@ import { OTPStrategy } from '../src/index'
 import { encrypt, generateOtp } from '../src/utils'
 
 // Constants.
-const BASE_URL = 'http://localhost:3000'
+const BASE_URL = 'localhost:3000'
 const SECRET_ENV = 'SECRET'
 const OTP_DEFAULTS = {
   expiresAt: 1000 * 60 * 15,
@@ -159,7 +159,7 @@ describe('OTP Strategy', () => {
       expect(invalidateCode).toHaveBeenCalledTimes(1)
     })
 
-    test('Should reassign form email with the one from the Session.', async () => {
+    test('Should reassign form email with the one stored in Session.', async () => {
       verify.mockImplementation(() => Promise.resolve())
 
       // Sets up testing data.
@@ -187,7 +187,10 @@ describe('OTP Strategy', () => {
       // Creates Request.
       const request = new Request(`${BASE_URL}`, {
         method: 'POST',
-        headers: { cookie: await sessionStorage.commitSession(session) },
+        headers: {
+          cookie: await sessionStorage.commitSession(session),
+          host: BASE_URL,
+        },
         body: formData,
       })
 
@@ -284,6 +287,9 @@ describe('OTP Strategy', () => {
       // Creates Request.
       const request = new Request(`${BASE_URL}`, {
         method: 'POST',
+        headers: {
+          host: BASE_URL,
+        },
         body: formData,
       })
 
@@ -315,6 +321,9 @@ describe('OTP Strategy', () => {
       // Creates Request.
       const request = new Request(`${BASE_URL}`, {
         method: 'POST',
+        headers: {
+          host: BASE_URL,
+        },
         body: formData,
       })
 
@@ -346,6 +355,9 @@ describe('OTP Strategy', () => {
       // Creates Request.
       const request = new Request(`${BASE_URL}`, {
         method: 'POST',
+        headers: {
+          host: BASE_URL,
+        },
         body: formData,
       })
 
@@ -382,6 +394,9 @@ describe('OTP Strategy', () => {
       // Creates Request.
       const request = new Request(`${BASE_URL}`, {
         method: 'POST',
+        headers: {
+          host: BASE_URL,
+        },
         body: formData,
       })
 
@@ -978,4 +993,39 @@ describe('OTP Strategy', () => {
       expect(result.headers.get('Location')).toMatch('/account')
     })
   })
+
+  /* test.only('Should contain Location header pointing to provided successRedirect url.', async () => {
+    verify.mockImplementation(() => Promise.resolve({}))
+
+    // Sets up testing data.
+    const formData = new FormData()
+    formData.append('email', 'example@gmail.com')
+
+    // Creates Request.
+    const request = new Request(`${BASE_URL}`, {
+      method: 'POST',
+      headers: {
+        host: BASE_URL,
+      },
+      body: formData,
+    })
+
+    // Initializes Strategy.
+    const strategy = new OTPStrategy(
+      { secret: SECRET_ENV, storeCode, sendCode, validateCode, invalidateCode },
+      verify,
+    )
+
+    const result = await strategy
+      .authenticate(request, sessionStorage, {
+        ...BASE_OPTIONS,
+        successRedirect: '/verify',
+      })
+      .catch((error) => error)
+
+    console.log(result)
+
+    // Asserts.
+    // expect(result.headers.get('Location')).toMatch('/verify')
+  }) */
 })
