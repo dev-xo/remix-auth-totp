@@ -3,7 +3,7 @@ import { describe, afterEach, test, expect, vi } from 'vitest'
 import { createCookieSessionStorage } from '@remix-run/node'
 import { AuthenticateOptions, AuthorizationError } from 'remix-auth'
 import { OTPStrategy } from '../src/index'
-import { encrypt, generateOtp, generateMagicLink } from '../src/utils'
+import { encrypt, generateOtp, generateMagicLink, getBaseUrl } from '../src/utils'
 
 // Constants.
 const HOST_URL = 'localhost:3000'
@@ -83,6 +83,28 @@ describe('OTP Strategy', () => {
         new AuthorizationError('Missing required secret option.'),
       )
     })
+  })
+
+  test('Should properly use `http` protocol for local environments', async () => {
+    const request = new Request(`${HOST_URL}`)
+    const samples: Array<[string, 'http:' | 'https:']> = [
+      ['127.0.0.1', 'http:'],
+      ['127.1.1.1', 'http:'],
+      ['127.0.0.1:8888', 'http:'],
+      ['localhost', 'http:'],
+      ['localhost:3000', 'http:'],
+      ['remix.run', 'https:'],
+      ['remix.run:3000', 'https:'],
+      ['local.com', 'https:'],
+      ['legit.local.com:3000', 'https:'],
+      ['remix-auth-otp.local', 'http:'],
+      ['remix-auth-otp.local:3000', 'http:'],
+    ]
+
+    for (const [host, protocol] of samples) {
+      request.headers.set('host', host)
+      expect(getBaseUrl(request).startsWith(protocol)).toBe(true)
+    }
   })
 
   describe('[ 1st Authentication Phase ]', () => {

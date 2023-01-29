@@ -58,10 +58,9 @@ export function getBaseUrl(request: Request) {
   }
 
   // If the host is localhost or ends with .local, use http.
-  const protocol =
-    ['localhost', '127.0.0.1'].includes(host) || host.match(/\.local(:?:\d+)?$/)
-      ? 'http'
-      : 'https'
+  const protocol = host.match(/(:?\.local|^localhost|^127\.\d+\.\d+\.\d+)(:?:\d+)?$/)
+    ? 'http'
+    : 'https'
 
   return `${protocol}://${host}`
 }
