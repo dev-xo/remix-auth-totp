@@ -328,10 +328,10 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
 
   private readonly customErrorsDefaults = {
     requiredEmail: 'Email address is required.',
-    invalidEmail: 'Email address is invalid.',
-    inactiveCode: 'The code is no longer active.',
-    expiredCode: 'The code has expired.',
-    maxCodeAttemptsReached: 'The code attempts has reached the maximum.',
+    invalidEmail: 'Email address is not valid.',
+    inactiveCode: 'Code is no longer active.',
+    expiredCode: 'Code has expired.',
+    maxCodeAttemptsReached: 'Code cannot be used anymore.',
   }
 
   constructor(
