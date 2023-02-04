@@ -306,6 +306,7 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
   private readonly sendCode: SendCodeFunction<User>
   private readonly validateCode: ValidateCodeFunction
   private readonly invalidateCode: InvalidateCodeFunction
+  private readonly customErrors: CustomErrorsOptions
   private readonly sessionEmailKey: string
   private readonly sessionOtpKey: string
 
@@ -323,6 +324,14 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
     enabled: true,
     baseUrl: undefined,
     callbackPath: '/magic-link',
+  }
+
+  private readonly customErrorsDefaults = {
+    requiredEmail: 'Email address is required.',
+    invalidEmail: 'Email address is invalid.',
+    inactiveCode: 'The code is no longer active.',
+    expiredCode: 'The code has expired.',
+    maxCodeAttemptsReached: 'The code attempts has reached the maximum.',
   }
 
   constructor(
@@ -348,6 +357,10 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
     this.magicLinkGeneration = {
       ...this.magicLinkGenerationDefaults,
       ...options.magicLinkGeneration,
+    }
+    this.customErrors = {
+      ...this.customErrorsDefaults,
+      ...options.customErrors,
     }
   }
 
