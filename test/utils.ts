@@ -1,6 +1,5 @@
 import type { AuthenticateOptions } from 'remix-auth'
 import { createCookieSessionStorage } from '@remix-run/node'
-import { vi } from 'vitest'
 
 /**
  * Constants.
@@ -39,12 +38,3 @@ export const MAGIC_LINK_DEFAULTS = {
 export const sessionStorage = createCookieSessionStorage({
   cookie: { secrets: ['SESSION_SECRET_KEY'] },
 })
-
-/**
- * Mocks.
- */
-export const verify = vi.fn()
-export const storeCode = vi.fn()
-export const sendCode = vi.fn()
-export const validateCode = vi.fn()
-export const invalidateCode = vi.fn()
