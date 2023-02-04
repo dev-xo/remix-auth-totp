@@ -414,7 +414,7 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
 
           if (!code) {
             if (!email) {
-              throw new Error('Email address is required.')
+              throw new Error(this.customErrors.requiredEmail)
             }
             await this.validateEmail(email)
 
@@ -537,7 +537,7 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
 
   private async validateEmailDefaults(email: string) {
     if (!/.+@.+/u.test(email)) {
-      throw new Error('Email address is not valid.')
+      throw new Error(this.customErrors.invalidEmail)
     }
   }
 
@@ -597,15 +597,15 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
       this.codeGeneration.maxAttempts ?? this.codeGenerationDefaults.maxAttempts
 
     if (dbPayload.active !== true) {
-      throw new Error('Code is no longer active.')
+      throw new Error(this.customErrors.inactiveCode)
     }
 
     if (dbPayload.attempts >= maxAttempts) {
-      throw new Error('Code cannot be used anymore.')
+      throw new Error(this.customErrors.maxCodeAttemptsReached)
     }
 
     if (new Date() > expiresAt) {
-      throw new Error('Code has expired.')
+      throw new Error(this.customErrors.expiredCode)
     }
 
     return { dbPayload, otp, sessionOtp }
