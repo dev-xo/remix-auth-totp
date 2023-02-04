@@ -4,11 +4,11 @@ import { AuthorizationError } from 'remix-auth'
 import { OTPStrategy } from '../src/index'
 import { encrypt, generateOtp, generateMagicLink } from '../src/utils'
 import {
+  SECRET_ENV,
+  HOST_URL,
   BASE_OPTIONS,
   OTP_DEFAULTS,
   MAGIC_LINK_DEFAULTS,
-  SECRET_ENV,
-  HOST_URL,
   sessionStorage,
   verify,
   storeCode,

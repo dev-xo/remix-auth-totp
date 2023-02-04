@@ -3,10 +3,10 @@ import { AuthorizationError } from 'remix-auth'
 import { OTPStrategy } from '../src/index'
 import { encrypt, generateOtp } from '../src/utils'
 import {
-  BASE_OPTIONS,
-  OTP_DEFAULTS,
   SECRET_ENV,
   HOST_URL,
+  BASE_OPTIONS,
+  OTP_DEFAULTS,
   sessionStorage,
   verify,
   storeCode,
