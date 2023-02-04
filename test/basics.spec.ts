@@ -41,6 +41,10 @@ describe('Basics', () => {
       .catch((error) => error)
 
     // Asserts.
-    expect(result).toEqual(new AuthorizationError('Missing required secret option.'))
+    expect(result).toEqual(
+      new AuthorizationError(
+        'Missing required `secret` option from OTPStrategy constructor.',
+      ),
+    )
   })
 })

@@ -75,7 +75,7 @@ describe('Magic Link', () => {
 
     // Asserts.
     expect(result).toEqual(
-      new AuthorizationError('Magic Link does not match expected path.'),
+      new AuthorizationError('Magic Link does not match the expected path.'),
     )
   })
 
@@ -186,7 +186,9 @@ describe('Magic Link', () => {
 
     // Asserts.
     expect(result).toEqual(
-      new AuthorizationError('Code does not match provided email address.'),
+      new AuthorizationError(
+        'Magic Link does not match the provided email address.',
+      ),
     )
   })
 

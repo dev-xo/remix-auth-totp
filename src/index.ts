@@ -179,6 +179,11 @@ export interface OTPStrategyOptions<User> {
   codeField?: string
 
   /**
+   * The validate email function.
+   */
+  validateEmail?: ValidateEmailFunction
+
+  /**
    * The code generation configuration.
    */
   codeGeneration?: CodeGenerationOptions
@@ -187,11 +192,6 @@ export interface OTPStrategyOptions<User> {
    * The Magic Link configuration.
    */
   magicLinkGeneration?: MagicLinkGenerationOptions
-
-  /**
-   * The validate email function.
-   */
-  validateEmail?: ValidateEmailFunction
 
   /**
    * The store code function.
@@ -264,9 +264,9 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
   private readonly secret: string
   private readonly emailField: string
   private readonly codeField: string
+  private readonly validateEmail: ValidateEmailFunction
   private readonly codeGeneration: CodeGenerationOptions
   private readonly magicLinkGeneration: MagicLinkGenerationOptions
-  private readonly validateEmail: ValidateEmailFunction
   private readonly storeCode: StoreCodeFunction
   private readonly sendCode: SendCodeFunction<User>
   private readonly validateCode: ValidateCodeFunction
@@ -322,7 +322,9 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
     options: AuthenticateOptions,
   ): Promise<User> {
     if (!this.secret) {
-      throw new Error('Missing required secret option.')
+      throw new Error(
+        'Missing required `secret` option from OTPStrategy constructor.',
+      )
     }
 
     const isPost = request.method === 'POST'
@@ -342,7 +344,7 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
         let formData: FormData | undefined
 
         if (!options.successRedirect) {
-          throw new Error('Missing required successRedirect option.')
+          throw new Error('Missing required `successRedirect` property.')
         }
 
         // 1st Authentication phase.
@@ -364,7 +366,7 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
 
           if (!code) {
             if (!email) {
-              throw new Error('Missing required email field.')
+              throw new Error('Email address is required.')
             }
             await this.validateEmail(email)
 
@@ -403,7 +405,7 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
           const url = new URL(request.url)
 
           if (url.pathname !== this.magicLinkGeneration.callbackPath) {
-            throw new Error('Magic Link does not match expected path.')
+            throw new Error('Magic Link does not match the expected path.')
           }
 
           magicLink = decodeURIComponent(url.searchParams.get(this.codeField) ?? '')
@@ -411,10 +413,10 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
 
         if ((isPost && code) || (isGet && magicLink)) {
           if (!session.has(this.sessionEmailKey)) {
-            throw new Error('Missing required email from Session.')
+            throw new Error('Missing required email address.')
           }
           if (!session.has(this.sessionOtpKey)) {
-            throw new Error('Missing required code from Session.')
+            throw new Error('Missing required OTP code.')
           }
 
           // Handles validations.
@@ -487,7 +489,7 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
 
   private async validateEmailDefaults(email: string) {
     if (!/.+@.+/u.test(email)) {
-      throw new Error('Invalid email address.')
+      throw new Error('Email address is not valid.')
     }
   }
 
@@ -529,7 +531,7 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
       typeof dbPayload.code !== 'string' ||
       typeof dbPayload.active !== 'boolean'
     ) {
-      throw new Error('OTP code not found.')
+      throw new Error('Code not found.')
     }
 
     const otpDecrypted = await decrypt(dbPayload.code, this.secret)
@@ -547,11 +549,11 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
       this.codeGeneration.maxAttempts ?? this.codeGenerationDefaults.maxAttempts
 
     if (dbPayload.active !== true) {
-      throw new Error('Code is not active.')
+      throw new Error('Code is no longer active.')
     }
 
     if (dbPayload.attempts >= maxAttempts) {
-      throw new Error('Code has reached maximum attempts.')
+      throw new Error('Code cannot be used anymore.')
     }
 
     if (new Date() > expiresAt) {
@@ -573,11 +575,11 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
         dbPayload.active,
         dbPayload.attempts + 1,
       )
-      throw new Error('Code is not valid.')
+      throw new Error('Code does not match.')
     }
 
     if (otp.email !== sessionOtp.email) {
-      throw new Error('Code does not match provided email address.')
+      throw new Error('Code does not match the provided email address.')
     }
   }
 
@@ -589,7 +591,7 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
     const { otp, sessionOtp } = await this.validateOtpEncrypted(magicLink)
 
     if (otp.email !== sessionOtp.email) {
-      throw new Error('Code does not match provided email address.')
+      throw new Error('Magic Link does not match the provided email address.')
     }
   }
 

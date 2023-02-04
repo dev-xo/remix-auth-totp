@@ -159,7 +159,7 @@ describe('OTP', () => {
 
       // Asserts.
       expect(result).toEqual(
-        new AuthorizationError('Missing required successRedirect option.'),
+        new AuthorizationError('Missing required `successRedirect` property.'),
       )
     })
 
@@ -192,7 +192,7 @@ describe('OTP', () => {
         .catch((error) => error)
 
       // Asserts.
-      expect(result).toEqual(new AuthorizationError('Missing required email field.'))
+      expect(result).toEqual(new AuthorizationError('Email address is required.'))
     })
 
     test('Should throw an Error on invalid email.', async () => {
@@ -224,7 +224,7 @@ describe('OTP', () => {
         .catch((error) => error)
 
       // Asserts.
-      expect(result).toEqual(new AuthorizationError('Invalid email address.'))
+      expect(result).toEqual(new AuthorizationError('Email address is not valid.'))
     })
 
     test('Should call storeCode function.', async () => {
@@ -405,7 +405,7 @@ describe('OTP', () => {
 
       // Asserts.
       expect(result).toEqual(
-        new AuthorizationError('Missing required email from Session.'),
+        new AuthorizationError('Missing required email address.'),
       )
     })
 
@@ -445,9 +445,7 @@ describe('OTP', () => {
         .catch((error) => error)
 
       // Asserts.
-      expect(result).toEqual(
-        new AuthorizationError('Missing required code from Session.'),
-      )
+      expect(result).toEqual(new AuthorizationError('Missing required OTP code.'))
     })
 
     test('Should call validateCode function.', async () => {
@@ -540,7 +538,7 @@ describe('OTP', () => {
         .catch((error) => error)
 
       // Asserts.
-      expect(result).toEqual(new AuthorizationError('OTP code not found.'))
+      expect(result).toEqual(new AuthorizationError('Code not found.'))
     })
 
     test('Should throw an Error on inactive OTP code.', async () => {
@@ -591,7 +589,7 @@ describe('OTP', () => {
         .catch((error) => error)
 
       // Asserts.
-      expect(result).toEqual(new AuthorizationError('Code is not active.'))
+      expect(result).toEqual(new AuthorizationError('Code is no longer active.'))
     })
 
     test('Should throw an Error on max OTP code attempts.', async () => {
@@ -642,9 +640,7 @@ describe('OTP', () => {
         .catch((error) => error)
 
       // Asserts.
-      expect(result).toEqual(
-        new AuthorizationError('Code has reached maximum attempts.'),
-      )
+      expect(result).toEqual(new AuthorizationError('Code cannot be used anymore.'))
     })
 
     test('Should throw an Error on expired OTP code.', async () => {
@@ -748,7 +744,7 @@ describe('OTP', () => {
         .catch((error) => error)
 
       // Asserts.
-      expect(result).toEqual(new AuthorizationError('Code is not valid.'))
+      expect(result).toEqual(new AuthorizationError('Code does not match.'))
     })
 
     test('Should throw an Error on invalid OTP email.', async () => {
@@ -805,7 +801,7 @@ describe('OTP', () => {
 
       // Asserts.
       expect(result).toEqual(
-        new AuthorizationError('Code does not match provided email address.'),
+        new AuthorizationError('Code does not match the provided email address.'),
       )
     })
 
