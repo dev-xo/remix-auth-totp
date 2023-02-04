@@ -156,6 +156,36 @@ export interface InvalidateCodeFunction {
 }
 
 /**
+ * The custom errors configuration.
+ */
+export interface CustomErrorsOptions {
+  /**
+   * The error message when the email address is required.
+   */
+  requiredEmail?: string
+
+  /**
+   * The error message when the email address is invalid.
+   */
+  invalidEmail?: string
+
+  /**
+   * The error message when the email address is no longer active.
+   */
+  inactiveCode?: string
+
+  /**
+   * The error message when the OTP code has expired.
+   */
+  expiredCode?: string
+
+  /**
+   * The error message when the OTP code attempts has reached the maximum.
+   */
+  maxCodeAttemptsReached?: string
+}
+
+/**
  * Declares the Strategy configuration
  * needed for the developer to correctly work with.
  */
@@ -212,6 +242,11 @@ export interface OTPStrategyOptions<User> {
    * The invalidate code function.
    */
   invalidateCode: InvalidateCodeFunction
+
+  /**
+   * The custom errors configuration.
+   */
+  customErrors?: CustomErrorsOptions
 
   /**
    * A Session key that stores the email address.
