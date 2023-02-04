@@ -358,7 +358,7 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
             // Invalidates previous OTP code.
             await this.invalidateOtp(sessionOtpEncrypted, false)
 
-            // Reassigns email. (Required for OTP code generation.)
+            // Re-assigns email. Required for OTP code generation.
             email = sessionEmail
           }
 
@@ -368,7 +368,7 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
             }
             await this.validateEmail(email)
 
-            // Generates and encrypts OTP code.
+            // Generates and encrypts the OTP code.
             const otp = generateOtp({ ...this.codeGeneration })
             const otpEncrypted = await encrypt(
               JSON.stringify({ email, ...otp }),
@@ -381,7 +381,7 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
               request,
             })
 
-            // Stores and sends OTP code.
+            // Stores and sends the OTP code.
             await this.saveOtp(otpEncrypted)
             await this.sendOtp(email, otp.code, magicLink, formData, request)
 
