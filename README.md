@@ -556,7 +556,6 @@ authenticator.use(
     },
     // storeCode: async (code) => {},
     // sendCode: async ({ email, ... }) => {},
-    // ...
   }),
 )
 ```
@@ -591,6 +590,55 @@ export interface MagicLinkGenerationOptions {
    */
   callbackPath?: string
 }
+```
+
+> **Note:** Just enabling the Magic Link feature is not enough, you will need to also [create the `magic-link` route](#auth-routes).
+
+### Custom Error Messages
+
+You can customize the error messages by passing an object called `customErrors` to the OTPStrategy Instance.
+This can be useful if you want to translate the error messages to your preferred language, or to give more context to the user.
+
+```ts
+/**
+ * The custom errors configuration.
+ */
+export interface CustomErrorsOptions {
+  /**
+   * The error message when the email address is required.
+   */
+  requiredEmail?: string
+
+  /**
+   * The error message when the email address is invalid.
+   */
+  invalidEmail?: string
+
+  /**
+   * The error message when the email address is no longer active.
+   */
+  inactiveCode?: string
+
+  /**
+   * The error message when the OTP code has expired.
+   */
+  expiredCode?: string
+
+  /**
+   * The error message when the OTP code attempts has reached the maximum.
+   */
+  maxCodeAttemptsReached?: string
+}
+
+authenticator.use(
+  new OTPStrategy({
+    customErrors: {
+      requiredEmail: 'Custom error message for required email.',
+    },
+    // storeCode: async (code) => {},
+    // sendCode: async ({ email, ... }) => {},
+  }),
+)
 ```
 
 > **Note:** Just enabling the Magic Link feature is not enough, you will need to also [create the `magic-link` route](#auth-routes).

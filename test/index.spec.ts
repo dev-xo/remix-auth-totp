@@ -137,7 +137,7 @@ describe('[ Basics ]', () => {
   })
 })
 
-describe('[ Authentication ]', () => {
+describe('[ OTP ]', () => {
   describe('Request (Re-send)', () => {
     test('Should call invalidateCode function.', async () => {
       verify.mockImplementation(() => Promise.resolve({ name: 'John Doe' }))
@@ -250,7 +250,7 @@ describe('[ Authentication ]', () => {
   })
 
   describe('Generation', () => {
-    test('Should throw an Error on missing email.', async () => {
+    test('Should throw an Error on missing form email.', async () => {
       // Sets up testing data.
       const formData = new FormData()
       formData.append('email', '')
@@ -282,7 +282,7 @@ describe('[ Authentication ]', () => {
       expect(result).toEqual(new AuthorizationError('Email address is required.'))
     })
 
-    test('Should throw an Error on invalid email.', async () => {
+    test('Should throw an Error on invalid form email.', async () => {
       // Sets up testing data.
       const formData = new FormData()
       formData.append('email', 'invalid-email')
