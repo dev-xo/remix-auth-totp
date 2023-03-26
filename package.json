@@ -1,0 +1,72 @@
+{
+  "name": "remix-auth-otp",
+  "version": "2.2.1",
+  "main": "./build/index.js",
+  "types": "./build/index.d.ts",
+  "license": "MIT",
+  "author": {
+    "name": "dev-xo",
+    "url": "https://github.com/dev-xo"
+  },
+  "keywords": [
+    "remix",
+    "remix-run",
+    "remix-auth",
+    "authentication",
+    "one-time-password",
+    "passwordless"
+  ],
+  "description": "A One-Time Password Authentication Strategy for Remix Auth.",
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "lint": "eslint --ext .ts,.tsx src/",
+    "typecheck": "tsc -b",
+    "format": "prettier --write .",
+    "test": "vitest --reporter verbose",
+    "test:cov": "vitest --coverage ",
+    "validate": "npm run lint && npm run typecheck && npx vitest --watch=false",
+    "prepare": "husky install"
+  },
+  "files": [
+    "build",
+    "package.json",
+    "README.md"
+  ],
+  "eslintIgnore": [
+    "/node_modules",
+    "/build",
+    "/public/build"
+  ],
+  "dependencies": {
+    "crypto-js": "^4.1.1",
+    "otp-generator": "^4.0.0"
+  },
+  "peerDependencies": {
+    "@remix-run/server-runtime": "^1.10.0",
+    "remix-auth": "^3.4.0"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^17.4.2",
+    "@commitlint/config-conventional": "^17.4.2",
+    "@remix-run/node": "^1.10.0",
+    "@remix-run/server-runtime": "^1.10.0",
+    "@types/crypto-js": "^4.1.1",
+    "@types/otp-generator": "^4.0.0",
+    "@typescript-eslint/eslint-plugin": "^5.48.1",
+    "@typescript-eslint/parser": "^5.48.1",
+    "@vitest/coverage-c8": "^0.26.2",
+    "eslint": "^8.27.0",
+    "eslint-config-prettier": "^8.5.0",
+    "eslint-plugin-prettier": "^4.2.1",
+    "husky": "^8.0.3",
+    "prettier": "^2.7.1",
+    "react": "^18.2.0",
+    "typescript": "^4.8.4",
+    "vite": "^4.0.3",
+    "vite-tsconfig-paths": "^4.0.3",
+    "vitest": "^0.26.2"
+  },
+  "engines": {
+    "node": ">=16"
+  }
+}
