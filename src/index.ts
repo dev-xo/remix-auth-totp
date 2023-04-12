@@ -209,6 +209,12 @@ export interface OTPStrategyOptions<User> {
   codeField?: string
 
   /**
+   * The maximum age of the session in milliseconds. (remember me)
+   * @default undefined
+   */
+  maxAge?: number
+
+  /**
    * The validate email function.
    */
   validateEmail?: ValidateEmailFunction
@@ -299,6 +305,7 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
   private readonly secret: string
   private readonly emailField: string
   private readonly codeField: string
+  private readonly maxAge: number | undefined
   private readonly validateEmail: ValidateEmailFunction
   private readonly codeGeneration: CodeGenerationOptions
   private readonly magicLinkGeneration: MagicLinkGenerationOptions
@@ -340,6 +347,7 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
     this.secret = options.secret ?? ''
     this.emailField = options.emailField ?? 'email'
     this.codeField = options.codeField ?? 'code'
+    this.maxAge = options.maxAge ?? undefined
     this.validateEmail = options.validateEmail ?? this.validateEmailDefaults
     this.storeCode = options.storeCode
     this.sendCode = options.sendCode
@@ -439,7 +447,9 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
 
             throw redirect(options.successRedirect, {
               headers: {
-                'Set-Cookie': await sessionStorage.commitSession(session),
+                'Set-Cookie': await sessionStorage.commitSession(session, {
+                  maxAge: this.maxAge,
+                }),
               },
             })
           }
@@ -491,7 +501,9 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
 
           throw redirect(options.successRedirect, {
             headers: {
-              'Set-Cookie': await sessionStorage.commitSession(session),
+              'Set-Cookie': await sessionStorage.commitSession(session, {
+                maxAge: this.maxAge,
+              }),
             },
           })
         }

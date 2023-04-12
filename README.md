@@ -168,6 +168,9 @@ authenticator.use(
 )
 ```
 
+> **Note**
+> You can specify how long a session should last by passing a `maxAge` value in milliseconds, to the strategy options object. The default value is `undefined`, which will not persist the session across browsers restarts. This is useful for a "Remember me" like feature.
+
 ### 2. Setting Up the Strategy Options.
 
 The Strategy Instance requires the following methods: `storeCode`, `sendCode`, `validateCode` and `invalidateCode`. It's important to note that all of them are required.
@@ -652,6 +655,12 @@ export interface OTPStrategyOptions<User> {
    * @default "code"
    */
   codeField?: string
+
+  /**
+   * The maximum age of the session in milliseconds. (remember me)
+   * @default undefined
+   */
+  maxAge?: number
 
   /**
    * A Session key that stores the email address.
