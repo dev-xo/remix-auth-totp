@@ -236,15 +236,23 @@ authenticator.use(
     // Invalidate code.
     // It should return a Promise<void>.
     invalidateCode: async (code, active, attempts) => {
-      await db.otp.update({
-        where: {
-          code: code,
-        },
-        data: {
-          active: active,
-          attempts: attempts,
-        },
-      })
+      if (!active) {
+        await prisma.otp.delete({
+          where: {
+            code: code
+          }
+        })
+      } else {
+        await db.otp.update({
+          where: {
+            code: code,
+          },
+          data: {
+            active: active,
+            attempts: attempts,
+          },
+        })
+      }
     },
     async ({ email, code, magicLink, form, request }) => {},
   }),
