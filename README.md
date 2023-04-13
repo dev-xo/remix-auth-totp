@@ -168,6 +168,9 @@ authenticator.use(
 )
 ```
 
+> **Note**
+> You can specify how long a session should last by passing a `maxAge` value in milliseconds, to the strategy options object. The default value is `undefined`, which will not persist the session across browsers restarts. This is useful for a "Remember Me" like feature.
+
 ### 2. Setting Up the Strategy Options.
 
 The Strategy Instance requires the following methods: `storeCode`, `sendCode`, `validateCode` and `invalidateCode`. It's important to note that all of them are required.
@@ -233,15 +236,23 @@ authenticator.use(
     // Invalidate code.
     // It should return a Promise<void>.
     invalidateCode: async (code, active, attempts) => {
-      await db.otp.update({
-        where: {
-          code: code,
-        },
-        data: {
-          active: active,
-          attempts: attempts,
-        },
-      })
+      if (!active) {
+        await prisma.otp.delete({
+          where: {
+            code: code
+          }
+        })
+      } else {
+        await db.otp.update({
+          where: {
+            code: code,
+          },
+          data: {
+            active: active,
+            attempts: attempts,
+          },
+        })
+      }
     },
     async ({ email, code, magicLink, form, request }) => {},
   }),
@@ -652,6 +663,12 @@ export interface OTPStrategyOptions<User> {
    * @default "code"
    */
   codeField?: string
+
+  /**
+   * The maximum age of the session in milliseconds. ("Remember Me" feature)
+   * @default undefined
+   */
+  maxAge?: number
 
   /**
    * A Session key that stores the email address.
