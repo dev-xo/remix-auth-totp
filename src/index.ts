@@ -209,7 +209,7 @@ export interface OTPStrategyOptions<User> {
   codeField?: string
 
   /**
-   * The maximum age of the session in milliseconds. (remember me)
+   * The maximum age of the session in milliseconds.
    * @default undefined
    */
   maxAge?: number
