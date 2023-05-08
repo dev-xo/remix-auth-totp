@@ -11,7 +11,7 @@ A **One-Time Password Authentication** _Strategy_ for Remix Auth.
 
 - **😌 Easy to Setup**. The Strategy handles the entire authentication flow for you.
 - **🔐 Secure**. Encrypted and single-use codes.
-- **📧 Magic Link Built-In**. Authenticate your users with a single click.
+- **📧 Magic Link Built-In**. Authenticate your users with a simple click.
 - **📚 One Source of Truth**. The database of your choice.
 - **🛡 Bulletproof**. Written in strict TypeScript with a high test coverage.
 - **🚀 Built on top of Remix Auth**. An amazing authentication library for Remix.
@@ -169,7 +169,7 @@ authenticator.use(
 ```
 
 > **Note**
-> You can specify how long a session should last by passing a `maxAge` value in milliseconds. Default value is `undefined`, which will not persist the session across browsers restarts. This is useful for implementing a "Remember Me" feature.
+> You can specify how long a session should last by passing a `maxAge` value in milliseconds. Default value is `undefined`, which will not persist the session across browsers restarts.
 
 ### 2. Setting Up the Strategy Options.
 
