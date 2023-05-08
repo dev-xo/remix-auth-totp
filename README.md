@@ -9,9 +9,9 @@ A **One-Time Password Authentication** _Strategy_ for Remix Auth.
 
 ### Features
 
-- **😌 Easy to Setup**. The Strategy will handle the entire authentication flow for you.
-- **🔐 Secure**. The OTP code is encrypted and signed with a Secret Key.
-- **📧 Magic Link Built-In**. Send a Magic Link to the user and authenticate it with a simple click.
+- **😌 Easy to Setup**. The Strategy handles the entire authentication flow for you.
+- **🔐 Secure**. Encrypted and single-use codes.
+- **📧 Magic Link Built-In**. Authenticate your users with a single click.
 - **📚 One Source of Truth**. The database of your choice.
 - **🛡 Bulletproof**. Written in strict TypeScript with a high test coverage.
 - **🚀 Built on top of Remix Auth**. An amazing authentication library for Remix.
@@ -24,16 +24,16 @@ We've created a simple template demo that displays the authentication workflow. 
 
 ## Getting Started
 
-This Strategy uses a password-less authentication flow based on Email-Code validation.<br />
+This Strategy uses a password-less authentication flow based on email-code validation.<br />
 
-The user will receive an email with a code that will be used to authenticate itself. The code has just a single use and it's valid for a short period of time, which makes it very secure.<br />
+The user will receive an email with a code that will be used to authenticate itself. The code has just a single use and it's valid for a short period of time, which makes it secure and reliable.<br />
 
 Let's see how we can implement this Strategy for our Remix App.
 
 > **Note**
 > All the code examples are written in TypeScript. Feel free to use JavaScript instead and adapt the code to your needs.
 
-### Install the Package
+### Package
 
 First things first, we'll need to install the package.
 
@@ -43,7 +43,7 @@ npm install remix-auth-otp
 
 ### Database
 
-We'll require a database to store our codes. The OTP model has no relations to any other model from your database, this simplifies the process of generating the codes and makes it easier to be implemented into any database of your choice.
+We'll require a database to store our codes. The 'OTP' model has no relations with any other model, this simplifies the process of generating the codes and makes it easier to be implemented into any database of your choice.
 
 In this example we'll use Prisma ORM with a SQLite database. As long as your database model looks like the following one, you are good to go.
 
@@ -72,7 +72,7 @@ model Otp {
 
 ### Email Service
 
-We'll require an Email Service to send the codes to our users. I'll recommend [Sendinblue](https://www.sendinblue.com), it's free and does not require Credit Card for registration, either use. Feel free to use any other Email Service of your choice like [Mailgun](https://www.mailgun.com/), [Sendgrid](https://sendgrid.com/), etc.
+We'll require an Email Service to send the codes to our users. I'll recommend [Sendinblue](https://www.sendinblue.com) for dev purposes, it's free and does not require Credit Card for registration, either use. Feel free to use any other service of your choice like [Mailgun](https://www.mailgun.com/), [Sendgrid](https://sendgrid.com/), etc.
 
 The goal is to have a sender function similar to the following one.
 
@@ -110,7 +110,7 @@ We'll require to initialize a new Cookie Session Storage to work with.<br />
 The Session will be used to store the user data and everything related to the authentication flow.
 
 Create a file called `session.server.ts` wherever you want.<br />
-Paste the following code and replace the `secrets` property with a strong string into your `.env` file.
+Implement the following code and replace the `secrets` property with a strong string into your `.env` file.
 
 ```ts
 // app/services/session.server.ts
@@ -132,12 +132,12 @@ export const { getSession, commitSession, destroySession } = sessionStorage
 
 ### Strategy Instance
 
-Now that we have the Database, Email Service and Session Storage ready, we can create the OTP Strategy Instance. I'll divide this in a few small steps.
+Now that we have everything set up, we can start creating the Strategy Instance.
 
 ### 1. Creating the Strategy Instance.
 
 Create a file called `auth.server.ts` wherever you want.<br />
-Paste the following code and replace the `secret` property with a strong string into your `.env` file.
+Implement the following code and replace the `secret` property with a strong string into your `.env` file.
 
 ```ts
 // app/services/auth.server.ts
@@ -169,7 +169,7 @@ authenticator.use(
 ```
 
 > **Note**
-> You can specify how long a session should last by passing a `maxAge` value in milliseconds, to the strategy options object. The default value is `undefined`, which will not persist the session across browsers restarts. This is useful for a "Remember Me" like feature.
+> You can specify how long a session should last by passing a `maxAge` value in milliseconds. Default value is `undefined`, which will not persist the session across browsers restarts. This is useful for implementing a "Remember Me" feature.
 
 ### 2. Setting Up the Strategy Options.
 
@@ -313,7 +313,7 @@ And that's it! Feel free to check the [Example Code](https://github.com/dev-xo/r
 Last but not least, we'll need to create the routes that will handle the authentication flow.
 Create the following files inside the `app/routes` folder.
 
-### 1. Login Route
+### `login.tsx`
 
 ```tsx
 // app/routes/login.tsx
@@ -402,7 +402,7 @@ export default function Login() {
 }
 ```
 
-### 2. Account Route
+### `account.tsx`
 
 ```tsx
 // app/routes/account.tsx
@@ -435,7 +435,7 @@ export default function Account() {
 }
 ```
 
-### 3. Magic Link Route
+### `magic-link.tsx`
 
 ```tsx
 // app/routes/magic-link.tsx
@@ -450,7 +450,7 @@ export async function loader({ request }: DataFunctionArgs) {
 }
 ```
 
-### 4. Logout Route
+### `logout.tsx`
 
 ```tsx
 // app/routes/logout.tsx
@@ -461,6 +461,8 @@ export async function action({ request }: DataFunctionArgs) {
   return await authenticator.logout(request, { redirectTo: '/' })
 }
 ```
+
+Done! 🎉 You can now start your server and test the authentication flow.
 
 ## Options and Customization
 
