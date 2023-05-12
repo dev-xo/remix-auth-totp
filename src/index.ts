@@ -91,7 +91,7 @@ export interface MagicLinkGenerationOptions {
  * @param code The encrypted OTP code.
  */
 export interface StoreCodeFunction {
-  (code: string): Promise<void>
+  (code: string, email: string): Promise<void>
 }
 
 /**
@@ -438,7 +438,7 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
             })
 
             // Store and send the OTP code.
-            await this.saveOtp(otpEncrypted)
+            await this.saveOtp(otpEncrypted, email)
             await this.sendOtp(email, otp.code, magicLink, formData, request)
 
             session.set(this.sessionEmailKey, email)
@@ -551,8 +551,8 @@ export class OTPStrategy<User> extends Strategy<User, OTPVerifyParams> {
     }
   }
 
-  private async saveOtp(code: string) {
-    await this.storeCode(code)
+  private async saveOtp(code: string, email: string) {
+    await this.storeCode(code, email)
   }
 
   private async sendOtp(
