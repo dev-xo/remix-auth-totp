@@ -10,7 +10,7 @@
   <div>
     <a href="https://totp.fly.dev">Live Demo</a>
     •
-    <a href="https://github.com/dev-xo/remix-auth-totp/tree/main/examples">Examples</a>
+    <a href="https://github.com/dev-xo/remix-auth-totp/blob/main/docs/examples.md">Examples</a>
     •
     <a href="https://www.npmjs.com/package/remix-auth-otp">Legacy v2.0</a>
     <br/>
