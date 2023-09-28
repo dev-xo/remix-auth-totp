@@ -119,7 +119,7 @@ export async function sendEmail(body: SendEmailBody) {
 }
 ```
 
-In the [Starter Example](https://github.com/dev-xo/remix-auth-totp-starter) project, we can find a straightforward `sendEmail` implementation using [Resend](https://resend.com).
+In the [Starter Example](https://github.com/dev-xo/totp-starter-example) project, we can find a straightforward `sendEmail` implementation using [Resend](https://resend.com).
 
 ## Session Storage
 
@@ -416,7 +416,7 @@ export async function action({ request }: DataFunctionArgs) {
 }
 ```
 
-Done! 🎉 Feel free to check the [Starter Example](https://github.com/dev-xo/remix-auth-totp-starter) for a detailed implementation.
+Done! 🎉 Feel free to check the [Starter Example](https://github.com/dev-xo/totp-starter-example) for a detailed implementation.
 
 ## Options and Customization
 
