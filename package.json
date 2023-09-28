@@ -1,0 +1,61 @@
+{
+  "name": "remix-auth-totp",
+  "version": "1.0.2",
+  "type": "module",
+  "description": "A Time-Based One-Time Password (TOTP) Authentication Strategy for Remix-Auth.",
+  "author": "Daniel Kanem <devxo@mail.com> (https://twitter.com/DanielKanem)",
+  "repository": "dev-xo/remix-auth-totp",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "license": "MIT",
+  "keywords": [
+    "remix",
+    "remix-run",
+    "remix-auth",
+    "remix-auth-totp",
+    "authentication",
+    "totp"
+  ],
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "lint": "eslint --ext .ts,.tsx src/",
+    "typecheck": "tsc -b",
+    "format": "prettier --write .",
+    "test": "vitest --reporter verbose",
+    "validate": "npm run lint && npm run typecheck && npx vitest --watch=false"
+  },
+  "files": [
+    "dist",
+    "package.json",
+    "README.md"
+  ],
+  "eslintIgnore": [
+    "/node_modules",
+    "/dist",
+    "/public/dist"
+  ],
+  "dependencies": {
+    "@epic-web/totp": "^1.1.1",
+    "jsonwebtoken": "^9.0.2",
+    "thirty-two": "^1.0.2"
+  },
+  "peerDependencies": {
+    "remix-auth": "^3.5.1"
+  },
+  "devDependencies": {
+    "@remix-run/node": "^2.0.1",
+    "@remix-run/server-runtime": "^2.0.1",
+    "@types/jsonwebtoken": "^9.0.3",
+    "@types/node": "^20.7.0",
+    "@typescript-eslint/eslint-plugin": "^5.62.0",
+    "@typescript-eslint/parser": "^5.62.0",
+    "eslint": "^8.50.0",
+    "eslint-config-prettier": "^8.10.0",
+    "eslint-plugin-prettier": "^4.2.1",
+    "prettier": "^2.8.8",
+    "typescript": "^4.9.5",
+    "vite": "^4.4.9",
+    "vite-tsconfig-paths": "^4.2.1",
+    "vitest": "^0.34.5"
+  }
+}

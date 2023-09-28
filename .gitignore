@@ -1,0 +1,23 @@
+# Package Managers.
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+pnpm-lock.yml
+node_modules
+
+# Editor Configs.
+.idea
+.vscode
+.DS_Store
+
+# Files.
+/.cache
+/dist
+/public/build
+.env
+
+# Tests.
+/coverage
+
+# Miscellaneous.
+TODO.md
