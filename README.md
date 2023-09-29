@@ -47,8 +47,6 @@ npm install remix-auth-totp --legacy-peer-deps
 
 ## Usage
 
-This documentation covers Remix Auth TOTP for email verification in your Remix app. A 2FA proposal is already in progress.
-
 Remix Auth TOTP exports three required methods:
 
 - `storeTOTP` - Stores the generated OTP into database.
@@ -72,7 +70,7 @@ Let's see how we can implement the Strategy into our Remix App.
 
 We'll require a database to store our encrypted OTP codes.
 
-For this example we'll use Prisma ORM with a SQLite database. As long as the database model resembles the following one, you're all set.
+For this example we'll use Prisma ORM with a SQLite database. As long as your database supports the following fields, you can use any database of choice.
 
 ```ts
 // The model only requires 3 fields: hash, active and attempts.
@@ -164,10 +162,15 @@ import { sessionStorage } from './session.server'
 import { sendEmail } from './email.server'
 import { db } from '~/db'
 
-export let authenticator = new Authenticator<{ id: string; email: string }>(
-  sessionStorage,
-  { throwOnError: true },
-)
+// The User type should match the one from database.
+type User = {
+  id: string
+  email: string
+}
+
+export let authenticator = new Authenticator<User>(sessionStorage, {
+  throwOnError: true,
+})
 
 authenticator.use(
   new TOTPStrategy(
@@ -187,7 +190,7 @@ authenticator.use(
 
 ### 2: Implementing the Strategy Logic.
 
-The Strategy Instance requires the following methods: `storeTOTP`, `sendTOTP`, `handleTOTP`. It's important to note that all of them are required.
+The Strategy Instance requires the following methods: `storeTOTP`, `sendTOTP`, `handleTOTP`.
 
 ```ts
 authenticator.use(
@@ -195,9 +198,11 @@ authenticator.use(
     secret: process.env.ENCRYPTION_SECRET,
 
     storeTOTP: async (data) => {
+      // Store the generated OTP into database.
       await db.totp.create({ data })
     },
     sendTOTP: async ({ email, code, magicLink }) => {
+      // Send the generated OTP to the user.
       await sendEmail({ email, code, magicLink })
     },
     handleTOTP: async (hash, data) => {
@@ -226,7 +231,7 @@ All of this CRUD methods should be replaced and adapted with the ones provided b
 
 ### 3. Creating and Storing the User.
 
-The Strategy returns a `verify` method that allow us handling our own logic. This includes creating the user, updating the user, etc.<br />
+The Strategy returns a `verify` method that allows handling our own logic. This includes creating the user, updating the user, etc.<br />
 
 This should return the user data that will be stored in Session.
 
@@ -234,7 +239,7 @@ This should return the user data that will be stored in Session.
 authenticator.use(
   new OTPStrategy(
     {
-      // We've already We've already set up these options.
+      // We've already set up these options.
       // storeTOTP: async (data) => {},
       // ...
     },
