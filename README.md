@@ -280,8 +280,8 @@ import type { DataFunctionArgs } from '@remix-run/node'
 import { json } from '@remix-run/node'
 import { Form, useLoaderData } from '@remix-run/react'
 
-import { authenticator } from '~/services/auth.server'
-import { getSession, commitSession } from '~/services/session.server'
+import { authenticator } from '~/modules/auth/auth.server'
+import { getSession, commitSession } from '~/modules/auth/session.server'
 
 export async function loader({ request }: DataFunctionArgs) {
   await authenticator.isAuthenticated(request, {
@@ -397,7 +397,7 @@ export default function Account() {
 ```tsx
 // app/routes/magic-link.tsx
 import type { DataFunctionArgs } from '@remix-run/node'
-import { authenticator } from '~/services/auth.server'
+import { authenticator } from '~/modules/auth/auth.server'
 
 export async function loader({ request }: DataFunctionArgs) {
   await authenticator.authenticate('TOTP', request, {
@@ -412,7 +412,7 @@ export async function loader({ request }: DataFunctionArgs) {
 ```tsx
 // app/routes/logout.tsx
 import type { DataFunctionArgs } from '@remix-run/node'
-import { authenticator } from '~/services/auth.server'
+import { authenticator } from '~/modules/auth/auth.server'
 
 export async function action({ request }: DataFunctionArgs) {
   return await authenticator.logout(request, {
