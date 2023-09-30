@@ -190,7 +190,7 @@ authenticator.use(
 
 ### 2: Implementing the Strategy Logic.
 
-The Strategy Instance requires the following methods: `storeTOTP`, `sendTOTP`, `handleTOTP`.
+The Strategy Instance requires the following three methods: `storeTOTP`, `sendTOTP`, `handleTOTP`.
 
 ```ts
 authenticator.use(
@@ -334,7 +334,7 @@ export default function Login() {
       )}
 
       {/* Code Verification Form. */}
-      {hasSentEmail && (
+      {authEmail && (
         <div style={{ display: 'flex' flexDirection: 'column' }}>
           {/* Renders the form that verifies the code. */}
           <Form method="POST">
