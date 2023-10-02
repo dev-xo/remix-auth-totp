@@ -19,16 +19,12 @@
 </div>
 
 ```
-npm install remix-auth-totp --legacy-peer-deps
+npm install remix-auth-totp
 ```
 
 [![CI](https://img.shields.io/github/actions/workflow/status/dev-xo/remix-auth-totp/main.yml?label=Build)](https://github.com/dev-xo/remix-auth-totp/actions/workflows/main.yml)
 [![Release](https://img.shields.io/npm/v/remix-auth-totp.svg?&label=Release)](https://www.npmjs.com/package/remix-auth-totp)
 [![License](https://img.shields.io/badge/License-MIT-brightgreen.svg)](https://github.com/dev-xo/remix-auth-totp/blob/main/LICENSE)
-
-> **Note**
-> We'll require the `--legacy-peer-deps` flag until `remix-auth` fully gives support for Remix v2.0.<br />
-> A proposal has been already created. This flag will be removed soon.
 
 ## Features
 
