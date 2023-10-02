@@ -22,6 +22,7 @@
     "typecheck": "tsc -b",
     "format": "prettier --write .",
     "test": "vitest --reporter verbose",
+    "test:cov": "vitest run --coverage",
     "validate": "npm run lint && npm run typecheck && npx vitest --watch=false"
   },
   "files": [
@@ -49,6 +50,7 @@
     "@types/node": "^20.7.0",
     "@typescript-eslint/eslint-plugin": "^5.62.0",
     "@typescript-eslint/parser": "^5.62.0",
+    "@vitest/coverage-v8": "^1.0.0-beta.0",
     "eslint": "^8.50.0",
     "eslint-config-prettier": "^8.10.0",
     "eslint-plugin-prettier": "^4.2.1",

@@ -353,310 +353,344 @@ describe('[ TOTP ]', () => {
   })
 
   describe('2nd Authentication Phase', () => {
-    describe('TOTP Validation', () => {
-      test('Should call handleTOTP function.', async () => {
-        const totp = generateTOTP(TOTP_DEFAULTS)
-        const formData = new FormData()
-        formData.append(FORM_FIELDS.TOTP, totp.otp)
+    test('Should call handleTOTP function.', async () => {
+      const totp = generateTOTP(TOTP_DEFAULTS)
+      const formData = new FormData()
+      formData.append(FORM_FIELDS.TOTP, totp.otp)
 
-        const request = new Request(`${HOST_URL}`, {
-          method: 'POST',
-          headers: {
-            host: HOST_URL,
-          },
-          body: formData,
-        })
-
-        const strategy = new TOTPStrategy(
-          { secret: SECRET_ENV, storeTOTP, sendTOTP, handleTOTP },
-          verify,
-        )
-        await strategy
-          .authenticate(request, sessionStorage, {
-            ...AUTH_OPTIONS,
-            throwOnError: true,
-            successRedirect: '/',
-          })
-          .catch((error) => error)
-
-        expect(handleTOTP).toHaveBeenCalledTimes(1)
+      const request = new Request(`${HOST_URL}`, {
+        method: 'POST',
+        headers: {
+          host: HOST_URL,
+        },
+        body: formData,
       })
 
-      test('Should throw an Error on missing TOTP from database.', async () => {
-        const totp = generateTOTP(TOTP_DEFAULTS)
-        const formData = new FormData()
-        formData.append(FORM_FIELDS.TOTP, totp.otp)
-
-        const request = new Request(`${HOST_URL}`, {
-          method: 'POST',
-          headers: { host: HOST_URL },
-          body: formData,
+      const strategy = new TOTPStrategy(
+        { secret: SECRET_ENV, storeTOTP, sendTOTP, handleTOTP },
+        verify,
+      )
+      await strategy
+        .authenticate(request, sessionStorage, {
+          ...AUTH_OPTIONS,
+          throwOnError: true,
+          successRedirect: '/',
         })
+        .catch((error) => error)
 
-        const strategy = new TOTPStrategy(
-          { secret: SECRET_ENV, storeTOTP, sendTOTP, handleTOTP },
-          verify,
-        )
-        const result = (await strategy
-          .authenticate(request, sessionStorage, {
-            ...AUTH_OPTIONS,
-            throwOnError: true,
-            successRedirect: '/',
-          })
-          .catch((error) => error)) as Response
-
-        expect(result).toEqual(new AuthorizationError(ERRORS.TOTP_NOT_FOUND))
-      })
-
-      test('Should throw an Error on inactive TOTP.', async () => {
-        handleTOTP.mockImplementation(() =>
-          Promise.resolve({ hash: signedTotp, attempts: 0, active: false }),
-        )
-
-        const { otp: _otp, ...totp } = generateTOTP(TOTP_DEFAULTS)
-        const signedTotp = signJWT(totp, TOTP_DEFAULTS.period, SECRET_ENV)
-
-        const formData = new FormData()
-        formData.append(FORM_FIELDS.TOTP, _otp)
-
-        const request = new Request(`${HOST_URL}`, {
-          method: 'POST',
-          headers: {
-            host: HOST_URL,
-          },
-          body: formData,
-        })
-
-        const strategy = new TOTPStrategy(
-          { secret: SECRET_ENV, storeTOTP, sendTOTP, handleTOTP },
-          verify,
-        )
-        const result = (await strategy
-          .authenticate(request, sessionStorage, {
-            ...AUTH_OPTIONS,
-            throwOnError: true,
-            successRedirect: '/',
-          })
-          .catch((error) => error)) as Response
-
-        expect(result).toEqual(new AuthorizationError(ERRORS.INACTIVE_TOTP))
-      })
-
-      test('Should throw an Error on TOTP max attempts reached.', async () => {
-        handleTOTP.mockImplementation(() =>
-          Promise.resolve({
-            hash: signedTotp,
-            attempts: TOTP_DEFAULTS.maxAttempts,
-            active: true,
-          }),
-        )
-
-        const { otp: _otp, ...totp } = generateTOTP(TOTP_DEFAULTS)
-        const signedTotp = signJWT(totp, TOTP_DEFAULTS.period, SECRET_ENV)
-
-        const formData = new FormData()
-        formData.append(FORM_FIELDS.TOTP, _otp)
-
-        const request = new Request(`${HOST_URL}`, {
-          method: 'POST',
-          headers: {
-            host: HOST_URL,
-          },
-          body: formData,
-        })
-
-        const strategy = new TOTPStrategy(
-          { secret: SECRET_ENV, storeTOTP, sendTOTP, handleTOTP },
-          verify,
-        )
-        const result = (await strategy
-          .authenticate(request, sessionStorage, {
-            ...AUTH_OPTIONS,
-            throwOnError: true,
-            successRedirect: '/',
-          })
-          .catch((error) => error)) as Response
-
-        expect(result).toEqual(new AuthorizationError(ERRORS.INACTIVE_TOTP))
-      })
-
-      test('Should throw an Error on invalid TOTP verification.', async () => {
-        handleTOTP.mockImplementation(() =>
-          Promise.resolve({ hash: signedTotp, attempts: 0, active: true }),
-        )
-
-        const { otp: _otp, ...totp } = generateTOTP({ ...TOTP_DEFAULTS, period: 0.1 })
-        const signedTotp = signJWT(totp, TOTP_DEFAULTS.period, SECRET_ENV)
-
-        const formData = new FormData()
-        formData.append(FORM_FIELDS.TOTP, _otp)
-
-        const session = await sessionStorage.getSession()
-        session.set(SESSION_KEYS.TOTP, signedTotp)
-
-        const request = new Request(`${HOST_URL}`, {
-          method: 'POST',
-          headers: {
-            host: HOST_URL,
-            cookie: await sessionStorage.commitSession(session),
-          },
-          body: formData,
-        })
-
-        // This promise is used to wait for the TOTP period to expire.
-        const awaitTotpExpiration = new Promise((resolve) => {
-          setTimeout(() => {
-            resolve(true)
-          }, 200)
-        })
-        await awaitTotpExpiration
-
-        const strategy = new TOTPStrategy(
-          { secret: SECRET_ENV, storeTOTP, sendTOTP, handleTOTP },
-          verify,
-        )
-        const result = (await strategy
-          .authenticate(request, sessionStorage, {
-            ...AUTH_OPTIONS,
-            throwOnError: true,
-            successRedirect: '/',
-          })
-          .catch((error) => error)) as Response
-
-        expect(handleTOTP).toHaveBeenCalledTimes(2)
-        expect(result).toEqual(new AuthorizationError(ERRORS.INVALID_TOTP))
-      })
-
-      test('Should successfully validate TOTP.', async () => {
-        handleTOTP.mockImplementation(() =>
-          Promise.resolve({ hash: signedTotp, attempts: 0, active: true }),
-        )
-
-        const { otp: _otp, ...totp } = generateTOTP(TOTP_DEFAULTS)
-        const signedTotp = signJWT(totp, TOTP_DEFAULTS.period, SECRET_ENV)
-
-        const formData = new FormData()
-        formData.append(FORM_FIELDS.TOTP, _otp)
-
-        const session = await sessionStorage.getSession()
-        session.set(SESSION_KEYS.TOTP, signedTotp)
-
-        const request = new Request(`${HOST_URL}`, {
-          method: 'POST',
-          headers: {
-            host: HOST_URL,
-            cookie: await sessionStorage.commitSession(session),
-          },
-          body: formData,
-        })
-
-        const strategy = new TOTPStrategy(
-          { secret: SECRET_ENV, storeTOTP, sendTOTP, handleTOTP },
-          verify,
-        )
-        const result = (await strategy
-          .authenticate(request, sessionStorage, {
-            ...AUTH_OPTIONS,
-            throwOnError: true,
-            successRedirect: '/',
-          })
-          .catch((error) => error)) as Response
-
-        expect(result.headers.get('location')).toMatch('/')
-      })
+      expect(handleTOTP).toHaveBeenCalledTimes(1)
     })
 
-    describe('Magic Link Validation', () => {
-      test('Should throw an Error on invalid expected path.', async () => {
-        const { otp: _otp } = generateTOTP(TOTP_DEFAULTS)
+    test('Should throw an Error on missing TOTP from database.', async () => {
+      const totp = generateTOTP(TOTP_DEFAULTS)
+      const formData = new FormData()
+      formData.append(FORM_FIELDS.TOTP, totp.otp)
 
-        const magicLink = generateMagicLink({
-          ...MAGIC_LINK_DEFAULTS,
-          callbackPath: '/invalid',
-          param: 'code',
-          code: _otp,
-          request: new Request(HOST_URL, {
-            headers: {
-              host: HOST_URL,
-            },
-          }),
+      const request = new Request(`${HOST_URL}`, {
+        method: 'POST',
+        headers: { host: HOST_URL },
+        body: formData,
+      })
+
+      const strategy = new TOTPStrategy(
+        { secret: SECRET_ENV, storeTOTP, sendTOTP, handleTOTP },
+        verify,
+      )
+      const result = (await strategy
+        .authenticate(request, sessionStorage, {
+          ...AUTH_OPTIONS,
+          throwOnError: true,
+          successRedirect: '/',
         })
+        .catch((error) => error)) as Response
 
-        const request = new Request(`${magicLink}`, {
-          method: 'GET',
+      expect(result).toEqual(new AuthorizationError(ERRORS.TOTP_NOT_FOUND))
+    })
+
+    test('Should throw an Error on inactive TOTP.', async () => {
+      handleTOTP.mockImplementation(() =>
+        Promise.resolve({ hash: signedTotp, attempts: 0, active: false }),
+      )
+
+      const { otp: _otp, ...totp } = generateTOTP(TOTP_DEFAULTS)
+      const signedTotp = signJWT(totp, TOTP_DEFAULTS.period, SECRET_ENV)
+
+      const formData = new FormData()
+      formData.append(FORM_FIELDS.TOTP, _otp)
+
+      const request = new Request(`${HOST_URL}`, {
+        method: 'POST',
+        headers: {
+          host: HOST_URL,
+        },
+        body: formData,
+      })
+
+      const strategy = new TOTPStrategy(
+        { secret: SECRET_ENV, storeTOTP, sendTOTP, handleTOTP },
+        verify,
+      )
+      const result = (await strategy
+        .authenticate(request, sessionStorage, {
+          ...AUTH_OPTIONS,
+          throwOnError: true,
+          successRedirect: '/',
+        })
+        .catch((error) => error)) as Response
+
+      expect(result).toEqual(new AuthorizationError(ERRORS.INACTIVE_TOTP))
+    })
+
+    test('Should throw an Error on TOTP max attempts reached.', async () => {
+      handleTOTP.mockImplementation(() =>
+        Promise.resolve({
+          hash: signedTotp,
+          attempts: TOTP_DEFAULTS.maxAttempts,
+          active: true,
+        }),
+      )
+
+      const { otp: _otp, ...totp } = generateTOTP(TOTP_DEFAULTS)
+      const signedTotp = signJWT(totp, TOTP_DEFAULTS.period, SECRET_ENV)
+
+      const formData = new FormData()
+      formData.append(FORM_FIELDS.TOTP, _otp)
+
+      const request = new Request(`${HOST_URL}`, {
+        method: 'POST',
+        headers: {
+          host: HOST_URL,
+        },
+        body: formData,
+      })
+
+      const strategy = new TOTPStrategy(
+        { secret: SECRET_ENV, storeTOTP, sendTOTP, handleTOTP },
+        verify,
+      )
+      const result = (await strategy
+        .authenticate(request, sessionStorage, {
+          ...AUTH_OPTIONS,
+          throwOnError: true,
+          successRedirect: '/',
+        })
+        .catch((error) => error)) as Response
+
+      expect(result).toEqual(new AuthorizationError(ERRORS.INACTIVE_TOTP))
+    })
+
+    test('Should throw an Error on TOTP invalid JWT.', async () => {
+      handleTOTP.mockImplementation(() =>
+        Promise.resolve({ hash: signedTotp, attempts: 0, active: true }),
+      )
+
+      const { otp: _otp, ...totp } = generateTOTP(TOTP_DEFAULTS)
+      const signedTotp = signJWT(totp, TOTP_DEFAULTS.period, 'INVALID_SECRET')
+
+      const formData = new FormData()
+      formData.append(FORM_FIELDS.TOTP, _otp)
+
+      const session = await sessionStorage.getSession()
+      session.set(SESSION_KEYS.TOTP, signedTotp)
+
+      const request = new Request(`${HOST_URL}`, {
+        method: 'POST',
+        headers: {
+          host: HOST_URL,
+          cookie: await sessionStorage.commitSession(session),
+        },
+        body: formData,
+      })
+
+      const strategy = new TOTPStrategy(
+        { secret: SECRET_ENV, storeTOTP, sendTOTP, handleTOTP },
+        verify,
+      )
+      const result = (await strategy
+        .authenticate(request, sessionStorage, {
+          ...AUTH_OPTIONS,
+          throwOnError: true,
+          successRedirect: '/',
+        })
+        .catch((error) => error)) as Response
+
+      expect(result).toEqual(new AuthorizationError(ERRORS.INACTIVE_TOTP))
+    })
+
+    test('Should throw an Error on invalid TOTP verification.', async () => {
+      handleTOTP.mockImplementation(() =>
+        Promise.resolve({ hash: signedTotp, attempts: 0, active: true }),
+      )
+
+      const { otp: _otp, ...totp } = generateTOTP({ ...TOTP_DEFAULTS, period: 0.1 })
+      const signedTotp = signJWT(totp, TOTP_DEFAULTS.period, SECRET_ENV)
+
+      const formData = new FormData()
+      formData.append(FORM_FIELDS.TOTP, _otp)
+
+      const session = await sessionStorage.getSession()
+      session.set(SESSION_KEYS.TOTP, signedTotp)
+
+      const request = new Request(`${HOST_URL}`, {
+        method: 'POST',
+        headers: {
+          host: HOST_URL,
+          cookie: await sessionStorage.commitSession(session),
+        },
+        body: formData,
+      })
+
+      // This promise is used to wait for the TOTP period to expire.
+      const awaitTotpExpiration = new Promise((resolve) => {
+        setTimeout(() => {
+          resolve(true)
+        }, 200)
+      })
+      await awaitTotpExpiration
+
+      const strategy = new TOTPStrategy(
+        { secret: SECRET_ENV, storeTOTP, sendTOTP, handleTOTP },
+        verify,
+      )
+      const result = (await strategy
+        .authenticate(request, sessionStorage, {
+          ...AUTH_OPTIONS,
+          throwOnError: true,
+          successRedirect: '/',
+        })
+        .catch((error) => error)) as Response
+
+      expect(handleTOTP).toHaveBeenCalledTimes(2)
+      expect(result).toEqual(new AuthorizationError(ERRORS.INVALID_TOTP))
+    })
+
+    test('Should throw an Error on invalid magic-link expected path.', async () => {
+      const { otp: _otp } = generateTOTP(TOTP_DEFAULTS)
+
+      const magicLink = generateMagicLink({
+        ...MAGIC_LINK_DEFAULTS,
+        callbackPath: '/invalid',
+        param: 'code',
+        code: _otp,
+        request: new Request(HOST_URL, {
           headers: {
             host: HOST_URL,
           },
-        })
-
-        const strategy = new TOTPStrategy(
-          { secret: SECRET_ENV, storeTOTP, sendTOTP, handleTOTP },
-          verify,
-        )
-        const result = (await strategy
-          .authenticate(request, sessionStorage, {
-            ...AUTH_OPTIONS,
-            throwOnError: true,
-            successRedirect: '/',
-          })
-          .catch((error) => error)) as Response
-
-        expect(result).toEqual(new AuthorizationError(ERRORS.INVALID_MAGIC_LINK_PATH))
+        }),
       })
 
-      test('Should throw an Error on invalid TOTP verification.', async () => {
-        handleTOTP.mockImplementation(() =>
-          Promise.resolve({ hash: signedTotp, attempts: 0, active: true }),
-        )
+      const request = new Request(`${magicLink}`, {
+        method: 'GET',
+        headers: {
+          host: HOST_URL,
+        },
+      })
 
-        const { otp: _otp, ...totp } = generateTOTP({ ...TOTP_DEFAULTS, period: 0.1 })
-        const signedTotp = signJWT(totp, TOTP_DEFAULTS.period, SECRET_ENV)
-
-        const magicLink = generateMagicLink({
-          ...MAGIC_LINK_DEFAULTS,
-          callbackPath: '/magic-link',
-          param: 'code',
-          code: _otp,
-          request: new Request(HOST_URL, {
-            headers: {
-              host: HOST_URL,
-            },
-          }),
+      const strategy = new TOTPStrategy(
+        { secret: SECRET_ENV, storeTOTP, sendTOTP, handleTOTP },
+        verify,
+      )
+      const result = (await strategy
+        .authenticate(request, sessionStorage, {
+          ...AUTH_OPTIONS,
+          throwOnError: true,
+          successRedirect: '/',
         })
+        .catch((error) => error)) as Response
 
-        const session = await sessionStorage.getSession()
-        session.set(SESSION_KEYS.TOTP, signedTotp)
+      expect(result).toEqual(new AuthorizationError(ERRORS.INVALID_MAGIC_LINK_PATH))
+    })
 
-        const request = new Request(`${magicLink}`, {
-          method: 'GET',
+    test('Should throw an Error on invalid magic-link TOTP verification.', async () => {
+      handleTOTP.mockImplementation(() =>
+        Promise.resolve({ hash: signedTotp, attempts: 0, active: true }),
+      )
+
+      const { otp: _otp, ...totp } = generateTOTP({ ...TOTP_DEFAULTS, period: 0.1 })
+      const signedTotp = signJWT(totp, TOTP_DEFAULTS.period, SECRET_ENV)
+
+      const magicLink = generateMagicLink({
+        ...MAGIC_LINK_DEFAULTS,
+        callbackPath: '/magic-link',
+        param: 'code',
+        code: _otp,
+        request: new Request(HOST_URL, {
           headers: {
             host: HOST_URL,
-            cookie: await sessionStorage.commitSession(session),
           },
-        })
-
-        // This promise is used to wait for the TOTP period to expire.
-        const awaitTotpExpiration = new Promise((resolve) => {
-          setTimeout(() => {
-            resolve(true)
-          }, 200)
-        })
-        await awaitTotpExpiration
-
-        const strategy = new TOTPStrategy(
-          { secret: SECRET_ENV, storeTOTP, sendTOTP, handleTOTP },
-          verify,
-        )
-        const result = (await strategy
-          .authenticate(request, sessionStorage, {
-            ...AUTH_OPTIONS,
-            throwOnError: true,
-            successRedirect: '/',
-          })
-          .catch((error) => error)) as Response
-
-        expect(result).toEqual(new AuthorizationError(ERRORS.INVALID_TOTP))
+        }),
       })
+
+      const session = await sessionStorage.getSession()
+      session.set(SESSION_KEYS.TOTP, signedTotp)
+
+      const request = new Request(`${magicLink}`, {
+        method: 'GET',
+        headers: {
+          host: HOST_URL,
+          cookie: await sessionStorage.commitSession(session),
+        },
+      })
+
+      // This promise is used to wait for the TOTP period to expire.
+      const awaitTotpExpiration = new Promise((resolve) => {
+        setTimeout(() => {
+          resolve(true)
+        }, 200)
+      })
+      await awaitTotpExpiration
+
+      const strategy = new TOTPStrategy(
+        { secret: SECRET_ENV, storeTOTP, sendTOTP, handleTOTP },
+        verify,
+      )
+      const result = (await strategy
+        .authenticate(request, sessionStorage, {
+          ...AUTH_OPTIONS,
+          throwOnError: true,
+          successRedirect: '/',
+        })
+        .catch((error) => error)) as Response
+
+      expect(result).toEqual(new AuthorizationError(ERRORS.INVALID_TOTP))
+    })
+
+    test('Should successfully validate TOTP.', async () => {
+      handleTOTP.mockImplementation(() =>
+        Promise.resolve({ hash: signedTotp, attempts: 0, active: true }),
+      )
+
+      const { otp: _otp, ...totp } = generateTOTP(TOTP_DEFAULTS)
+      const signedTotp = signJWT(totp, TOTP_DEFAULTS.period, SECRET_ENV)
+
+      const formData = new FormData()
+      formData.append(FORM_FIELDS.TOTP, _otp)
+
+      const session = await sessionStorage.getSession()
+      session.set(SESSION_KEYS.TOTP, signedTotp)
+
+      const request = new Request(`${HOST_URL}`, {
+        method: 'POST',
+        headers: {
+          host: HOST_URL,
+          cookie: await sessionStorage.commitSession(session),
+        },
+        body: formData,
+      })
+
+      const strategy = new TOTPStrategy(
+        { secret: SECRET_ENV, storeTOTP, sendTOTP, handleTOTP },
+        verify,
+      )
+      const result = (await strategy
+        .authenticate(request, sessionStorage, {
+          ...AUTH_OPTIONS,
+          throwOnError: true,
+          successRedirect: '/',
+        })
+        .catch((error) => error)) as Response
+
+      expect(result.headers.get('location')).toMatch('/')
     })
 
     test('Should contain user property in session.', async () => {
@@ -725,5 +759,3 @@ describe('[ Utils ]', () => {
     }
   })
 })
-
-// TODO: Add JWT tests.
