@@ -29,7 +29,7 @@ jobs:
         uses: bahmutov/npm-install@v1.8.28
         with:
           useLockFile: false
-          install-command: npm install --force
+          install-command: npm install
 
       - name: Run Build
         run: npm run build
@@ -53,7 +53,7 @@ jobs:
         uses: bahmutov/npm-install@v1.8.28
         with:
           useLockFile: false
-          install-command: npm install --force
+          install-command: npm install
 
       - name: Run Lint
         run: npm run lint
@@ -77,7 +77,7 @@ jobs:
         uses: bahmutov/npm-install@v1.8.28
         with:
           useLockFile: false
-          install-command: npm install --force
+          install-command: npm install
 
       - name: Run Typecheck
         run: npm run typecheck --if-present
@@ -101,7 +101,7 @@ jobs:
         uses: bahmutov/npm-install@v1.8.28
         with:
           useLockFile: false
-          install-command: npm install --force
+          install-command: npm install
 
       - name: Run Vitest
         run: npm run test
