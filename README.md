@@ -69,20 +69,36 @@ We'll require a database to store our encrypted OTP codes.
 For this example we'll use Prisma ORM with a SQLite database. As long as your database supports the following fields, you can use any database of choice.
 
 ```ts
-// The model only requires 3 fields: hash, active and attempts.
-// ...
-// The `hash` field should be a String.
-// The `active` field should be a Boolean and be set to true by default.
-// The `attempts` field should be an Int (Number) and be set to 0 by default.
-// ...
-// The `createdAt` and `updatedAt` fields are optional, and not required.
+/**
+ * Model Fields:
+ * - `hash`: String
+ * - `active`: Boolean, default: true
+ * - `attempts`: Int (Number), default: 0
+
+ *
+ * Optional:
+ * - `createdAt`
+ * - `updatedAt`
+ * - `expiresAt`: BigInt? (Number)
+ */
 
 model Totp {
   id String @id @default(uuid())
 
-  hash      String   @unique
-  active    Boolean  @default(true)
-  attempts  Int      @default(0)
+  /// The encrypted OTP code.
+  hash String @unique
+
+  /// The OTP code status.
+  /// Used internally / programmatically to invalidate OTPs.
+  active Boolean @default(true)
+
+  /// The number of inputted attempts.
+  /// Used internally to invalidate OTPs after a certain number of attempts.
+  attempts Int @default(0)
+
+  /// The expiration date of the OTP in milliseconds.
+  /// Used programmatically to invalidate unused OTPs.
+  expiresAt BigInt?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

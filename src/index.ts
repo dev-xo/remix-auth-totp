@@ -91,16 +91,22 @@ export interface StoreTOTPOptions {
   hash: string
 
   /**
+   * The status of the OTP.
+   * @default true
+   */
+  active: boolean
+
+  /**
    * The number of attempts the user tried to verify the OTP.
    * @default 0
    */
   attempts: number
 
   /**
-   * The status of the OTP.
-   * @default true
+   * The OTP expiration date represented as Unix timestamp.
+   * @default Date.now() + TOTP generation period.
    */
-  active: boolean
+  expiresAt?: number
 }
 
 /**
@@ -465,7 +471,13 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
             })
 
             // Store and Send TOTP.
-            await this._saveOTP({ hash: signedTotp, attempts: 0, active: true })
+            await this._saveOTP({
+              hash: signedTotp,
+              active: true,
+              attempts: 0,
+              expiresAt:
+                Date.now() + (totp.period ?? this._totpGenerationDefaults.period) * 1000,
+            })
             await this._sendOTP({
               email: formDataEmail,
               code: _otp,
