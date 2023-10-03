@@ -416,12 +416,26 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
           /**
            * Re-send TOTP.
            */
-          if (!formDataTotp && sessionEmail && sessionTotp) {
+          if (!formDataEmail && !formDataTotp && sessionEmail && sessionTotp) {
             // Invalidate previous TOTP.
             await this.handleTOTP(sessionTotp, { active: false })
 
             // Assign session email to form email.
             formDataEmail = sessionEmail
+          }
+
+          /**
+           * Invalidate previous TOTP.
+           * User has submitted a different email address.
+           */
+          if (
+            formDataEmail &&
+            sessionEmail &&
+            formDataEmail !== sessionEmail &&
+            sessionTotp
+          ) {
+            // Invalidate previous TOTP.
+            await this.handleTOTP(sessionTotp, { active: false })
           }
 
           /**
