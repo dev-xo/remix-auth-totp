@@ -147,7 +147,10 @@ describe('[ TOTP ]', () => {
         .authenticate(request, sessionStorage, { ...AUTH_OPTIONS, successRedirect: '/' })
         .catch((error) => error)
 
-      expect(handleTOTP).toHaveBeenCalledTimes(1)
+      // Called 2 times:
+      // - 1st: Inside 'Re-send TOTP'.
+      // - 2nd: Inside 'First TOTP request' after storing the TOTP.
+      expect(handleTOTP).toHaveBeenCalledTimes(2)
     })
 
     test('Should assign session email to form email.', async () => {

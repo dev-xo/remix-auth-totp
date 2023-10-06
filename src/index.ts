@@ -170,10 +170,14 @@ export interface SendTOTP<User> {
  * @param data The data to update.
  */
 export interface HandleTOTP {
-  (hash: string, data?: { active?: boolean; attempts?: number }): Promise<{
+  (
+    hash: string,
+    data?: { active?: boolean; attempts?: number; expiresAt?: number },
+  ): Promise<{
     hash?: string
     attempts: number
     active: boolean
+    expiresAt?: number
   } | null>
 }
 
@@ -470,14 +474,13 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
               request,
             })
 
-            // Store and Send TOTP.
-            await this._saveOTP({
-              hash: signedTotp,
-              active: true,
-              attempts: 0,
-              expiresAt:
-                Date.now() + (totp.period ?? this._totpGenerationDefaults.period) * 1000,
-            })
+            // Store TOTP.
+            await this._saveOTP({ hash: signedTotp, active: true, attempts: 0 })
+
+            // Update `expiresAt` database field (if exists).
+            await this._handleExpiresAt(signedTotp, totp)
+
+            // Send TOTP.
             await this._sendOTP({
               email: formDataEmail,
               code: _otp,
@@ -637,6 +640,21 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     if (!isValid) {
       await this.handleTOTP(sessionTotp, { attempts: dbTOTP.attempts + 1 })
       throw new Error(this.customErrors.invalidTotp)
+    }
+  }
+
+  private async _handleExpiresAt(
+    sessionTotp: string,
+    totp: Partial<TOTPGenerationOptions>,
+  ) {
+    // Retrieve encrypted TOTP from database.
+    const dbTOTP = await this.handleTOTP(sessionTotp)
+
+    if (dbTOTP && 'expiresAt' in dbTOTP) {
+      await this.handleTOTP(sessionTotp, {
+        expiresAt:
+          Date.now() + (totp.period ?? this._totpGenerationDefaults.period) * 1000,
+      })
     }
   }
 }

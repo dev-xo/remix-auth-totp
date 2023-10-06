@@ -70,33 +70,31 @@ For this example we'll use Prisma ORM with a SQLite database. As long as your da
 
 ```ts
 /**
- * Model Fields:
+ * Required Fields:
  * - `hash`: String
- * - `active`: Boolean, default: true
- * - `attempts`: Int (Number), default: 0
- * - `expiresAt`: BigInt (Number)
-
+ * - `active`: Boolean - default: true
+ * - `attempts`: Int (Number) - default: 0
  *
- * Optional:
+ * Optional Fields:
  * - `createdAt`
  * - `updatedAt`
+ * - `expiresAt`: BigInt (Number)
  */
-
 model Totp {
   id String @id @default(uuid())
 
-  /// The encrypted OTP code.
+  /// The encrypted data used to generate the OTP.
   hash String @unique
 
-  /// The OTP code status.
+  /// The status of the OTP.
   /// Used internally / programmatically to invalidate OTPs.
   active Boolean @default(true)
 
-  /// The number of inputted attempts.
-  /// Used internally to invalidate OTPs after a certain number of attempts.
+  /// The input attempts of the OTP.
+  /// Used internally to invalidate OTPs after a certain amount of attempts.
   attempts Int @default(0)
 
-  /// The expiration date of the OTP in milliseconds.
+  /// The expiration date of the OTP (in milliseconds).
   /// Used programmatically to invalidate unused OTPs.
   expiresAt BigInt
 
