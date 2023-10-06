@@ -53,7 +53,7 @@ export interface TOTPGenerationOptions {
    * The max number of attempts the user can try to verify the OTP.
    * @default 3
    */
-  maxAttempts: number
+  maxAttempts?: number
 }
 
 /**
@@ -617,7 +617,11 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     if (dbTOTP.active !== true) {
       throw new Error(this.customErrors.inactiveTotp)
     }
-    if (dbTOTP.attempts >= this.totpGeneration.maxAttempts) {
+
+    const maxAttempts =
+      this.totpGeneration.maxAttempts ?? this._totpGenerationDefaults.maxAttempts
+
+    if (dbTOTP.attempts >= maxAttempts) {
       await this.handleTOTP(sessionTotp, { active: false })
       throw new Error(this.customErrors.inactiveTotp)
     }
