@@ -23,7 +23,9 @@
     "format": "prettier --write .",
     "test": "vitest --reporter verbose",
     "test:cov": "vitest run --coverage",
-    "validate": "npm run lint && npm run typecheck && npx vitest --watch=false"
+    "validate": "npm run lint && npm run typecheck && npx vitest --watch=false",
+    "prepare": "husky install",
+    "prepublishOnly": "npm run validate && npm run build"
   },
   "files": [
     "dist",
@@ -54,6 +56,7 @@
     "eslint": "^8.50.0",
     "eslint-config-prettier": "^8.10.0",
     "eslint-plugin-prettier": "^4.2.1",
+    "husky": "^8.0.3",
     "prettier": "^2.8.8",
     "typescript": "^5.1.6",
     "vite": "^4.4.9",
