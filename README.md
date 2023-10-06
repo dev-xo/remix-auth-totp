@@ -74,12 +74,12 @@ For this example we'll use Prisma ORM with a SQLite database. As long as your da
  * - `hash`: String
  * - `active`: Boolean, default: true
  * - `attempts`: Int (Number), default: 0
+ * - `expiresAt`: BigInt (Number)
 
  *
  * Optional:
  * - `createdAt`
  * - `updatedAt`
- * - `expiresAt`: BigInt? (Number)
  */
 
 model Totp {
@@ -98,7 +98,7 @@ model Totp {
 
   /// The expiration date of the OTP in milliseconds.
   /// Used programmatically to invalidate unused OTPs.
-  expiresAt BigInt?
+  expiresAt BigInt
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
