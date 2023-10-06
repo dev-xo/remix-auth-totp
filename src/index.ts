@@ -177,7 +177,7 @@ export interface HandleTOTP {
     hash?: string
     attempts: number
     active: boolean
-    expiresAt?: number
+    expiresAt?: bigint | number | Date | null
   } | null>
 }
 
