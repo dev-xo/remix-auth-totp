@@ -96,7 +96,7 @@ model Totp {
 
   /// The expiration date of the OTP (in milliseconds).
   /// Used programmatically to invalidate unused OTPs.
-  expiresAt BigInt
+  expiresAt BigInt?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
