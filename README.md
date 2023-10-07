@@ -94,9 +94,9 @@ model Totp {
   /// Used internally to invalidate OTPs after a certain amount of attempts.
   attempts Int @default(0)
 
-  /// The expiration date of the OTP (in milliseconds).
+  /// The expiration date of the OTP.
   /// Used programmatically to invalidate unused OTPs.
-  expiresAt BigInt?
+  expiresAt DateTime? @default(now())
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
