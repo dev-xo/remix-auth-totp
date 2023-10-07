@@ -72,13 +72,13 @@ For this example we'll use Prisma ORM with a SQLite database. As long as your da
 /**
  * Required Fields:
  * - `hash`: String
- * - `active`: Boolean - default: true
- * - `attempts`: Int (Number) - default: 0
+ * - `active`: Boolean, default: true
+ * - `attempts`: Int (Number), default: 0
  *
  * Optional Fields:
  * - `createdAt`
  * - `updatedAt`
- * - `expiresAt`: BigInt (Number)
+ * - `expiresAt`: DateTime (Date), @default(now()) | String, @default("")
  */
 model Totp {
   id String @id @default(uuid())

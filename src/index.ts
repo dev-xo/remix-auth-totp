@@ -103,10 +103,10 @@ export interface StoreTOTPOptions {
   attempts: number
 
   /**
-   * The OTP expiration date represented as Unix timestamp.
+   * The OTP expiration date.
    * @default Date.now() + TOTP generation period.
    */
-  expiresAt?: number
+  expiresAt?: Date | string
 }
 
 /**
@@ -172,12 +172,12 @@ export interface SendTOTP<User> {
 export interface HandleTOTP {
   (
     hash: string,
-    data?: { active?: boolean; attempts?: number; expiresAt?: number },
+    data?: { active?: boolean; attempts?: number; expiresAt?: Date | string },
   ): Promise<{
     hash?: string
     attempts: number
     active: boolean
-    expiresAt?: bigint | number | Date | null
+    expiresAt?: Date | string | null
   } | null>
 }
 
@@ -651,9 +651,23 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     const dbTOTP = await this.handleTOTP(sessionTotp)
 
     if (dbTOTP && 'expiresAt' in dbTOTP) {
+      const newExpiresAt =
+        Date.now() + (totp.period ?? this._totpGenerationDefaults.period) * 1000
+
+      let formattedExpiresAt
+
+      if (dbTOTP.expiresAt instanceof Date) {
+        formattedExpiresAt = new Date(newExpiresAt)
+      } else if (typeof dbTOTP.expiresAt === 'string') {
+        formattedExpiresAt = new Date(newExpiresAt).toISOString()
+      } else if (dbTOTP.expiresAt === null) {
+        throw new Error(
+          "Please initialize 'expiresAt' field in your database to either a Date or String type.",
+        )
+      }
+
       await this.handleTOTP(sessionTotp, {
-        expiresAt:
-          Date.now() + (totp.period ?? this._totpGenerationDefaults.period) * 1000,
+        expiresAt: formattedExpiresAt,
       })
     }
   }
