@@ -76,8 +76,6 @@ For this example we'll use Prisma ORM with a SQLite database. As long as your da
  * - `attempts`: Int (Number), default: 0
  *
  * Optional Fields:
- * - `createdAt`
- * - `updatedAt`
  * - `expiresAt`: DateTime (Date), @default(now()) | String, @default("")
  */
 model Totp {
@@ -97,9 +95,6 @@ model Totp {
   /// The expiration date of the OTP.
   /// Used programmatically to invalidate unused OTPs.
   expiresAt DateTime? @default(now())
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 }
 ```
 
@@ -433,184 +428,15 @@ export async function action({ request }: DataFunctionArgs) {
 
 Done! 🎉 Feel free to check the [Starter Example](https://github.com/dev-xo/totp-starter-example) for a detailed implementation.
 
-## Options and Customization
+## [Options and Customization](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/customization.md)
 
 The Strategy includes a few options that can be customized.
 
-### Email Validation
-
-The email validation will match by default against a basic RegEx email pattern.
-Feel free to customize it by passing `validateEmail` method to the TOTPStrategy Instance.
-
-_This can be used to verify that the provided email is not a disposable one._
-
-```ts
-authenticator.use(
-  new OTPStrategy({
-    validateEmail: async (email) => {
-      // Handle custom email validation.
-      // ...
-    },
-  }),
-)
-```
-
-### TOTP Generation
-
-The TOTP generation can customized by passing an object called `codeGeneration` to the TOTPStrategy Instance.
-
-```ts
-export interface TOTPGenerationOptions {
-  /**
-   * The secret used to generate the OTP.
-   * It should be Base32 encoded (Feel free to use: https://npm.im/thirty-two).
-   * @default Random Base32 secret.
-   */
-  secret?: string
-  /**
-   * The algorithm used to generate the OTP.
-   * @default 'SHA1'
-   */
-  algorithm?: string
-  /**
-   * The character set used to generate the OTP.
-   * @default 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-   */
-  charSet?: string
-  /**
-   * The number of digits the OTP will have.
-   * @default 6
-   */
-  digits?: number
-  /**
-   * The number of seconds the OTP will be valid.
-   * @default 60
-   */
-  period?: number
-  /**
-   * The number of attempts the user has to verify the OTP.
-   * @default 3
-   */
-  maxAttempts: number
-}
-
-authenticator.use(
-  new OTPStrategy({
-    codeGeneration: {
-      digits: 6,
-      period: 60,
-      // ...
-    },
-  }),
-)
-```
-
-### Magic Link Generation
-
-The Magic Link is optional and enabled by default. You can decide to opt-out by setting the `enabled` option to `false`.
-
-Furthermore, the Magic Link can be customized via the `magicLinkGeneration` object in the TOTPStrategy Instance.
-The URL link generated will be in the format of `https://{hostURL}{callbackPath}?{codeField}=<magic-link-code>`.
-
-```ts
-export interface MagicLinkGenerationOptions {
-  /**
-   * Whether to enable the Magic Link generation.
-   * @default true
-   */
-  enabled?: boolean
-  /**
-   * The host URL for the Magic Link.
-   * If omitted, it will be inferred from the request.
-   * @default undefined
-   */
-  hostUrl?: string
-  /**
-   * The callback path for the Magic Link.
-   * @default '/magic-link'
-   */
-  callbackPath?: string
-}
-```
-
-> **Note:** Enabling the Magic Link feature will require to create a [magic-link.tsx](#magic-linktsx) route.
-
-### Custom Error Messages
-
-The Strategy includes a few default error messages that can be customized by passing an object called `customErrors` to the TOTPStrategy Instance.
-
-```ts
-export interface CustomErrorsOptions {
-  /**
-   * The required email error message.
-   */
-  requiredEmail?: string
-  /**
-   * The invalid email error message.
-   */
-  invalidEmail?: string
-  /**
-   * The invalid TOTP error message.
-   */
-  invalidTotp?: string
-  /**
-   * The inactive TOTP error message.
-   */
-  inactiveTotp?: string
-}
-
-authenticator.use(
-  new OTPStrategy({
-    customErrors: {
-      requiredEmail: 'Whoops, email is required.',
-    },
-  }),
-)
-```
-
-### More Options
-
-The Strategy includes a few more options that can be customized.
-
-```ts
-export interface TOTPStrategyOptions<User> {
-  /**
-   * The secret used to encrypt the session.
-   */
-  secret: string
-  /**
-   * The maximum age of the session in milliseconds.
-   * @default undefined
-   */
-  maxAge?: number
-  /**
-   * The form input name used to get the email address.
-   * @default "email"
-   */
-  emailFieldKey?: string
-  /**
-   * The form input name used to get the TOTP.
-   * @default "totp"
-   */
-  totpFieldKey?: string
-  /**
-   * The session key that stores the email address.
-   * @default "auth:email"
-   */
-  sessionEmailKey?: string
-  /**
-   * The session key that stores the encrypted TOTP.
-   * @default "auth:totp"
-   */
-  sessionTotpKey?: string
-}
-```
+You can find a detailed list of all the available options in the [customization](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/customization.md) documentation.
 
 ## Support
 
-Thank you for exploring our documentation!
-
-If you found it helpful and enjoyed your experience, please consider giving us a star [Star ⭐](https://github.com/dev-xo/remix-auth-totp). It helps the repository grow and gives the required motivation to maintain the project.
+If you found this Strategy helpful and enjoyed your experience, please consider giving us a star [Star ⭐](https://github.com/dev-xo/remix-auth-totp). It helps the repository grow and gives the required motivation to maintain the project.
 
 ### Acknowledgments
 
