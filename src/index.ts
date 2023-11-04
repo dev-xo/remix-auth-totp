@@ -120,7 +120,7 @@ export interface StoreTOTP {
 /**
  * The send TOTP configuration.
  */
-export interface SendTOTPOptions<User> {
+export interface SendTOTPOptions {
   /**
    * The email address provided by the user.
    */
@@ -137,11 +137,6 @@ export interface SendTOTPOptions<User> {
   magicLink?: string
 
   /**
-   * The user object.
-   */
-  user?: User | null
-
-  /**
    * The formData object.
    */
   form?: FormData
@@ -156,8 +151,8 @@ export interface SendTOTPOptions<User> {
  * The sender email method.
  * @param options The send TOTP options.
  */
-export interface SendTOTP<User> {
-  (options: SendTOTPOptions<User>): Promise<void>
+export interface SendTOTP {
+  (options: SendTOTPOptions): Promise<void>
 }
 
 /**
@@ -219,7 +214,7 @@ export interface CustomErrorsOptions {
 /**
  * The TOTP Strategy options.
  */
-export interface TOTPStrategyOptions<User> {
+export interface TOTPStrategyOptions {
   /**
    * The secret used to sign the JWT.
    */
@@ -249,7 +244,7 @@ export interface TOTPStrategyOptions<User> {
   /**
    * The send TOTP method.
    */
-  sendTOTP: SendTOTP<User>
+  sendTOTP: SendTOTP
 
   /**
    * The handle TOTP method.
@@ -330,7 +325,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   private readonly totpGeneration: TOTPGenerationOptions
   private readonly magicLinkGeneration: MagicLinkGenerationOptions
   private readonly storeTOTP: StoreTOTP
-  private readonly sendTOTP: SendTOTP<User>
+  private readonly sendTOTP: SendTOTP
   private readonly handleTOTP: HandleTOTP
   private readonly validateEmail: ValidateEmail
   private readonly customErrors: CustomErrorsOptions
@@ -360,7 +355,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   } satisfies CustomErrorsOptions
 
   constructor(
-    options: TOTPStrategyOptions<User>,
+    options: TOTPStrategyOptions,
     verify: StrategyVerifyCallback<User, TOTPVerifyParams>,
   ) {
     super(verify)
@@ -607,9 +602,8 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     await this.storeTOTP(totp)
   }
 
-  private async _sendOTP(data: SendTOTPOptions<User>) {
-    const user = await this.verify(data)
-    await this.sendTOTP({ ...data, user })
+  private async _sendOTP(data: SendTOTPOptions) {
+    await this.sendTOTP({ ...data })
   }
 
   private async _validateTotp(sessionTotp: string, otp: string) {
