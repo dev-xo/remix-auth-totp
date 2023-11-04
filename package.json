@@ -1,6 +1,6 @@
 {
   "name": "remix-auth-totp",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "type": "module",
   "description": "A Time-Based One-Time Password (TOTP) Authentication Strategy for Remix-Auth.",
   "author": "Daniel Kanem <devxo@mail.com> (https://twitter.com/DanielKanem)",
@@ -48,19 +48,19 @@
   "devDependencies": {
     "@remix-run/node": "^2.0.0",
     "@remix-run/server-runtime": "^2.0.0",
-    "@types/jsonwebtoken": "^9.0.3",
-    "@types/node": "^20.7.0",
+    "@types/jsonwebtoken": "^9.0.4",
+    "@types/node": "^20.8.10",
     "@typescript-eslint/eslint-plugin": "^5.62.0",
     "@typescript-eslint/parser": "^5.62.0",
-    "@vitest/coverage-v8": "^1.0.0-beta.0",
-    "eslint": "^8.50.0",
+    "@vitest/coverage-v8": "1.0.0-beta.3",
+    "eslint": "^8.53.0",
     "eslint-config-prettier": "^8.10.0",
     "eslint-plugin-prettier": "^4.2.1",
     "husky": "^8.0.3",
     "prettier": "^2.8.8",
-    "typescript": "^5.1.6",
-    "vite": "^4.4.9",
+    "typescript": "^5.2.2",
+    "vite": "^4.5.0",
     "vite-tsconfig-paths": "^4.2.1",
-    "vitest": "^0.34.5"
+    "vitest": "^1.0.0-beta.3"
   }
 }
