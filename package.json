@@ -1,6 +1,6 @@
 {
   "name": "remix-auth-totp",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "type": "module",
   "description": "A Time-Based One-Time Password (TOTP) Authentication Strategy for Remix-Auth.",
   "author": "Daniel Kanem <devxo@mail.com> (https://twitter.com/DanielKanem)",
