@@ -57,7 +57,7 @@ Here's a basic overview of the authentication process.
 4. The Strategy validates the OTP code and authenticates the user.
    <br />
 
-> **Note**
+> [!NOTE]
 > Remix Auth TOTP is only Remix v2.0+ compatible. We are already working on a v1.0+ compatible version.
 
 Let's see how we can implement the Strategy into our Remix App.
@@ -190,7 +190,7 @@ authenticator.use(
 )
 ```
 
-> **Note**
+> [!NOTE]
 > We can specify session duration with `maxAge` in milliseconds. Default is undefined, not persisting across browser restarts.
 
 ### 2: Implementing the Strategy Logic.
