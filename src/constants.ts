@@ -22,7 +22,7 @@ export const ERRORS = {
   REQUIRED_SUCCESS_REDIRECT_URL: 'Missing required successRedirect URL.',
 
   USER_NOT_FOUND: 'User not found.',
-  TOTP_NOT_FOUND: 'Database OTP code not found.',
+  TOTP_NOT_FOUND: 'Database TOTP not found.',
 
   INVALID_MAGIC_LINK_PATH: 'Invalid magic-link expected path.',
   INVALID_JWT: 'Invalid JWT.',

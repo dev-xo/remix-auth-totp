@@ -18,7 +18,7 @@ import { STRATEGY_NAME, FORM_FIELDS, SESSION_KEYS, ERRORS } from './constants.js
  */
 export interface TOTPGenerationOptions {
   /**
-   * The secret used to generate the OTP.
+   * The secret used to generate the TOTP.
    * It should be Base32 encoded (Feel free to use: https://npm.im/thirty-two).
    *
    * @default random Base32 secret.
@@ -26,31 +26,31 @@ export interface TOTPGenerationOptions {
   secret?: string
 
   /**
-   * The algorithm used to generate the OTP.
+   * The algorithm used to generate the TOTP.
    * @default 'SHA1'
    */
   algorithm?: string
 
   /**
-   * The character set used to generate the OTP.
+   * The character set used to generate the TOTP.
    * @default 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
    */
   charSet?: string
 
   /**
-   * The number of digits used to generate the OTP.
+   * The number of digits used to generate the TOTP.
    * @default 6
    */
   digits?: number
 
   /**
-   * The number of seconds the OTP will be valid.
+   * The number of seconds the TOTP will be valid.
    * @default 60
    */
   period?: number
 
   /**
-   * The max number of attempts the user can try to verify the OTP.
+   * The max number of attempts the user can try to verify the TOTP.
    * @default 3
    */
   maxAttempts?: number
@@ -86,24 +86,24 @@ export interface MagicLinkGenerationOptions {
  */
 export interface StoreTOTPOptions {
   /**
-   * The encrypted OTP.
+   * The encrypted TOTP.
    */
   hash: string
 
   /**
-   * The status of the OTP.
+   * The status of the TOTP.
    * @default true
    */
   active: boolean
 
   /**
-   * The number of attempts the user tried to verify the OTP.
+   * The number of attempts the user tried to verify the TOTP.
    * @default 0
    */
   attempts: number
 
   /**
-   * The OTP expiration date.
+   * The TOTP expiration date.
    * @default Date.now() + TOTP generation period.
    */
   expiresAt?: Date | string
@@ -111,7 +111,7 @@ export interface StoreTOTPOptions {
 
 /**
  * The store TOTP method.
- * @param data The encrypted OTP.
+ * @param data The encrypted TOTP.
  */
 export interface StoreTOTP {
   (data: StoreTOTPOptions): Promise<void>
@@ -127,7 +127,7 @@ export interface SendTOTPOptions {
   email: string
 
   /**
-   * The decrypted OTP code.
+   * The decrypted TOTP code.
    */
   code: string
 
@@ -159,9 +159,9 @@ export interface SendTOTP {
  * The handle TOTP method.
  *
  * If `data` argument is provided, it will trigger a database update.
- * Otherwise, it will retrieve the encrypted OTP from database.
+ * Otherwise, it will retrieve the encrypted TOTP from database.
  *
- * @param hash The stored OTP from database.
+ * @param hash The stored TOTP from database.
  * @param data The data to update.
  */
 export interface HandleTOTP {
@@ -227,7 +227,7 @@ export interface TOTPStrategyOptions {
   maxAge?: number
 
   /**
-   * The OTP generation configuration.
+   * The TOTP generation configuration.
    */
   totpGeneration?: TOTPGenerationOptions
 
@@ -268,7 +268,7 @@ export interface TOTPStrategyOptions {
   emailFieldKey?: string
 
   /**
-   * The form input name used to get the OTP.
+   * The form input name used to get the TOTP.
    * @default "totp"
    */
   totpFieldKey?: string
@@ -280,7 +280,7 @@ export interface TOTPStrategyOptions {
   sessionEmailKey?: string
 
   /**
-   * The session key that stores the signed OTP.
+   * The session key that stores the signed TOTP.
    * @default "auth:totp"
    */
   sessionTotpKey?: string
@@ -297,7 +297,7 @@ export interface TOTPVerifyParams {
   email: string
 
   /**
-   * The OTP code.
+   * The TOTP code.
    */
   code?: string
 
@@ -409,7 +409,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     try {
       if (!user) {
         /**
-         * 1st Authentication phase.
+         * 1st Authentication Phase.
          */
         if (isPOST) {
           formData = await request.formData()
@@ -419,19 +419,16 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
           formDataTotp = form[this.totpFieldKey] && String(form[this.totpFieldKey])
 
           /**
-           * Re-send TOTP.
+           * Re-send TOTP - User has requested a new TOTP.
+           * This will invalidate previous TOTP and assign session email to form email.
            */
           if (!formDataEmail && !formDataTotp && sessionEmail && sessionTotp) {
-            // Invalidate previous TOTP.
             await this.handleTOTP(sessionTotp, { active: false })
-
-            // Assign session email to form email.
             formDataEmail = sessionEmail
           }
 
           /**
-           * Invalidate previous TOTP.
-           * User has submitted a different email address.
+           * Invalidate previous TOTP - User has submitted a new email address.
            */
           if (
             formDataEmail &&
@@ -439,7 +436,6 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
             formDataEmail !== sessionEmail &&
             sessionTotp
           ) {
-            // Invalidate previous TOTP.
             await this.handleTOTP(sessionTotp, { active: false })
           }
 
@@ -455,11 +451,12 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
               ...this.totpGeneration,
               secret: generateSecret(),
             })
-            const signedTotp = signJWT(
-              totp,
-              this.totpGeneration.period ?? this._totpGenerationDefaults.period,
-              this.secret,
-            )
+            const signedTotp = await signJWT({
+              payload: totp,
+              expiresIn:
+                this.totpGeneration.period ?? this._totpGenerationDefaults.period,
+              secretKey: this.secret,
+            })
 
             // Generate Magic Link.
             const magicLink = generateMagicLink({
@@ -470,13 +467,13 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
             })
 
             // Store TOTP.
-            await this._saveOTP({ hash: signedTotp, active: true, attempts: 0 })
+            await this._storeTOTP({ hash: signedTotp, active: true, attempts: 0 })
 
-            // Update `expiresAt` database field (if exists).
+            // Update `expiresAt` database field - If exists.
             await this._handleExpiresAt(signedTotp, totp)
 
             // Send TOTP.
-            await this._sendOTP({
+            await this._sendTOTP({
               email: formDataEmail,
               code: _otp,
               magicLink,
@@ -499,7 +496,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
         }
 
         /**
-         * 2nd Authentication phase.
+         * 2nd Authentication Phase.
          * Either via form submission or magic-link URL.
          */
         if (isGET && this.magicLinkGeneration.enabled) {
@@ -510,24 +507,19 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
           }
 
           magicLinkTotp = url.searchParams.has(this.totpFieldKey)
-            ? // @ts-expect-error - If param exists, it will be a string.
-              decodeURIComponent(url.searchParams.get(this.totpFieldKey))
+            ? decodeURIComponent(url.searchParams.get(this.totpFieldKey) ?? '')
             : undefined
         }
 
         if ((isPOST && formDataTotp) || (isGET && magicLinkTotp)) {
           // Validation.
-          if (isPOST && formDataTotp) {
-            await this._validateTotp(sessionTotp, formDataTotp)
-          }
-          if (isGET && magicLinkTotp) {
-            await this._validateTotp(sessionTotp, magicLinkTotp)
-          }
+          if (isPOST && formDataTotp) await this._validateTOTP(sessionTotp, formDataTotp)
+          if (isGET && magicLinkTotp) await this._validateTOTP(sessionTotp, magicLinkTotp)
 
           // Invalidation.
           await this.handleTOTP(sessionTotp, { active: false })
 
-          // Allow developer to handle the user verification.
+          // Allow developer to handle user validation.
           user = await this.verify({
             email: sessionEmail,
             form: formData,
@@ -550,7 +542,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
         }
       }
     } catch (error) {
-      // Allow responses to pass-through.
+      // Allow Response to pass-through.
       if (error instanceof Response && error.status === 302) throw error
       if (error instanceof Error) {
         if (error.message === ERRORS.INVALID_JWT) {
@@ -598,15 +590,15 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     if (!regexEmail.test(email)) throw new Error(this.customErrors.invalidEmail)
   }
 
-  private async _saveOTP(totp: StoreTOTPOptions) {
+  private async _storeTOTP(totp: StoreTOTPOptions) {
     await this.storeTOTP(totp)
   }
 
-  private async _sendOTP(data: SendTOTPOptions) {
+  private async _sendTOTP(data: SendTOTPOptions) {
     await this.sendTOTP({ ...data })
   }
 
-  private async _validateTotp(sessionTotp: string, otp: string) {
+  private async _validateTOTP(sessionTotp: string, otp: string) {
     // Retrieve encrypted TOTP from database.
     const dbTOTP = await this.handleTOTP(sessionTotp)
     if (!dbTOTP || !dbTOTP.hash) throw new Error(ERRORS.TOTP_NOT_FOUND)
@@ -624,10 +616,10 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     }
 
     // Decryption and Verification.
-    const { iat, exp, ...totp } = verifyJWT(
-      sessionTotp,
-      this.secret,
-    ) as Required<TOTPGenerationOptions> & { iat: number; exp: number }
+    const { iat, exp, ...totp } = (await verifyJWT({
+      jwt: sessionTotp,
+      secretKey: this.secret,
+    })) as Required<TOTPGenerationOptions> & { iat: number; exp: number }
 
     // Verify TOTP (@epic-web/totp).
     const isValid = verifyTOTP({ ...totp, otp })
