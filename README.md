@@ -1,21 +1,28 @@
 <div align="center">
-  <h1><a href="https://npm.im/remix-auth-totp">💿 Remix Auth TOTP</a></h1>
-  <!-- <strong>
-    A Time-Based One-Time Password (TOTP) Authentication Strategy for Remix-Auth.
-  </strong> -->
+  <a href="https://github.com/dev-xo/remix-auth-totp" target="_blank">
+    <img alt="Remix Auth TOTP" src="https://raw.githubusercontent.com/dev-xo/dev-xo/main/remix-auth-totp/logo-4.png" width="200" />
+  </a>
+</div>
+
+<h1 align="center">
+  Email Code Authentication for Remix
+</h1>
+
+<div align="center">
   <p>
-    A <strong>Time-Based One-Time Password (TOTP) Authentication Strategy</strong> for <a href="https://github.com/sergiodxa/remix-auth">Remix Auth</a> based on <a href="https://github.com/epicweb-dev/totp/blob/main/index.js">@epic-web/totp</a> that supports <strong>Email Verification & Two Factor Authentication (2FA)</strong> in your application.
+    Remix Auth TOTP is a <strong>Time-Based One-Time Password (TOTP) Authentication Strategy</strong> for <a href="https://github.com/sergiodxa/remix-auth">Remix Auth</a> that supports <strong>Email Verification & Two Factor Authentication (2FA)</strong> in your application.
   </p>
-  <!-- <br /><br /> -->
-  <div>
+</div>
+
+<div align="center">
+  <p>
+    <!-- <br /> -->
+    <a href="https://github.com/dev-xo/remix-auth-totp?tab=readme-ov-file#features"><strong>Explore Docs »</strong></a>
+    <br/><br/>
     <a href="https://totp.fly.dev">Live Demo</a>
-    •
+    ·
     <a href="https://github.com/dev-xo/remix-auth-totp/blob/main/docs/examples.md">Examples</a>
-    •
-    <a href="https://www.npmjs.com/package/remix-auth-otp">Legacy v2.0</a>
-    <br/>
-    <br/>
-  </div>
+  </p>
 </div>
 
 ```
@@ -30,16 +37,18 @@ npm install remix-auth-totp
 
 - **😌 Easy to Set Up** - Manages the entire authentication flow for you.
 - **🔐 Secure** - Features encrypted time-based codes.
-- **📧 Magic Link Built-In** - Authenticate users with a click.
+- **📧 Built-In Magic Link** - Authenticate users with a click.
 - **📚 Single Source of Truth** - A database of your choice.
-- **🛡 Bulletproof** - Crafted in strict TypeScript, high test coverage.
+- **🛡 Bulletproof** - Crafted in strict TypeScript with high test coverage.
 - **🚀 Remix Auth Foundation** - An amazing authentication library for Remix.
 
-## Live Demo
+<!-- ## [Live Demo](https://totp.fly.dev)
 
 [Live Demo](https://totp.fly.dev) that displays the authentication flow.
 
 [![Remix Auth TOTP](https://raw.githubusercontent.com/dev-xo/dev-xo/main/remix-auth-totp/thumbnail-2.png)](https://totp.fly.dev)
+
+-->
 
 ## Usage
 
@@ -58,7 +67,7 @@ Here's a basic overview of the authentication process.
    <br />
 
 > [!NOTE]
-> Remix Auth TOTP is only Remix v2.0+ compatible. We are already working on a v1.0+ compatible version.
+> Remix Auth TOTP is only Remix v2.0+ compatible.
 
 Let's see how we can implement the Strategy into our Remix App.
 
@@ -190,8 +199,8 @@ authenticator.use(
 )
 ```
 
-> [!NOTE]
-> We can specify session duration with `maxAge` in milliseconds. Default is undefined, not persisting across browser restarts.
+> [!TIP]
+> You can specify session duration with `maxAge` in milliseconds. Default is `undefined`, persisting across browser restarts.
 
 ### 2: Implementing the Strategy Logic.
 
@@ -436,7 +445,7 @@ You can find a detailed list of all the available options in the [customization]
 
 ## Support
 
-If you found this Strategy helpful and enjoyed your experience, please consider giving us a star [Star ⭐](https://github.com/dev-xo/remix-auth-totp). It helps the repository grow and gives the required motivation to maintain the project.
+If you found this library helpful, please consider leaving us a ⭐ [star](https://github.com/dev-xo/remix-auth-totp). It helps the repository grow and provides the necessary motivation to continue maintaining the project.
 
 ### Acknowledgments
 
