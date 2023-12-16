@@ -17,7 +17,7 @@ authenticator.use(
       // ...
     },
   }),
-);
+)
 ```
 
 ### TOTP Generation
@@ -31,32 +31,32 @@ export interface TOTPGenerationOptions {
    * It should be Base32 encoded (Feel free to use: https://npm.im/thirty-two).
    * @default Random Base32 secret.
    */
-  secret?: string;
+  secret?: string
   /**
    * The algorithm used to generate the OTP.
    * @default 'SHA1'
    */
-  algorithm?: string;
+  algorithm?: string
   /**
    * The character set used to generate the OTP.
    * @default 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
    */
-  charSet?: string;
+  charSet?: string
   /**
    * The number of digits the OTP will have.
    * @default 6
    */
-  digits?: number;
+  digits?: number
   /**
    * The number of seconds the OTP will be valid.
    * @default 60
    */
-  period?: number;
+  period?: number
   /**
    * The number of attempts the user has to verify the OTP.
    * @default 3
    */
-  maxAttempts: number;
+  maxAttempts: number
 }
 
 authenticator.use(
@@ -67,7 +67,7 @@ authenticator.use(
       // ...
     },
   }),
-);
+)
 ```
 
 ### Magic Link Generation
@@ -83,18 +83,18 @@ export interface MagicLinkGenerationOptions {
    * Whether to enable the Magic Link generation.
    * @default true
    */
-  enabled?: boolean;
+  enabled?: boolean
   /**
    * The host URL for the Magic Link.
    * If omitted, it will be inferred from the request.
    * @default undefined
    */
-  hostUrl?: string;
+  hostUrl?: string
   /**
    * The callback path for the Magic Link.
    * @default '/magic-link'
    */
-  callbackPath?: string;
+  callbackPath?: string
 }
 ```
 
@@ -109,19 +109,19 @@ export interface CustomErrorsOptions {
   /**
    * The required email error message.
    */
-  requiredEmail?: string;
+  requiredEmail?: string
   /**
    * The invalid email error message.
    */
-  invalidEmail?: string;
+  invalidEmail?: string
   /**
    * The invalid TOTP error message.
    */
-  invalidTotp?: string;
+  invalidTotp?: string
   /**
    * The inactive TOTP error message.
    */
-  inactiveTotp?: string;
+  inactiveTotp?: string
 }
 
 authenticator.use(
@@ -130,7 +130,7 @@ authenticator.use(
       requiredEmail: 'Whoops, email is required.',
     },
   }),
-);
+)
 ```
 
 ### More Options
@@ -142,32 +142,32 @@ export interface TOTPStrategyOptions<User> {
   /**
    * The secret used to encrypt the session.
    */
-  secret: string;
+  secret: string
   /**
    * The maximum age of the session in milliseconds.
    * @default undefined
    */
-  maxAge?: number;
+  maxAge?: number
   /**
    * The form input name used to get the email address.
    * @default "email"
    */
-  emailFieldKey?: string;
+  emailFieldKey?: string
   /**
    * The form input name used to get the TOTP.
    * @default "totp"
    */
-  totpFieldKey?: string;
+  totpFieldKey?: string
   /**
    * The session key that stores the email address.
    * @default "auth:email"
    */
-  sessionEmailKey?: string;
+  sessionEmailKey?: string
   /**
    * The session key that stores the encrypted TOTP.
    * @default "auth:totp"
    */
-  sessionTotpKey?: string;
+  sessionTotpKey?: string
 }
 ```
 

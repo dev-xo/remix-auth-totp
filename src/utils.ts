@@ -1,84 +1,84 @@
-import type { TOTPGenerationOptions, MagicLinkGenerationOptions } from './index.js';
+import type { TOTPGenerationOptions, MagicLinkGenerationOptions } from './index.js'
 
-import { SignJWT, jwtVerify } from 'jose';
-import { generateTOTP as _generateTOTP } from '@epic-web/totp';
+import { SignJWT, jwtVerify } from 'jose'
+import { generateTOTP as _generateTOTP } from '@epic-web/totp'
 
-import { ERRORS } from './constants.js';
+import { ERRORS } from './constants.js'
 
 // @ts-expect-error - `thirty-two` is not typed.
-import * as base32 from 'thirty-two';
-import * as crypto from 'crypto';
+import * as base32 from 'thirty-two'
+import * as crypto from 'crypto'
 
 /**
  * TOTP Generation.
  */
 export function generateSecret() {
-  return base32.encode(crypto.randomBytes(10)).toString() as string;
+  return base32.encode(crypto.randomBytes(10)).toString() as string
 }
 
 export function generateTOTP(options: TOTPGenerationOptions) {
-  return _generateTOTP(options);
+  return _generateTOTP(options)
 }
 
 export function generateMagicLink(
   options: MagicLinkGenerationOptions & {
-    code: string;
-    param: string;
-    request: Request;
+    code: string
+    param: string
+    request: Request
   },
 ) {
   if (!options.enabled) {
-    return undefined;
+    return undefined
   }
 
   const url = new URL(
     options.callbackPath ?? '/',
     options.hostUrl ?? getHostUrl(options.request),
-  );
-  url.searchParams.set(options.param, options.code);
+  )
+  url.searchParams.set(options.param, options.code)
 
-  return url.toString();
+  return url.toString()
 }
 
 /**
  * JSON Web Token (JWT).
  */
 type SignJWTOptions = {
-  payload: { [key: string]: any };
-  expiresIn: number;
-  secretKey: string;
-};
+  payload: { [key: string]: any }
+  expiresIn: number
+  secretKey: string
+}
 
 export async function signJWT({ payload, expiresIn, secretKey }: SignJWTOptions) {
   try {
-    const algorithm = 'HS256';
-    const secret = new TextEncoder().encode(secretKey);
-    const expires = new Date(Date.now() + expiresIn * 1000);
+    const algorithm = 'HS256'
+    const secret = new TextEncoder().encode(secretKey)
+    const expires = new Date(Date.now() + expiresIn * 1000)
 
     const token = await new SignJWT(payload)
       .setProtectedHeader({ alg: algorithm })
       .setExpirationTime(expires)
       .setIssuedAt()
-      .sign(secret);
+      .sign(secret)
 
-    return token;
+    return token
   } catch (err: unknown) {
-    throw new Error(ERRORS.INVALID_JWT);
+    throw new Error(ERRORS.INVALID_JWT)
   }
 }
 
 type VerifyJWTOptions = {
-  jwt: string;
-  secretKey: string;
-};
+  jwt: string
+  secretKey: string
+}
 
 export async function verifyJWT({ jwt, secretKey }: VerifyJWTOptions) {
   try {
-    const secret = new TextEncoder().encode(secretKey);
-    const { payload } = await jwtVerify(jwt, secret);
-    return payload;
+    const secret = new TextEncoder().encode(secretKey)
+    const { payload } = await jwtVerify(jwt, secret)
+    return payload
   } catch (err: unknown) {
-    throw new Error(ERRORS.INVALID_JWT);
+    throw new Error(ERRORS.INVALID_JWT)
   }
 }
 
@@ -86,13 +86,13 @@ export async function verifyJWT({ jwt, secretKey }: VerifyJWTOptions) {
  * Miscellaneous.
  */
 export function getHostUrl(request: Request) {
-  const host = request.headers.get('X-Forwarded-Host') ?? request.headers.get('host');
-  if (!host) throw new Error('Could not determine host.');
+  const host = request.headers.get('X-Forwarded-Host') ?? request.headers.get('host')
+  if (!host) throw new Error('Could not determine host.')
 
   // If the host is localhost or ends with .local, use http.
   const protocol = host.match(/(:?\.local|^localhost|^127\.\d+\.\d+\.\d+)(:?:\d+)?$/)
     ? 'http'
-    : 'https';
+    : 'https'
 
-  return `${protocol}://${host}`;
+  return `${protocol}://${host}`
 }

@@ -1,8 +1,8 @@
 /// <reference types="vitest" />
 /// <reference types="vite/client" />
 
-import { defineConfig } from 'vite';
-import tsconfigPaths from 'vite-tsconfig-paths';
+import { defineConfig } from 'vite'
+import tsconfigPaths from 'vite-tsconfig-paths'
 
 /**
  * Learn more about Vite: https://vitejs.dev/config/
@@ -25,4 +25,4 @@ export default defineConfig({
     // Disable CSS if you don't have tests that relies on it.
     css: false,
   },
-});
+})
