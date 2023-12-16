@@ -1,14 +1,14 @@
-export const STRATEGY_NAME = 'TOTP'
+export const STRATEGY_NAME = 'TOTP';
 
 export const FORM_FIELDS = {
   EMAIL: 'email',
   TOTP: 'code',
-} as const
+} as const;
 
 export const SESSION_KEYS = {
   EMAIL: 'auth:email',
   TOTP: 'auth:totp',
-} as const
+} as const;
 
 export const ERRORS = {
   // Customizable errors.
@@ -28,4 +28,4 @@ export const ERRORS = {
   INVALID_JWT: 'Invalid JWT.',
 
   UNKNOWN_ERROR: 'Unknown error.',
-} as const
+} as const;

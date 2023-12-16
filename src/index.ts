@@ -1,17 +1,17 @@
-import type { SessionStorage } from '@remix-run/server-runtime'
-import type { AuthenticateOptions, StrategyVerifyCallback } from 'remix-auth'
+import type { SessionStorage } from '@remix-run/server-runtime';
+import type { AuthenticateOptions, StrategyVerifyCallback } from 'remix-auth';
 
-import { redirect } from '@remix-run/server-runtime'
-import { Strategy } from 'remix-auth'
-import { verifyTOTP } from '@epic-web/totp'
+import { redirect } from '@remix-run/server-runtime';
+import { Strategy } from 'remix-auth';
+import { verifyTOTP } from '@epic-web/totp';
 import {
   generateSecret,
   generateTOTP,
   generateMagicLink,
   signJWT,
   verifyJWT,
-} from './utils.js'
-import { STRATEGY_NAME, FORM_FIELDS, SESSION_KEYS, ERRORS } from './constants.js'
+} from './utils.js';
+import { STRATEGY_NAME, FORM_FIELDS, SESSION_KEYS, ERRORS } from './constants.js';
 
 /**
  * The TOTP generation configuration.
@@ -23,37 +23,37 @@ export interface TOTPGenerationOptions {
    *
    * @default random Base32 secret.
    */
-  secret?: string
+  secret?: string;
 
   /**
    * The algorithm used to generate the TOTP.
    * @default 'SHA1'
    */
-  algorithm?: string
+  algorithm?: string;
 
   /**
    * The character set used to generate the TOTP.
    * @default 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
    */
-  charSet?: string
+  charSet?: string;
 
   /**
    * The number of digits used to generate the TOTP.
    * @default 6
    */
-  digits?: number
+  digits?: number;
 
   /**
    * The number of seconds the TOTP will be valid.
    * @default 60
    */
-  period?: number
+  period?: number;
 
   /**
    * The max number of attempts the user can try to verify the TOTP.
    * @default 3
    */
-  maxAttempts?: number
+  maxAttempts?: number;
 }
 
 /**
@@ -64,7 +64,7 @@ export interface MagicLinkGenerationOptions {
    * Whether to enable the Magic Link generation.
    * @default true
    */
-  enabled?: boolean
+  enabled?: boolean;
 
   /**
    * The host URL for the Magic Link.
@@ -72,13 +72,13 @@ export interface MagicLinkGenerationOptions {
    *
    * @default undefined
    */
-  hostUrl?: string
+  hostUrl?: string;
 
   /**
    * The callback URL path for the Magic Link.
    * @default '/magic-link'
    */
-  callbackPath?: string
+  callbackPath?: string;
 }
 
 /**
@@ -88,25 +88,25 @@ export interface StoreTOTPOptions {
   /**
    * The encrypted TOTP.
    */
-  hash: string
+  hash: string;
 
   /**
    * The status of the TOTP.
    * @default true
    */
-  active: boolean
+  active: boolean;
 
   /**
    * The number of attempts the user tried to verify the TOTP.
    * @default 0
    */
-  attempts: number
+  attempts: number;
 
   /**
    * The TOTP expiration date.
    * @default Date.now() + TOTP generation period.
    */
-  expiresAt?: Date | string
+  expiresAt?: Date | string;
 }
 
 /**
@@ -114,7 +114,7 @@ export interface StoreTOTPOptions {
  * @param data The encrypted TOTP.
  */
 export interface StoreTOTP {
-  (data: StoreTOTPOptions): Promise<void>
+  (data: StoreTOTPOptions): Promise<void>;
 }
 
 /**
@@ -124,27 +124,27 @@ export interface SendTOTPOptions {
   /**
    * The email address provided by the user.
    */
-  email: string
+  email: string;
 
   /**
    * The decrypted TOTP code.
    */
-  code: string
+  code: string;
 
   /**
    * The Magic Link URL.
    */
-  magicLink?: string
+  magicLink?: string;
 
   /**
    * The formData object.
    */
-  form?: FormData
+  form?: FormData;
 
   /**
    * The Request object.
    */
-  request: Request
+  request: Request;
 }
 
 /**
@@ -152,7 +152,7 @@ export interface SendTOTPOptions {
  * @param options The send TOTP options.
  */
 export interface SendTOTP {
-  (options: SendTOTPOptions): Promise<void>
+  (options: SendTOTPOptions): Promise<void>;
 }
 
 /**
@@ -169,11 +169,11 @@ export interface HandleTOTP {
     hash: string,
     data?: { active?: boolean; attempts?: number; expiresAt?: Date | string },
   ): Promise<{
-    hash?: string
-    attempts: number
-    active: boolean
-    expiresAt?: Date | string | null
-  } | null>
+    hash?: string;
+    attempts: number;
+    active: boolean;
+    expiresAt?: Date | string | null;
+  } | null>;
 }
 
 /**
@@ -183,7 +183,7 @@ export interface HandleTOTP {
  * @param email The email address to validate.
  */
 export interface ValidateEmail {
-  (email: string): Promise<void>
+  (email: string): Promise<void>;
 }
 
 /**
@@ -193,22 +193,22 @@ export interface CustomErrorsOptions {
   /**
    * The required email error message.
    */
-  requiredEmail?: string
+  requiredEmail?: string;
 
   /**
    * The invalid email error message.
    */
-  invalidEmail?: string
+  invalidEmail?: string;
 
   /**
    * The invalid TOTP error message.
    */
-  invalidTotp?: string
+  invalidTotp?: string;
 
   /**
    * The inactive TOTP error message.
    */
-  inactiveTotp?: string
+  inactiveTotp?: string;
 }
 
 /**
@@ -218,72 +218,72 @@ export interface TOTPStrategyOptions {
   /**
    * The secret used to sign the JWT.
    */
-  secret: string
+  secret: string;
 
   /**
    * The maximum age the session can live.
    * @default undefined
    */
-  maxAge?: number
+  maxAge?: number;
 
   /**
    * The TOTP generation configuration.
    */
-  totpGeneration?: TOTPGenerationOptions
+  totpGeneration?: TOTPGenerationOptions;
 
   /**
    * The Magic Link configuration.
    */
-  magicLinkGeneration?: MagicLinkGenerationOptions
+  magicLinkGeneration?: MagicLinkGenerationOptions;
 
   /**
    * The store TOTP method.
    */
-  storeTOTP: StoreTOTP
+  storeTOTP: StoreTOTP;
 
   /**
    * The send TOTP method.
    */
-  sendTOTP: SendTOTP
+  sendTOTP: SendTOTP;
 
   /**
    * The handle TOTP method.
    */
-  handleTOTP: HandleTOTP
+  handleTOTP: HandleTOTP;
 
   /**
    * The validate email method.
    */
-  validateEmail?: ValidateEmail
+  validateEmail?: ValidateEmail;
 
   /**
    * The custom errors configuration.
    */
-  customErrors?: CustomErrorsOptions
+  customErrors?: CustomErrorsOptions;
 
   /**
    * The form input name used to get the email address.
    * @default "email"
    */
-  emailFieldKey?: string
+  emailFieldKey?: string;
 
   /**
    * The form input name used to get the TOTP.
    * @default "totp"
    */
-  totpFieldKey?: string
+  totpFieldKey?: string;
 
   /**
    * The session key that stores the email address.
    * @default "auth:email"
    */
-  sessionEmailKey?: string
+  sessionEmailKey?: string;
 
   /**
    * The session key that stores the signed TOTP.
    * @default "auth:totp"
    */
-  sessionTotpKey?: string
+  sessionTotpKey?: string;
 }
 
 /**
@@ -294,45 +294,45 @@ export interface TOTPVerifyParams {
   /**
    * The email address provided by the user.
    */
-  email: string
+  email: string;
 
   /**
    * The TOTP code.
    */
-  code?: string
+  code?: string;
 
   /**
    * The Magic Link URL.
    */
-  magicLink?: string
+  magicLink?: string;
 
   /**
    * The formData object from the Request.
    */
-  form?: FormData
+  form?: FormData;
 
   /**
    * The Request object.
    */
-  request: Request
+  request: Request;
 }
 
 export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
-  public name = STRATEGY_NAME
+  public name = STRATEGY_NAME;
 
-  private readonly secret: string
-  private readonly maxAge: number | undefined
-  private readonly totpGeneration: TOTPGenerationOptions
-  private readonly magicLinkGeneration: MagicLinkGenerationOptions
-  private readonly storeTOTP: StoreTOTP
-  private readonly sendTOTP: SendTOTP
-  private readonly handleTOTP: HandleTOTP
-  private readonly validateEmail: ValidateEmail
-  private readonly customErrors: CustomErrorsOptions
-  private readonly emailFieldKey: string
-  private readonly totpFieldKey: string
-  private readonly sessionEmailKey: string
-  private readonly sessionTotpKey: string
+  private readonly secret: string;
+  private readonly maxAge: number | undefined;
+  private readonly totpGeneration: TOTPGenerationOptions;
+  private readonly magicLinkGeneration: MagicLinkGenerationOptions;
+  private readonly storeTOTP: StoreTOTP;
+  private readonly sendTOTP: SendTOTP;
+  private readonly handleTOTP: HandleTOTP;
+  private readonly validateEmail: ValidateEmail;
+  private readonly customErrors: CustomErrorsOptions;
+  private readonly emailFieldKey: string;
+  private readonly totpFieldKey: string;
+  private readonly sessionEmailKey: string;
+  private readonly sessionTotpKey: string;
 
   private readonly _totpGenerationDefaults = {
     secret: generateSecret(),
@@ -341,47 +341,47 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     digits: 6,
     period: 60,
     maxAttempts: 3,
-  } satisfies TOTPGenerationOptions
+  } satisfies TOTPGenerationOptions;
   private readonly _magicLinkGenerationDefaults = {
     enabled: true,
     hostUrl: undefined,
     callbackPath: '/magic-link',
-  } satisfies MagicLinkGenerationOptions
+  } satisfies MagicLinkGenerationOptions;
   private readonly _customErrorsDefaults = {
     requiredEmail: ERRORS.REQUIRED_EMAIL,
     invalidEmail: ERRORS.INVALID_EMAIL,
     invalidTotp: ERRORS.INVALID_TOTP,
     inactiveTotp: ERRORS.INACTIVE_TOTP,
-  } satisfies CustomErrorsOptions
+  } satisfies CustomErrorsOptions;
 
   constructor(
     options: TOTPStrategyOptions,
     verify: StrategyVerifyCallback<User, TOTPVerifyParams>,
   ) {
-    super(verify)
-    this.secret = options.secret
-    this.maxAge = options.maxAge ?? undefined
-    this.storeTOTP = options.storeTOTP
-    this.sendTOTP = options.sendTOTP
-    this.handleTOTP = options.handleTOTP
-    this.validateEmail = options.validateEmail ?? this._validateEmailDefaults
-    this.emailFieldKey = options.emailFieldKey ?? FORM_FIELDS.EMAIL
-    this.totpFieldKey = options.totpFieldKey ?? FORM_FIELDS.TOTP
-    this.sessionEmailKey = options.sessionEmailKey ?? SESSION_KEYS.EMAIL
-    this.sessionTotpKey = options.sessionTotpKey ?? SESSION_KEYS.TOTP
+    super(verify);
+    this.secret = options.secret;
+    this.maxAge = options.maxAge ?? undefined;
+    this.storeTOTP = options.storeTOTP;
+    this.sendTOTP = options.sendTOTP;
+    this.handleTOTP = options.handleTOTP;
+    this.validateEmail = options.validateEmail ?? this._validateEmailDefaults;
+    this.emailFieldKey = options.emailFieldKey ?? FORM_FIELDS.EMAIL;
+    this.totpFieldKey = options.totpFieldKey ?? FORM_FIELDS.TOTP;
+    this.sessionEmailKey = options.sessionEmailKey ?? SESSION_KEYS.EMAIL;
+    this.sessionTotpKey = options.sessionTotpKey ?? SESSION_KEYS.TOTP;
 
     this.totpGeneration = {
       ...this._totpGenerationDefaults,
       ...options.totpGeneration,
-    }
+    };
     this.magicLinkGeneration = {
       ...this._magicLinkGenerationDefaults,
       ...options.magicLinkGeneration,
-    }
+    };
     this.customErrors = {
       ...this._customErrorsDefaults,
       ...options.customErrors,
-    }
+    };
   }
 
   async authenticate(
@@ -389,22 +389,22 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     sessionStorage: SessionStorage,
     options: AuthenticateOptions,
   ): Promise<User> {
-    if (!this.secret) throw new Error(ERRORS.REQUIRED_ENV_SECRET)
-    if (!options.successRedirect) throw new Error(ERRORS.REQUIRED_SUCCESS_REDIRECT_URL)
+    if (!this.secret) throw new Error(ERRORS.REQUIRED_ENV_SECRET);
+    if (!options.successRedirect) throw new Error(ERRORS.REQUIRED_SUCCESS_REDIRECT_URL);
 
-    const isPOST = request.method === 'POST'
-    const isGET = request.method === 'GET'
+    const isPOST = request.method === 'POST';
+    const isGET = request.method === 'GET';
 
-    const session = await sessionStorage.getSession(request.headers.get('cookie'))
-    const sessionEmail = session.get(this.sessionEmailKey)
-    const sessionTotp = session.get(this.sessionTotpKey)
+    const session = await sessionStorage.getSession(request.headers.get('cookie'));
+    const sessionEmail = session.get(this.sessionEmailKey);
+    const sessionTotp = session.get(this.sessionTotpKey);
 
-    let user: User | null = session.get(options.sessionKey) ?? null
+    let user: User | null = session.get(options.sessionKey) ?? null;
 
-    let formData: FormData | undefined = undefined
-    let formDataEmail: string | undefined = undefined
-    let formDataTotp: string | undefined = undefined
-    let magicLinkTotp: string | undefined = undefined
+    let formData: FormData | undefined = undefined;
+    let formDataEmail: string | undefined = undefined;
+    let formDataTotp: string | undefined = undefined;
+    let magicLinkTotp: string | undefined = undefined;
 
     try {
       if (!user) {
@@ -412,19 +412,19 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
          * 1st Authentication Phase.
          */
         if (isPOST) {
-          formData = await request.formData()
-          const form = Object.fromEntries(formData)
+          formData = await request.formData();
+          const form = Object.fromEntries(formData);
 
-          formDataEmail = form[this.emailFieldKey] && String(form[this.emailFieldKey])
-          formDataTotp = form[this.totpFieldKey] && String(form[this.totpFieldKey])
+          formDataEmail = form[this.emailFieldKey] && String(form[this.emailFieldKey]);
+          formDataTotp = form[this.totpFieldKey] && String(form[this.totpFieldKey]);
 
           /**
            * Re-send TOTP - User has requested a new TOTP.
            * This will invalidate previous TOTP and assign session email to form email.
            */
           if (!formDataEmail && !formDataTotp && sessionEmail && sessionTotp) {
-            await this.handleTOTP(sessionTotp, { active: false })
-            formDataEmail = sessionEmail
+            await this.handleTOTP(sessionTotp, { active: false });
+            formDataEmail = sessionEmail;
           }
 
           /**
@@ -436,27 +436,27 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
             formDataEmail !== sessionEmail &&
             sessionTotp
           ) {
-            await this.handleTOTP(sessionTotp, { active: false })
+            await this.handleTOTP(sessionTotp, { active: false });
           }
 
           /**
            * First TOTP request.
            */
           if (!formDataTotp) {
-            if (!formDataEmail) throw new Error(this.customErrors.requiredEmail)
-            await this.validateEmail(formDataEmail)
+            if (!formDataEmail) throw new Error(this.customErrors.requiredEmail);
+            await this.validateEmail(formDataEmail);
 
             // Generate and Sign TOTP.
             const { otp: _otp, ...totp } = generateTOTP({
               ...this.totpGeneration,
               secret: generateSecret(),
-            })
+            });
             const signedTotp = await signJWT({
               payload: totp,
               expiresIn:
                 this.totpGeneration.period ?? this._totpGenerationDefaults.period,
               secretKey: this.secret,
-            })
+            });
 
             // Generate Magic Link.
             const magicLink = generateMagicLink({
@@ -464,13 +464,13 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
               param: this.totpFieldKey,
               code: _otp,
               request,
-            })
+            });
 
             // Store TOTP.
-            await this._storeTOTP({ hash: signedTotp, active: true, attempts: 0 })
+            await this._storeTOTP({ hash: signedTotp, active: true, attempts: 0 });
 
             // Update `expiresAt` database field - If exists.
-            await this._handleExpiresAt(signedTotp, totp)
+            await this._handleExpiresAt(signedTotp, totp);
 
             // Send TOTP.
             await this._sendTOTP({
@@ -479,11 +479,11 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
               magicLink,
               form: formData,
               request,
-            })
+            });
 
-            session.set(this.sessionEmailKey, formDataEmail)
-            session.set(this.sessionTotpKey, signedTotp)
-            session.unset(options.sessionErrorKey)
+            session.set(this.sessionEmailKey, formDataEmail);
+            session.set(this.sessionTotpKey, signedTotp);
+            session.unset(options.sessionErrorKey);
 
             throw redirect(options.successRedirect, {
               headers: {
@@ -491,7 +491,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
                   maxAge: this.maxAge,
                 }),
               },
-            })
+            });
           }
         }
 
@@ -500,24 +500,25 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
          * Either via form submission or magic-link URL.
          */
         if (isGET && this.magicLinkGeneration.enabled) {
-          const url = new URL(request.url)
+          const url = new URL(request.url);
 
           if (url.pathname !== this.magicLinkGeneration.callbackPath) {
-            throw new Error(ERRORS.INVALID_MAGIC_LINK_PATH)
+            throw new Error(ERRORS.INVALID_MAGIC_LINK_PATH);
           }
 
           magicLinkTotp = url.searchParams.has(this.totpFieldKey)
             ? decodeURIComponent(url.searchParams.get(this.totpFieldKey) ?? '')
-            : undefined
+            : undefined;
         }
 
         if ((isPOST && formDataTotp) || (isGET && magicLinkTotp)) {
           // Validation.
-          if (isPOST && formDataTotp) await this._validateTOTP(sessionTotp, formDataTotp)
-          if (isGET && magicLinkTotp) await this._validateTOTP(sessionTotp, magicLinkTotp)
+          if (isPOST && formDataTotp) await this._validateTOTP(sessionTotp, formDataTotp);
+          if (isGET && magicLinkTotp)
+            await this._validateTOTP(sessionTotp, magicLinkTotp);
 
           // Invalidation.
-          await this.handleTOTP(sessionTotp, { active: false })
+          await this.handleTOTP(sessionTotp, { active: false });
 
           // Allow developer to handle user validation.
           user = await this.verify({
@@ -525,12 +526,12 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
             form: formData,
             magicLink: magicLinkTotp,
             request,
-          })
+          });
 
-          session.set(options.sessionKey, user)
-          session.unset(this.sessionEmailKey)
-          session.unset(this.sessionTotpKey)
-          session.unset(options.sessionErrorKey)
+          session.set(options.sessionKey, user);
+          session.unset(this.sessionEmailKey);
+          session.unset(this.sessionTotpKey);
+          session.unset(options.sessionErrorKey);
 
           throw redirect(options.successRedirect, {
             headers: {
@@ -538,18 +539,18 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
                 maxAge: this.maxAge,
               }),
             },
-          })
+          });
         }
       }
     } catch (error) {
       // Allow Response to pass-through.
-      if (error instanceof Response && error.status === 302) throw error
+      if (error instanceof Response && error.status === 302) throw error;
       if (error instanceof Error) {
         if (error.message === ERRORS.INVALID_JWT) {
-          const dbTOTP = await this.handleTOTP(sessionTotp)
-          if (!dbTOTP || !dbTOTP.hash) throw new Error(ERRORS.TOTP_NOT_FOUND)
+          const dbTOTP = await this.handleTOTP(sessionTotp);
+          if (!dbTOTP || !dbTOTP.hash) throw new Error(ERRORS.TOTP_NOT_FOUND);
 
-          await this.handleTOTP(sessionTotp, { active: false })
+          await this.handleTOTP(sessionTotp, { active: false });
 
           return await this.failure(
             this.customErrors.inactiveTotp || ERRORS.INACTIVE_TOTP,
@@ -557,10 +558,10 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
             sessionStorage,
             options,
             error,
-          )
+          );
         }
 
-        return await this.failure(error.message, request, sessionStorage, options, error)
+        return await this.failure(error.message, request, sessionStorage, options, error);
       }
       if (typeof error === 'string') {
         return await this.failure(
@@ -569,7 +570,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
           sessionStorage,
           options,
           new Error(error),
-        )
+        );
       }
       return await this.failure(
         ERRORS.UNKNOWN_ERROR,
@@ -577,55 +578,55 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
         sessionStorage,
         options,
         new Error(JSON.stringify(error, null, 2)),
-      )
+      );
     }
 
-    if (!user) throw new Error(ERRORS.USER_NOT_FOUND)
+    if (!user) throw new Error(ERRORS.USER_NOT_FOUND);
 
-    return this.success(user, request, sessionStorage, options)
+    return this.success(user, request, sessionStorage, options);
   }
 
   private async _validateEmailDefaults(email: string) {
-    const regexEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/gm
-    if (!regexEmail.test(email)) throw new Error(this.customErrors.invalidEmail)
+    const regexEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/gm;
+    if (!regexEmail.test(email)) throw new Error(this.customErrors.invalidEmail);
   }
 
   private async _storeTOTP(totp: StoreTOTPOptions) {
-    await this.storeTOTP(totp)
+    await this.storeTOTP(totp);
   }
 
   private async _sendTOTP(data: SendTOTPOptions) {
-    await this.sendTOTP({ ...data })
+    await this.sendTOTP({ ...data });
   }
 
   private async _validateTOTP(sessionTotp: string, otp: string) {
     // Retrieve encrypted TOTP from database.
-    const dbTOTP = await this.handleTOTP(sessionTotp)
-    if (!dbTOTP || !dbTOTP.hash) throw new Error(ERRORS.TOTP_NOT_FOUND)
+    const dbTOTP = await this.handleTOTP(sessionTotp);
+    if (!dbTOTP || !dbTOTP.hash) throw new Error(ERRORS.TOTP_NOT_FOUND);
 
     if (dbTOTP.active !== true) {
-      throw new Error(this.customErrors.inactiveTotp)
+      throw new Error(this.customErrors.inactiveTotp);
     }
 
     const maxAttempts =
-      this.totpGeneration.maxAttempts ?? this._totpGenerationDefaults.maxAttempts
+      this.totpGeneration.maxAttempts ?? this._totpGenerationDefaults.maxAttempts;
 
     if (dbTOTP.attempts >= maxAttempts) {
-      await this.handleTOTP(sessionTotp, { active: false })
-      throw new Error(this.customErrors.inactiveTotp)
+      await this.handleTOTP(sessionTotp, { active: false });
+      throw new Error(this.customErrors.inactiveTotp);
     }
 
     // Decryption and Verification.
     const { iat, exp, ...totp } = (await verifyJWT({
       jwt: sessionTotp,
       secretKey: this.secret,
-    })) as Required<TOTPGenerationOptions> & { iat: number; exp: number }
+    })) as Required<TOTPGenerationOptions> & { iat: number; exp: number };
 
     // Verify TOTP (@epic-web/totp).
-    const isValid = verifyTOTP({ ...totp, otp })
+    const isValid = verifyTOTP({ ...totp, otp });
     if (!isValid) {
-      await this.handleTOTP(sessionTotp, { attempts: dbTOTP.attempts + 1 })
-      throw new Error(this.customErrors.invalidTotp)
+      await this.handleTOTP(sessionTotp, { attempts: dbTOTP.attempts + 1 });
+      throw new Error(this.customErrors.invalidTotp);
     }
   }
 
@@ -634,27 +635,27 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     totp: Partial<TOTPGenerationOptions>,
   ) {
     // Retrieve encrypted TOTP from database.
-    const dbTOTP = await this.handleTOTP(sessionTotp)
+    const dbTOTP = await this.handleTOTP(sessionTotp);
 
     if (dbTOTP && 'expiresAt' in dbTOTP) {
       const newExpiresAt =
-        Date.now() + (totp.period ?? this._totpGenerationDefaults.period) * 1000
+        Date.now() + (totp.period ?? this._totpGenerationDefaults.period) * 1000;
 
-      let formattedExpiresAt
+      let formattedExpiresAt;
 
       if (dbTOTP.expiresAt instanceof Date) {
-        formattedExpiresAt = new Date(newExpiresAt)
+        formattedExpiresAt = new Date(newExpiresAt);
       } else if (typeof dbTOTP.expiresAt === 'string') {
-        formattedExpiresAt = new Date(newExpiresAt).toISOString()
+        formattedExpiresAt = new Date(newExpiresAt).toISOString();
       } else if (dbTOTP.expiresAt === null) {
         throw new Error(
           "Please initialize 'expiresAt' field in your database to either a Date or String type.",
-        )
+        );
       }
 
       await this.handleTOTP(sessionTotp, {
         expiresAt: formattedExpiresAt,
-      })
+      });
     }
   }
 }

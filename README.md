@@ -104,11 +104,11 @@ We'll require an Email Service to send the codes to our users. Feel free to use 
 
 ```ts
 export type SendEmailBody = {
-  to: string | string[]
-  subject: string
-  html: string
-  text?: string
-}
+  to: string | string[];
+  subject: string;
+  html: string;
+  text?: string;
+};
 
 export async function sendEmail(body: SendEmailBody) {
   return fetch(`https://any-email-service.com`, {
@@ -118,7 +118,7 @@ export async function sendEmail(body: SendEmailBody) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ ...body }),
-  })
+  });
 }
 ```
 
@@ -133,7 +133,7 @@ Implement the following code and replace the `secrets` property with a strong st
 
 ```ts
 // app/modules/auth/session.server.ts
-import { createCookieSessionStorage } from '@remix-run/node'
+import { createCookieSessionStorage } from '@remix-run/node';
 
 export const sessionStorage = createCookieSessionStorage({
   cookie: {
@@ -144,9 +144,9 @@ export const sessionStorage = createCookieSessionStorage({
     secrets: [process.env.SESSION_SECRET || 'NOT_A_STRONG_SECRET'],
     secure: process.env.NODE_ENV === 'production',
   },
-})
+});
 
-export const { getSession, commitSession, destroySession } = sessionStorage
+export const { getSession, commitSession, destroySession } = sessionStorage;
 ```
 
 ## Strategy Instance
@@ -160,22 +160,22 @@ Implement the following code and replace the `secret` property with a strong str
 
 ```ts
 // app/modules/auth/auth.server.ts
-import { Authenticator } from 'remix-auth'
-import { TOTPStrategy } from 'remix-auth-totp'
+import { Authenticator } from 'remix-auth';
+import { TOTPStrategy } from 'remix-auth-totp';
 
-import { sessionStorage } from './session.server'
-import { sendEmail } from './email.server'
-import { db } from '~/db'
+import { sessionStorage } from './session.server';
+import { sendEmail } from './email.server';
+import { db } from '~/db';
 
 // The User type should match the one from database.
 type User = {
-  id: string
-  email: string
-}
+  id: string;
+  email: string;
+};
 
 export let authenticator = new Authenticator<User>(sessionStorage, {
   throwOnError: true,
-})
+});
 
 authenticator.use(
   new TOTPStrategy(
@@ -187,7 +187,7 @@ authenticator.use(
     },
     async ({ email, code, form, magicLink, request }) => {},
   ),
-)
+);
 ```
 
 > [!NOTE]
@@ -251,26 +251,26 @@ authenticator.use(
     async ({ email, code, magicLink, form, request }) => {
       // You can determine whether the user is authenticating
       // via OTP code submission or Magic-Link URL and run your own logic.
-      if (form) console.log('Optional form submission logic.')
-      if (magicLink) console.log('Optional magic-link submission logic.')
+      if (form) console.log('Optional form submission logic.');
+      if (magicLink) console.log('Optional magic-link submission logic.');
 
       // Get user from database.
       let user = await db.user.findFirst({
         where: { email },
-      })
+      });
 
       // Create a new user if it doesn't exist.
       if (!user) {
         user = await db.user.create({
           data: { email },
-        })
+        });
       }
 
       // Return user as Session.
-      return user
+      return user;
     },
   ),
-)
+);
 ```
 
 ## Auth Routes
@@ -401,14 +401,14 @@ export default function Account() {
 
 ```tsx
 // app/routes/magic-link.tsx
-import type { DataFunctionArgs } from '@remix-run/node'
-import { authenticator } from '~/modules/auth/auth.server'
+import type { DataFunctionArgs } from '@remix-run/node';
+import { authenticator } from '~/modules/auth/auth.server';
 
 export async function loader({ request }: DataFunctionArgs) {
   await authenticator.authenticate('TOTP', request, {
     successRedirect: '/account',
     failureRedirect: '/login',
-  })
+  });
 }
 ```
 
@@ -416,13 +416,13 @@ export async function loader({ request }: DataFunctionArgs) {
 
 ```tsx
 // app/routes/logout.tsx
-import type { DataFunctionArgs } from '@remix-run/node'
-import { authenticator } from '~/modules/auth/auth.server'
+import type { DataFunctionArgs } from '@remix-run/node';
+import { authenticator } from '~/modules/auth/auth.server';
 
 export async function action({ request }: DataFunctionArgs) {
   return await authenticator.logout(request, {
     redirectTo: '/',
-  })
+  });
 }
 ```
 
