@@ -10,7 +10,7 @@ import * as crypto from 'crypto'
  * Constants.
  */
 export const SECRET_ENV = 'SECRET_ENV'
-export const HOST_URL = 'localhost:3000'
+export const HOST_URL = 'http://localhost:3000'
 export const DEFAULT_EMAIL = 'localhost@3000.com'
 
 /**

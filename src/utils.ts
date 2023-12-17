@@ -33,7 +33,7 @@ export function generateMagicLink(
 
   const url = new URL(
     options.callbackPath ?? '/',
-    options.hostUrl ?? getHostUrl(options.request),
+    options.hostUrl ?? new URL(options.request.url).origin,
   )
   url.searchParams.set(options.param, options.code)
 
@@ -80,19 +80,4 @@ export async function verifyJWT({ jwt, secretKey }: VerifyJWTOptions) {
   } catch (err: unknown) {
     throw new Error(ERRORS.INVALID_JWT)
   }
-}
-
-/**
- * Miscellaneous.
- */
-export function getHostUrl(request: Request) {
-  const host = request.headers.get('X-Forwarded-Host') ?? request.headers.get('host')
-  if (!host) throw new Error('Could not determine host.')
-
-  // If the host is localhost or ends with .local, use http.
-  const protocol = host.match(/(:?\.local|^localhost|^127\.\d+\.\d+\.\d+)(:?:\d+)?$/)
-    ? 'http'
-    : 'https'
-
-  return `${protocol}://${host}`
 }
