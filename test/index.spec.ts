@@ -2,13 +2,12 @@ import { describe, test, expect, afterEach, vi } from 'vitest'
 import { AuthorizationError } from 'remix-auth'
 
 import { TOTPStrategy } from '../src/index'
-import { generateTOTP, generateMagicLink, getHostUrl, signJWT } from '../src/utils'
+import { generateTOTP, generateMagicLink, signJWT } from '../src/utils'
 import { STRATEGY_NAME, FORM_FIELDS, SESSION_KEYS, ERRORS } from '../src/constants'
 
 import {
   SECRET_ENV,
   HOST_URL,
-  HOST,
   AUTH_OPTIONS,
   TOTP_GENERATION_DEFAULTS,
   MAGIC_LINK_GENERATION_DEFAULTS,
@@ -276,7 +275,6 @@ describe('[ TOTP ]', () => {
       const request = new Request(`${HOST_URL}`, {
         method: 'POST',
         headers: {
-          host: HOST,
           cookie: await sessionStorage.commitSession(session),
         },
         body: formData,
@@ -309,7 +307,6 @@ describe('[ TOTP ]', () => {
 
       const request = new Request(`${HOST_URL}`, {
         method: 'POST',
-        headers: { host: HOST },
         body: formData,
       })
 
@@ -335,7 +332,6 @@ describe('[ TOTP ]', () => {
 
       const request = new Request(`${HOST_URL}`, {
         method: 'POST',
-        headers: { host: HOST },
         body: formData,
       })
 
@@ -371,7 +367,6 @@ describe('[ TOTP ]', () => {
 
       const request = new Request(`${HOST_URL}`, {
         method: 'POST',
-        headers: { host: HOST },
         body: formData,
       })
 
@@ -411,7 +406,6 @@ describe('[ TOTP ]', () => {
 
       const request = new Request(`${HOST_URL}`, {
         method: 'POST',
-        headers: { host: HOST },
         body: formData,
       })
 
@@ -451,7 +445,6 @@ describe('[ TOTP ]', () => {
       const request = new Request(`${HOST_URL}`, {
         method: 'POST',
         headers: {
-          host: HOST,
           cookie: await sessionStorage.commitSession(session),
         },
         body: formData,
@@ -496,7 +489,6 @@ describe('[ TOTP ]', () => {
       const request = new Request(`${HOST_URL}`, {
         method: 'POST',
         headers: {
-          host: HOST,
           cookie: await sessionStorage.commitSession(session),
         },
         body: formData,
@@ -544,9 +536,7 @@ describe('[ TOTP ]', () => {
         callbackPath: '/magic-link',
         param: 'code',
         code: _otp,
-        request: new Request(HOST_URL, {
-          headers: { host: HOST },
-        }),
+        request: new Request(HOST_URL),
       })
 
       const session = await sessionStorage.getSession()
@@ -555,7 +545,6 @@ describe('[ TOTP ]', () => {
       const request = new Request(`${magicLink}`, {
         method: 'GET',
         headers: {
-          host: HOST,
           cookie: await sessionStorage.commitSession(session),
         },
       })
@@ -590,14 +579,11 @@ describe('[ TOTP ]', () => {
         callbackPath: '/invalid',
         param: 'code',
         code: _otp,
-        request: new Request(HOST_URL, {
-          headers: { host: HOST },
-        }),
+        request: new Request(HOST_URL),
       })
 
       const request = new Request(`${magicLink}`, {
         method: 'GET',
-        headers: { host: HOST },
       })
 
       const strategy = new TOTPStrategy(
@@ -636,7 +622,6 @@ describe('[ TOTP ]', () => {
       const request = new Request(`${HOST_URL}`, {
         method: 'POST',
         headers: {
-          host: HOST,
           cookie: await sessionStorage.commitSession(session),
         },
         body: formData,
@@ -680,7 +665,6 @@ describe('[ TOTP ]', () => {
       const request = new Request(`${HOST_URL}`, {
         method: 'POST',
         headers: {
-          host: HOST,
           cookie: await sessionStorage.commitSession(session),
         },
         body: formData,
@@ -707,28 +691,6 @@ describe('[ TOTP ]', () => {
 })
 
 describe('[ Utils ]', () => {
-  test('Should use the HTTP protocol for local environments.', async () => {
-    const request = new Request(`${HOST_URL}`)
-    const samples: Array<[string, 'http:' | 'https:']> = [
-      ['127.0.0.1', 'http:'],
-      ['127.1.1.1', 'http:'],
-      ['127.0.0.1:8888', 'http:'],
-      ['localhost', 'http:'],
-      ['localhost:3000', 'http:'],
-      ['remix.run', 'https:'],
-      ['remix.run:3000', 'https:'],
-      ['local.com', 'https:'],
-      ['legit.local.com:3000', 'https:'],
-      ['remix-auth-otp.local', 'http:'],
-      ['remix-auth-otp.local:3000', 'http:'],
-    ]
-
-    for (const [host, protocol] of samples) {
-      request.headers.set('host', host)
-      expect(getHostUrl(request).startsWith(protocol)).toBe(true)
-    }
-  })
-
   test('Should use the origin from the request for the magic-link if hostUrl is not provided.', async () => {
     const samples: Array<[string, string]> = [
       ['http://localhost/login', 'http://localhost/magic-link?code=U2N2EY'],
@@ -741,9 +703,7 @@ describe('[ Utils ]', () => {
     ]
 
     for (const [requestUrl, magicLinkUrl] of samples) {
-      const request = new Request(requestUrl, {
-        headers: { host: HOST },
-      })
+      const request = new Request(requestUrl)
       expect(
         generateMagicLink({
           ...MAGIC_LINK_GENERATION_DEFAULTS,
