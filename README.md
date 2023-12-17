@@ -1,11 +1,11 @@
-<div align="center">
+<!-- <div align="center">
   <a href="https://github.com/dev-xo/remix-auth-totp" target="_blank">
     <img alt="Remix Auth TOTP" src="https://raw.githubusercontent.com/dev-xo/dev-xo/main/remix-auth-totp/logo-4.png" width="200" />
   </a>
-</div>
+</div> -->
 
 <h1 align="center">
-  Email Code Authentication for Remix
+  🏌️‍♂️ Remix Auth TOTP
 </h1>
 
 <div align="center">
@@ -42,13 +42,11 @@ npm install remix-auth-totp
 - **🛡 Bulletproof** - Crafted in strict TypeScript with high test coverage.
 - **🚀 Remix Auth Foundation** - An amazing authentication library for Remix.
 
-<!-- ## [Live Demo](https://totp.fly.dev)
+## [Live Demo](https://totp.fly.dev)
 
 [Live Demo](https://totp.fly.dev) that displays the authentication flow.
 
 [![Remix Auth TOTP](https://raw.githubusercontent.com/dev-xo/dev-xo/main/remix-auth-totp/thumbnail-2.png)](https://totp.fly.dev)
-
--->
 
 ## Usage
 
