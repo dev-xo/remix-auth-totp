@@ -707,7 +707,7 @@ describe('[ TOTP ]', () => {
 })
 
 describe('[ Utils ]', () => {
-  test('Should properly use the HTTP protocol for local environments.', async () => {
+  test('Should use the HTTP protocol for local environments.', async () => {
     const request = new Request(`${HOST_URL}`)
     const samples: Array<[string, 'http:' | 'https:']> = [
       ['127.0.0.1', 'http:'],
@@ -729,7 +729,7 @@ describe('[ Utils ]', () => {
     }
   })
 
-  test('Should use the origin from the request for the magic link if hostUrl is not provided.', async () => {
+  test('Should use the origin from the request for the magic-link if hostUrl is not provided.', async () => {
     const samples: Array<[string, string]> = [
       ['http://localhost/login', 'http://localhost/magic-link?code=U2N2EY'],
       ['http://localhost:3000/login', 'http://localhost:3000/magic-link?code=U2N2EY'],
