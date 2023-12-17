@@ -33,7 +33,7 @@ export function generateMagicLink(
 
   const url = new URL(
     options.callbackPath ?? '/',
-    options.hostUrl ?? getHostUrl(options.request),
+    options.hostUrl ?? new URL(options.request.url).origin,
   )
   url.searchParams.set(options.param, options.code)
 
@@ -84,6 +84,13 @@ export async function verifyJWT({ jwt, secretKey }: VerifyJWTOptions) {
 
 /**
  * Miscellaneous.
+ */
+
+/**
+ * Returns the host URL.
+ * This is no longer called by generateMagicLink() since the host in the request headers
+ * may be different from the origin of the request url and the browser would not
+ * find the right cookies for the magic link.
  */
 export function getHostUrl(request: Request) {
   const host = request.headers.get('X-Forwarded-Host') ?? request.headers.get('host')

@@ -8,6 +8,7 @@ import { STRATEGY_NAME, FORM_FIELDS, SESSION_KEYS, ERRORS } from '../src/constan
 import {
   SECRET_ENV,
   HOST_URL,
+  HOST,
   AUTH_OPTIONS,
   TOTP_GENERATION_DEFAULTS,
   MAGIC_LINK_GENERATION_DEFAULTS,
@@ -275,7 +276,7 @@ describe('[ TOTP ]', () => {
       const request = new Request(`${HOST_URL}`, {
         method: 'POST',
         headers: {
-          host: HOST_URL,
+          host: HOST,
           cookie: await sessionStorage.commitSession(session),
         },
         body: formData,
@@ -308,7 +309,7 @@ describe('[ TOTP ]', () => {
 
       const request = new Request(`${HOST_URL}`, {
         method: 'POST',
-        headers: { host: HOST_URL },
+        headers: { host: HOST },
         body: formData,
       })
 
@@ -334,7 +335,7 @@ describe('[ TOTP ]', () => {
 
       const request = new Request(`${HOST_URL}`, {
         method: 'POST',
-        headers: { host: HOST_URL },
+        headers: { host: HOST },
         body: formData,
       })
 
@@ -370,7 +371,7 @@ describe('[ TOTP ]', () => {
 
       const request = new Request(`${HOST_URL}`, {
         method: 'POST',
-        headers: { host: HOST_URL },
+        headers: { host: HOST },
         body: formData,
       })
 
@@ -410,7 +411,7 @@ describe('[ TOTP ]', () => {
 
       const request = new Request(`${HOST_URL}`, {
         method: 'POST',
-        headers: { host: HOST_URL },
+        headers: { host: HOST },
         body: formData,
       })
 
@@ -450,7 +451,7 @@ describe('[ TOTP ]', () => {
       const request = new Request(`${HOST_URL}`, {
         method: 'POST',
         headers: {
-          host: HOST_URL,
+          host: HOST,
           cookie: await sessionStorage.commitSession(session),
         },
         body: formData,
@@ -495,7 +496,7 @@ describe('[ TOTP ]', () => {
       const request = new Request(`${HOST_URL}`, {
         method: 'POST',
         headers: {
-          host: HOST_URL,
+          host: HOST,
           cookie: await sessionStorage.commitSession(session),
         },
         body: formData,
@@ -544,7 +545,7 @@ describe('[ TOTP ]', () => {
         param: 'code',
         code: _otp,
         request: new Request(HOST_URL, {
-          headers: { host: HOST_URL },
+          headers: { host: HOST },
         }),
       })
 
@@ -554,7 +555,7 @@ describe('[ TOTP ]', () => {
       const request = new Request(`${magicLink}`, {
         method: 'GET',
         headers: {
-          host: HOST_URL,
+          host: HOST,
           cookie: await sessionStorage.commitSession(session),
         },
       })
@@ -590,13 +591,13 @@ describe('[ TOTP ]', () => {
         param: 'code',
         code: _otp,
         request: new Request(HOST_URL, {
-          headers: { host: HOST_URL },
+          headers: { host: HOST },
         }),
       })
 
       const request = new Request(`${magicLink}`, {
         method: 'GET',
-        headers: { host: HOST_URL },
+        headers: { host: HOST },
       })
 
       const strategy = new TOTPStrategy(
@@ -635,7 +636,7 @@ describe('[ TOTP ]', () => {
       const request = new Request(`${HOST_URL}`, {
         method: 'POST',
         headers: {
-          host: HOST_URL,
+          host: HOST,
           cookie: await sessionStorage.commitSession(session),
         },
         body: formData,
@@ -679,7 +680,7 @@ describe('[ TOTP ]', () => {
       const request = new Request(`${HOST_URL}`, {
         method: 'POST',
         headers: {
-          host: HOST_URL,
+          host: HOST,
           cookie: await sessionStorage.commitSession(session),
         },
         body: formData,
@@ -725,6 +726,32 @@ describe('[ Utils ]', () => {
     for (const [host, protocol] of samples) {
       request.headers.set('host', host)
       expect(getHostUrl(request).startsWith(protocol)).toBe(true)
+    }
+  })
+
+  test('Should use the origin from the request for the magic link if hostUrl is not provided.', async () => {
+    const samples: Array<[string, string]> = [
+      ['http://localhost/login', 'http://localhost/magic-link?code=U2N2EY'],
+      ['http://localhost:3000/login', 'http://localhost:3000/magic-link?code=U2N2EY'],
+      ['http://127.0.0.1/login', 'http://127.0.0.1/magic-link?code=U2N2EY'],
+      ['http://127.0.0.1:3000/login', 'http://127.0.0.1:3000/magic-link?code=U2N2EY'],
+      ['http://localhost:8788/signin', 'http://localhost:8788/magic-link?code=U2N2EY'],
+      ['https://host.com/login', 'https://host.com/magic-link?code=U2N2EY'],
+      ['https://host.com:3000/login', 'https://host.com:3000/magic-link?code=U2N2EY'],
+    ]
+
+    for (const [requestUrl, magicLinkUrl] of samples) {
+      const request = new Request(requestUrl, {
+        headers: { host: HOST },
+      })
+      expect(
+        generateMagicLink({
+          ...MAGIC_LINK_GENERATION_DEFAULTS,
+          param: 'code',
+          code: 'U2N2EY',
+          request,
+        }),
+      ).toBe(magicLinkUrl)
     }
   })
 })
