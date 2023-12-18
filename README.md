@@ -5,7 +5,7 @@
 </div> -->
 
 <h1 align="center">
-  🏌️‍♂️ Remix Auth TOTP
+  💿 Remix Auth TOTP
 </h1>
 
 <div align="center">
@@ -447,7 +447,7 @@ If you found this library helpful, please consider leaving us a ⭐ [star](https
 
 ### Acknowledgments
 
-[@w00fz](https://github.com/w00fz) for its amazing implementation of the Magic Link feature!
+Bit thanks to [@w00fz](https://github.com/w00fz) for its amazing implementation of the **Magic Link feature** and to [@mw10013](https://github.com/mw10013) for the **Cloudflare support** and the dedication set into the implementation.
 
 ## License
 
