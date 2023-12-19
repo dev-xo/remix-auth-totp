@@ -321,7 +321,7 @@ export async function action({ request }: DataFunctionArgs) {
     // ...
     // User is not authenticated yet.
     // We want to redirect to our verify code form. (/verify-code or any other route).
-    successRedirect: '/login',
+    successRedirect: '/verify',
 
     // The `failureRedirect` route it's required.
     // ...

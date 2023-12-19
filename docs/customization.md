@@ -11,7 +11,7 @@ _This can be used to verify that the provided email is not a disposable one._
 
 ```ts
 authenticator.use(
-  new OTPStrategy({
+  new TOTPStrategy({
     validateEmail: async (email) => {
       // Handle custom email validation.
       // ...
@@ -75,7 +75,7 @@ authenticator.use(
 The Magic Link is optional and enabled by default. You can decide to opt-out by setting the `enabled` option to `false`.
 
 Furthermore, the Magic Link can be customized via the `magicLinkGeneration` object in the TOTPStrategy Instance.
-The URL link generated will be in the format of `https://{hostURL}{callbackPath}?{codeField}=<magic-link-code>`.
+The URL link generated will be in the format of `{hostURL}{callbackPath}?{codeField}=<magic-link-code>`.
 
 ```ts
 export interface MagicLinkGenerationOptions {
@@ -170,6 +170,25 @@ export interface TOTPStrategyOptions<User> {
   sessionTotpKey?: string
 }
 ```
+
+## Cloudflare
+
+To use on the Cloudflare runtime, you'll need to add the following to your `remix.config.js` file to specify the polyfills for a couple of node builtin modules. See the remix docs on [supportNodeBuiltinsPolyfill](https://remix.run/docs/en/main/file-conventions/remix-config#servernodebuiltinspolyfill).
+
+### `remix.config.js`
+
+```js
+export default {
+  serverNodeBuiltinsPolyfill: {
+    modules: { buffer: true, crypto: true },
+    globals: {
+      Buffer: true,
+    },
+  }
+}
+```
+
+
 
 ## Contributing
 
