@@ -441,21 +441,6 @@ The Strategy includes a few options that can be customized.
 
 You can find a detailed list of all the available options in the [customization](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/customization.md) documentation.
 
-## Cloudflare
-
-### `remix.config.js`
-
-```js
-export default {
-  serverNodeBuiltinsPolyfill: {
-    modules: { buffer: true, crypto: true },
-    globals: {
-      Buffer: true,
-    },
-  }
-}
-```
-
 ## Support
 
 If you found this library helpful, please consider leaving us a ⭐ [star](https://github.com/dev-xo/remix-auth-totp). It helps the repository grow and provides the necessary motivation to continue maintaining the project.

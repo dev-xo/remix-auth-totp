@@ -171,6 +171,25 @@ export interface TOTPStrategyOptions<User> {
 }
 ```
 
+## Cloudflare
+
+To use on the Cloudflare runtime, you'll need to add the following to your `remix.config.js` file to specify the polyfills for a couple of node builtin modules. See the remix docs on [supportNodeBuiltinsPolyfill](https://remix.run/docs/en/main/file-conventions/remix-config#servernodebuiltinspolyfill).
+
+### `remix.config.js`
+
+```js
+export default {
+  serverNodeBuiltinsPolyfill: {
+    modules: { buffer: true, crypto: true },
+    globals: {
+      Buffer: true,
+    },
+  }
+}
+```
+
+
+
 ## Contributing
 
 If you have any suggestion you'd like to share, feel free to open a PR!
