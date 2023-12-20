@@ -67,14 +67,6 @@ export interface MagicLinkGenerationOptions {
   enabled?: boolean
 
   /**
-   * The host URL for the Magic Link.
-   * If omitted, it will be inferred from the Request.
-   *
-   * @default undefined
-   */
-  hostUrl?: string
-
-  /**
    * The callback URL path for the Magic Link.
    * @default '/magic-link'
    */
@@ -209,6 +201,11 @@ export interface CustomErrorsOptions {
    * The inactive TOTP error message.
    */
   inactiveTotp?: string
+
+  /**
+   * The TOTP not found error message.
+   */
+  totpNotFound?: string
 }
 
 /**
@@ -344,7 +341,6 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   } satisfies TOTPGenerationOptions
   private readonly _magicLinkGenerationDefaults = {
     enabled: true,
-    hostUrl: undefined,
     callbackPath: '/magic-link',
   } satisfies MagicLinkGenerationOptions
   private readonly _customErrorsDefaults = {
@@ -352,6 +348,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     invalidEmail: ERRORS.INVALID_EMAIL,
     invalidTotp: ERRORS.INVALID_TOTP,
     inactiveTotp: ERRORS.INACTIVE_TOTP,
+    totpNotFound: ERRORS.TOTP_NOT_FOUND,
   } satisfies CustomErrorsOptions
 
   constructor(
@@ -547,7 +544,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       if (error instanceof Error) {
         if (error.message === ERRORS.INVALID_JWT) {
           const dbTOTP = await this.handleTOTP(sessionTotp)
-          if (!dbTOTP || !dbTOTP.hash) throw new Error(ERRORS.TOTP_NOT_FOUND)
+          if (!dbTOTP || !dbTOTP.hash) throw new Error(this.customErrors.totpNotFound)
 
           await this.handleTOTP(sessionTotp, { active: false })
 
@@ -601,7 +598,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   private async _validateTOTP(sessionTotp: string, otp: string) {
     // Retrieve encrypted TOTP from database.
     const dbTOTP = await this.handleTOTP(sessionTotp)
-    if (!dbTOTP || !dbTOTP.hash) throw new Error(ERRORS.TOTP_NOT_FOUND)
+    if (!dbTOTP || !dbTOTP.hash) throw new Error(this.customErrors.totpNotFound)
 
     if (dbTOTP.active !== true) {
       throw new Error(this.customErrors.inactiveTotp)

@@ -34,7 +34,6 @@ export const TOTP_GENERATION_DEFAULTS = {
 
 export const MAGIC_LINK_GENERATION_DEFAULTS = {
   enabled: true,
-  hostUrl: undefined,
   callbackPath: '/magic-link',
 } satisfies MagicLinkGenerationOptions
 

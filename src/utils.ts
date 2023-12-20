@@ -33,7 +33,7 @@ export function generateMagicLink(
 
   const url = new URL(
     options.callbackPath ?? '/',
-    options.hostUrl ?? new URL(options.request.url).origin,
+    new URL(options.request.url).origin,
   )
   url.searchParams.set(options.param, options.code)
 
