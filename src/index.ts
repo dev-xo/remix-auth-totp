@@ -67,14 +67,6 @@ export interface MagicLinkGenerationOptions {
   enabled?: boolean
 
   /**
-   * The host URL for the Magic Link.
-   * If omitted, it will be inferred from the Request.
-   *
-   * @default undefined
-   */
-  hostUrl?: string
-
-  /**
    * The callback URL path for the Magic Link.
    * @default '/magic-link'
    */
@@ -349,7 +341,6 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   } satisfies TOTPGenerationOptions
   private readonly _magicLinkGenerationDefaults = {
     enabled: true,
-    hostUrl: undefined,
     callbackPath: '/magic-link',
   } satisfies MagicLinkGenerationOptions
   private readonly _customErrorsDefaults = {
