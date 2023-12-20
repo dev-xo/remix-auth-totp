@@ -350,6 +350,41 @@ describe('[ TOTP ]', () => {
       expect(result).toEqual(new AuthorizationError(ERRORS.TOTP_NOT_FOUND))
     })
 
+    test('Should throw a custom Error message on missing TOTP from database.', async () => {
+      const CUSTOM_ERROR = 'Custom error message.'
+
+      const totp = generateTOTP(TOTP_GENERATION_DEFAULTS)
+      const formData = new FormData()
+      formData.append(FORM_FIELDS.TOTP, totp.otp)
+
+      const request = new Request(`${HOST_URL}`, {
+        method: 'POST',
+        body: formData,
+      })
+
+      const strategy = new TOTPStrategy(
+        {
+          secret: SECRET_ENV,
+          storeTOTP,
+          sendTOTP,
+          handleTOTP,
+          customErrors: {
+            totpNotFound: CUSTOM_ERROR,
+          },
+        },
+        verify,
+      )
+      const result = (await strategy
+        .authenticate(request, sessionStorage, {
+          ...AUTH_OPTIONS,
+          throwOnError: true,
+          successRedirect: '/',
+        })
+        .catch((error) => error)) as Response
+
+      expect(result).toEqual(new AuthorizationError(CUSTOM_ERROR))
+    })
+
     test('Should throw an Error on inactive TOTP.', async () => {
       handleTOTP.mockImplementation(() =>
         Promise.resolve({ hash: signedTotp, attempts: 0, active: false }),
