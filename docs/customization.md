@@ -122,6 +122,11 @@ export interface CustomErrorsOptions {
    * The inactive TOTP error message.
    */
   inactiveTotp?: string
+    /**
+   * The TOTP not found error message.
+   */
+  totpNotFound?: string
+
 }
 
 authenticator.use(
