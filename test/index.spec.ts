@@ -19,6 +19,9 @@ import {
  * Mocks.
  */
 export const verify = vi.fn()
+export const createTOTP = vi.fn()
+export const readTOTP = vi.fn()
+export const updateTOTP = vi.fn()
 export const storeTOTP = vi.fn()
 export const sendTOTP = vi.fn()
 export const handleTOTP = vi.fn()
@@ -31,7 +34,15 @@ afterEach(() => {
 describe('[ Basics ]', () => {
   test('Should contain the name of the Strategy.', async () => {
     const strategy = new TOTPStrategy(
-      { secret: SECRET_ENV, storeTOTP, sendTOTP, handleTOTP },
+      {
+        secret: SECRET_ENV,
+        createTOTP,
+        readTOTP,
+        updateTOTP,
+        storeTOTP,
+        sendTOTP,
+        handleTOTP,
+      },
       verify,
     )
 
@@ -58,7 +69,15 @@ describe('[ Basics ]', () => {
     })
 
     const strategy = new TOTPStrategy(
-      { secret: SECRET_ENV, storeTOTP, sendTOTP, handleTOTP },
+      {
+        secret: SECRET_ENV,
+        createTOTP,
+        readTOTP,
+        updateTOTP,
+        storeTOTP,
+        sendTOTP,
+        handleTOTP,
+      },
       verify,
     )
     const result = await strategy
@@ -83,6 +102,9 @@ describe('[ Basics ]', () => {
     const strategy = new TOTPStrategy(
       {
         secret: SECRET_ENV,
+        createTOTP,
+        readTOTP,
+        updateTOTP,
         storeTOTP,
         sendTOTP,
         handleTOTP,
@@ -117,7 +139,15 @@ describe('[ TOTP ]', () => {
       })
 
       const strategy = new TOTPStrategy(
-        { secret: SECRET_ENV, storeTOTP, sendTOTP, handleTOTP },
+        {
+          secret: SECRET_ENV,
+          createTOTP,
+          readTOTP,
+          updateTOTP,
+          storeTOTP,
+          sendTOTP,
+          handleTOTP,
+        },
         verify,
       )
       const result = await strategy
@@ -142,7 +172,15 @@ describe('[ TOTP ]', () => {
       })
 
       const strategy = new TOTPStrategy(
-        { secret: SECRET_ENV, storeTOTP, sendTOTP, handleTOTP },
+        {
+          secret: SECRET_ENV,
+          createTOTP,
+          readTOTP,
+          updateTOTP,
+          storeTOTP,
+          sendTOTP,
+          handleTOTP,
+        },
         verify,
       )
       const result = await strategy
@@ -167,7 +205,15 @@ describe('[ TOTP ]', () => {
       })
 
       const strategy = new TOTPStrategy(
-        { secret: SECRET_ENV, storeTOTP, sendTOTP, handleTOTP },
+        {
+          secret: SECRET_ENV,
+          createTOTP,
+          readTOTP,
+          updateTOTP,
+          storeTOTP,
+          sendTOTP,
+          handleTOTP,
+        },
         verify,
       )
       await strategy
@@ -192,7 +238,15 @@ describe('[ TOTP ]', () => {
       })
 
       const strategy = new TOTPStrategy(
-        { secret: SECRET_ENV, storeTOTP, sendTOTP, handleTOTP },
+        {
+          secret: SECRET_ENV,
+          createTOTP,
+          readTOTP,
+          updateTOTP,
+          storeTOTP,
+          sendTOTP,
+          handleTOTP,
+        },
         verify,
       )
       await strategy
@@ -217,7 +271,15 @@ describe('[ TOTP ]', () => {
       })
 
       const strategy = new TOTPStrategy(
-        { secret: SECRET_ENV, storeTOTP, sendTOTP, handleTOTP },
+        {
+          secret: SECRET_ENV,
+          createTOTP,
+          readTOTP,
+          updateTOTP,
+          storeTOTP,
+          sendTOTP,
+          handleTOTP,
+        },
         verify,
       )
       const result = (await strategy
@@ -247,7 +309,15 @@ describe('[ TOTP ]', () => {
       })
 
       const strategy = new TOTPStrategy(
-        { secret: SECRET_ENV, storeTOTP, sendTOTP, handleTOTP },
+        {
+          secret: SECRET_ENV,
+          createTOTP,
+          readTOTP,
+          updateTOTP,
+          storeTOTP,
+          sendTOTP,
+          handleTOTP,
+        },
         verify,
       )
       const result = (await strategy
@@ -281,7 +351,16 @@ describe('[ TOTP ]', () => {
       })
 
       const strategy = new TOTPStrategy(
-        { secret: SECRET_ENV, storeTOTP, sendTOTP, handleTOTP, validateEmail },
+        {
+          secret: SECRET_ENV,
+          createTOTP,
+          readTOTP,
+          updateTOTP,
+          storeTOTP,
+          sendTOTP,
+          handleTOTP,
+          validateEmail,
+        },
         verify,
       )
       await strategy
@@ -311,7 +390,15 @@ describe('[ TOTP ]', () => {
       })
 
       const strategy = new TOTPStrategy(
-        { secret: SECRET_ENV, storeTOTP, sendTOTP, handleTOTP },
+        {
+          secret: SECRET_ENV,
+          createTOTP,
+          readTOTP,
+          updateTOTP,
+          storeTOTP,
+          sendTOTP,
+          handleTOTP,
+        },
         verify,
       )
       await strategy
@@ -336,7 +423,15 @@ describe('[ TOTP ]', () => {
       })
 
       const strategy = new TOTPStrategy(
-        { secret: SECRET_ENV, storeTOTP, sendTOTP, handleTOTP },
+        {
+          secret: SECRET_ENV,
+          createTOTP,
+          readTOTP,
+          updateTOTP,
+          storeTOTP,
+          sendTOTP,
+          handleTOTP,
+        },
         verify,
       )
       const result = (await strategy
@@ -365,6 +460,9 @@ describe('[ TOTP ]', () => {
       const strategy = new TOTPStrategy(
         {
           secret: SECRET_ENV,
+          createTOTP,
+          readTOTP,
+          updateTOTP,
           storeTOTP,
           sendTOTP,
           handleTOTP,
@@ -406,7 +504,15 @@ describe('[ TOTP ]', () => {
       })
 
       const strategy = new TOTPStrategy(
-        { secret: SECRET_ENV, storeTOTP, sendTOTP, handleTOTP },
+        {
+          secret: SECRET_ENV,
+          createTOTP,
+          readTOTP,
+          updateTOTP,
+          storeTOTP,
+          sendTOTP,
+          handleTOTP,
+        },
         verify,
       )
       const result = (await strategy
@@ -445,7 +551,15 @@ describe('[ TOTP ]', () => {
       })
 
       const strategy = new TOTPStrategy(
-        { secret: SECRET_ENV, storeTOTP, sendTOTP, handleTOTP },
+        {
+          secret: SECRET_ENV,
+          createTOTP,
+          readTOTP,
+          updateTOTP,
+          storeTOTP,
+          sendTOTP,
+          handleTOTP,
+        },
         verify,
       )
       const result = (await strategy
@@ -486,7 +600,15 @@ describe('[ TOTP ]', () => {
       })
 
       const strategy = new TOTPStrategy(
-        { secret: SECRET_ENV, storeTOTP, sendTOTP, handleTOTP },
+        {
+          secret: SECRET_ENV,
+          createTOTP,
+          readTOTP,
+          updateTOTP,
+          storeTOTP,
+          sendTOTP,
+          handleTOTP,
+        },
         verify,
       )
       const result = (await strategy
@@ -537,7 +659,15 @@ describe('[ TOTP ]', () => {
       })
 
       const strategy = new TOTPStrategy(
-        { secret: SECRET_ENV, storeTOTP, sendTOTP, handleTOTP },
+        {
+          secret: SECRET_ENV,
+          createTOTP,
+          readTOTP,
+          updateTOTP,
+          storeTOTP,
+          sendTOTP,
+          handleTOTP,
+        },
         verify,
       )
       const result = (await strategy
@@ -592,7 +722,15 @@ describe('[ TOTP ]', () => {
       })
 
       const strategy = new TOTPStrategy(
-        { secret: SECRET_ENV, storeTOTP, sendTOTP, handleTOTP },
+        {
+          secret: SECRET_ENV,
+          createTOTP,
+          readTOTP,
+          updateTOTP,
+          storeTOTP,
+          sendTOTP,
+          handleTOTP,
+        },
         verify,
       )
       const result = (await strategy
@@ -622,7 +760,15 @@ describe('[ TOTP ]', () => {
       })
 
       const strategy = new TOTPStrategy(
-        { secret: SECRET_ENV, storeTOTP, sendTOTP, handleTOTP },
+        {
+          secret: SECRET_ENV,
+          createTOTP,
+          readTOTP,
+          updateTOTP,
+          storeTOTP,
+          sendTOTP,
+          handleTOTP,
+        },
         verify,
       )
       const result = (await strategy
@@ -663,7 +809,15 @@ describe('[ TOTP ]', () => {
       })
 
       const strategy = new TOTPStrategy(
-        { secret: SECRET_ENV, storeTOTP, sendTOTP, handleTOTP },
+        {
+          secret: SECRET_ENV,
+          createTOTP,
+          readTOTP,
+          updateTOTP,
+          storeTOTP,
+          sendTOTP,
+          handleTOTP,
+        },
         verify,
       )
       const result = (await strategy
@@ -706,7 +860,15 @@ describe('[ TOTP ]', () => {
       })
 
       const strategy = new TOTPStrategy(
-        { secret: SECRET_ENV, storeTOTP, sendTOTP, handleTOTP },
+        {
+          secret: SECRET_ENV,
+          createTOTP,
+          readTOTP,
+          updateTOTP,
+          storeTOTP,
+          sendTOTP,
+          handleTOTP,
+        },
         verify,
       )
       const result = (await strategy

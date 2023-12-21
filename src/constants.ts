@@ -8,6 +8,7 @@ export const FORM_FIELDS = {
 export const SESSION_KEYS = {
   EMAIL: 'auth:email',
   TOTP: 'auth:totp',
+  TOTP_EXPIRES_AT: 'auth:totp:expiresAt',
 } as const
 
 export const ERRORS = {

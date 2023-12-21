@@ -12,6 +12,29 @@ import {
   verifyJWT,
 } from './utils.js'
 import { STRATEGY_NAME, FORM_FIELDS, SESSION_KEYS, ERRORS } from './constants.js'
+import { CreateContextOptions } from 'vm'
+
+/**
+ * The TOTP data which the application stores and uses in CRUD functions provided by the application.
+ */
+export interface TOTPData {
+  /**
+   * The encrypted TOTP.
+   */
+  hash: string
+
+  /**
+   * The status of the TOTP.
+   * @default true
+   */
+  active: boolean
+
+  /**
+   * The number of attempts the user tried to verify the TOTP.
+   * @default 0
+   */
+  attempts: number
+}
 
 /**
  * The TOTP generation configuration.
@@ -71,6 +94,35 @@ export interface MagicLinkGenerationOptions {
    * @default '/magic-link'
    */
   callbackPath?: string
+}
+
+/**
+ * The create TOTP CRUD method.
+ * @param data The TOTP data.
+ * @param expiresAt The TOTP expiration date.
+ */
+export interface CreateTOTP {
+  (data: TOTPData, expiresAt: Date): Promise<void>
+}
+
+/**
+ * The read TOTP CRUD method.
+ *
+ *  @param hash The hash of the TOTP.
+ */
+export interface ReadTOTP {
+  (hash: string): Promise<TOTPData | null>
+}
+
+/**
+ * The update TOTP CRUD method.
+ *
+ * @param hash The hash of the TOTP.
+ * @param data The TOTP data to be updated.
+ * @param expiresAt The TOTP expiration date. It is always the same as the expiration passed into createTOTP().
+ */
+export interface UpdateTOTP {
+  (hash: string, data: Partial<Omit<TOTPData, 'hash'>>, expiresAt: Date): Promise<void>
 }
 
 /**
@@ -234,6 +286,21 @@ export interface TOTPStrategyOptions {
   magicLinkGeneration?: MagicLinkGenerationOptions
 
   /**
+   * The create TOTP method.
+   */
+  createTOTP: CreateTOTP
+
+  /**
+   * The read TOTP method.
+   */
+  readTOTP: ReadTOTP
+
+  /**
+   * The update TOTP method.
+   */
+  updateTOTP: UpdateTOTP
+
+  /**
    * The store TOTP method.
    */
   storeTOTP: StoreTOTP
@@ -281,6 +348,12 @@ export interface TOTPStrategyOptions {
    * @default "auth:totp"
    */
   sessionTotpKey?: string
+
+  /**
+   * The session key that stores the expiration of the TOTP.
+   * @default "auth:totpExpiresAt"
+   */
+  sessionTotpExpiresAtKey?: string
 }
 
 /**
@@ -321,6 +394,9 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   private readonly maxAge: number | undefined
   private readonly totpGeneration: TOTPGenerationOptions
   private readonly magicLinkGeneration: MagicLinkGenerationOptions
+  private readonly createTOTP: CreateTOTP
+  private readonly readTOTP: ReadTOTP
+  private readonly updateTOTP: UpdateTOTP
   private readonly storeTOTP: StoreTOTP
   private readonly sendTOTP: SendTOTP
   private readonly handleTOTP: HandleTOTP
@@ -330,6 +406,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   private readonly totpFieldKey: string
   private readonly sessionEmailKey: string
   private readonly sessionTotpKey: string
+  private readonly sessionTotpExpiresAtKey: string
 
   private readonly _totpGenerationDefaults = {
     secret: generateSecret(),
@@ -358,6 +435,9 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     super(verify)
     this.secret = options.secret
     this.maxAge = options.maxAge ?? undefined
+    this.createTOTP = options.createTOTP
+    this.readTOTP = options.readTOTP
+    this.updateTOTP = options.updateTOTP
     this.storeTOTP = options.storeTOTP
     this.sendTOTP = options.sendTOTP
     this.handleTOTP = options.handleTOTP
@@ -366,6 +446,8 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     this.totpFieldKey = options.totpFieldKey ?? FORM_FIELDS.TOTP
     this.sessionEmailKey = options.sessionEmailKey ?? SESSION_KEYS.EMAIL
     this.sessionTotpKey = options.sessionTotpKey ?? SESSION_KEYS.TOTP
+    this.sessionTotpExpiresAtKey =
+      options.sessionTotpExpiresAtKey ?? SESSION_KEYS.TOTP_EXPIRES_AT
 
     this.totpGeneration = {
       ...this._totpGenerationDefaults,
@@ -395,6 +477,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     const session = await sessionStorage.getSession(request.headers.get('cookie'))
     const sessionEmail = session.get(this.sessionEmailKey)
     const sessionTotp = session.get(this.sessionTotpKey)
+    const sessionTotpExpiresAt = session.get(this.sessionTotpExpiresAtKey)
 
     let user: User | null = session.get(options.sessionKey) ?? null
 
