@@ -126,42 +126,6 @@ export interface UpdateTOTP {
 }
 
 /**
- * The store TOTP configuration.
- */
-export interface StoreTOTPOptions {
-  /**
-   * The encrypted TOTP.
-   */
-  hash: string
-
-  /**
-   * The status of the TOTP.
-   * @default true
-   */
-  active: boolean
-
-  /**
-   * The number of attempts the user tried to verify the TOTP.
-   * @default 0
-   */
-  attempts: number
-
-  /**
-   * The TOTP expiration date.
-   * @default Date.now() + TOTP generation period.
-   */
-  expiresAt?: Date | string
-}
-
-/**
- * The store TOTP method.
- * @param data The encrypted TOTP.
- */
-export interface StoreTOTP {
-  (data: StoreTOTPOptions): Promise<void>
-}
-
-/**
  * The send TOTP configuration.
  */
 export interface SendTOTPOptions {
@@ -301,11 +265,6 @@ export interface TOTPStrategyOptions {
   updateTOTP: UpdateTOTP
 
   /**
-   * The store TOTP method.
-   */
-  storeTOTP: StoreTOTP
-
-  /**
    * The send TOTP method.
    */
   sendTOTP: SendTOTP
@@ -397,7 +356,6 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   private readonly createTOTP: CreateTOTP
   private readonly readTOTP: ReadTOTP
   private readonly updateTOTP: UpdateTOTP
-  private readonly storeTOTP: StoreTOTP
   private readonly sendTOTP: SendTOTP
   private readonly handleTOTP: HandleTOTP
   private readonly validateEmail: ValidateEmail
@@ -438,7 +396,6 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     this.createTOTP = options.createTOTP
     this.readTOTP = options.readTOTP
     this.updateTOTP = options.updateTOTP
-    this.storeTOTP = options.storeTOTP
     this.sendTOTP = options.sendTOTP
     this.handleTOTP = options.handleTOTP
     this.validateEmail = options.validateEmail ?? this._validateEmailDefaults
@@ -546,11 +503,14 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
               request,
             })
 
-            // Store TOTP.
-            await this._storeTOTP({ hash: signedTotp, active: true, attempts: 0 })
-
-            // Update `expiresAt` database field - If exists.
-            await this._handleExpiresAt(signedTotp, totp)
+            // Create TOTP in application storage.
+            const expiresAtEpochMs =
+              Date.now() + (totp.period ?? this._totpGenerationDefaults.period) * 1000 // milliseconds since Unix epoch
+            const expiresAt = new Date(expiresAtEpochMs)
+            await this.createTOTP(
+              { hash: signedTotp, active: true, attempts: 0 },
+              expiresAt,
+            )
 
             // Send TOTP.
             await this._sendTOTP({
@@ -563,6 +523,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
 
             session.set(this.sessionEmailKey, formDataEmail)
             session.set(this.sessionTotpKey, signedTotp)
+            session.set(this.sessionTotpExpiresAtKey, expiresAt.toISOString())
             session.unset(options.sessionErrorKey)
 
             throw redirect(options.successRedirect, {
@@ -668,10 +629,6 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   private async _validateEmailDefaults(email: string) {
     const regexEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/gm
     if (!regexEmail.test(email)) throw new Error(this.customErrors.invalidEmail)
-  }
-
-  private async _storeTOTP(totp: StoreTOTPOptions) {
-    await this.storeTOTP(totp)
   }
 
   private async _sendTOTP(data: SendTOTPOptions) {

@@ -39,7 +39,6 @@ describe('[ Basics ]', () => {
         createTOTP,
         readTOTP,
         updateTOTP,
-        storeTOTP,
         sendTOTP,
         handleTOTP,
       },
@@ -74,7 +73,6 @@ describe('[ Basics ]', () => {
         createTOTP,
         readTOTP,
         updateTOTP,
-        storeTOTP,
         sendTOTP,
         handleTOTP,
       },
@@ -105,7 +103,6 @@ describe('[ Basics ]', () => {
         createTOTP,
         readTOTP,
         updateTOTP,
-        storeTOTP,
         sendTOTP,
         handleTOTP,
         customErrors: {
@@ -144,7 +141,6 @@ describe('[ TOTP ]', () => {
           createTOTP,
           readTOTP,
           updateTOTP,
-          storeTOTP,
           sendTOTP,
           handleTOTP,
         },
@@ -177,7 +173,6 @@ describe('[ TOTP ]', () => {
           createTOTP,
           readTOTP,
           updateTOTP,
-          storeTOTP,
           sendTOTP,
           handleTOTP,
         },
@@ -210,7 +205,6 @@ describe('[ TOTP ]', () => {
           createTOTP,
           readTOTP,
           updateTOTP,
-          storeTOTP,
           sendTOTP,
           handleTOTP,
         },
@@ -224,7 +218,7 @@ describe('[ TOTP ]', () => {
         })
         .catch((error) => error)
 
-      expect(storeTOTP).toHaveBeenCalledTimes(1)
+      expect(createTOTP).toHaveBeenCalledTimes(1)
     })
 
     test('Should call sendTOTP function.', async () => {
@@ -243,7 +237,6 @@ describe('[ TOTP ]', () => {
           createTOTP,
           readTOTP,
           updateTOTP,
-          storeTOTP,
           sendTOTP,
           handleTOTP,
         },
@@ -276,7 +269,6 @@ describe('[ TOTP ]', () => {
           createTOTP,
           readTOTP,
           updateTOTP,
-          storeTOTP,
           sendTOTP,
           handleTOTP,
         },
@@ -314,7 +306,6 @@ describe('[ TOTP ]', () => {
           createTOTP,
           readTOTP,
           updateTOTP,
-          storeTOTP,
           sendTOTP,
           handleTOTP,
         },
@@ -356,7 +347,6 @@ describe('[ TOTP ]', () => {
           createTOTP,
           readTOTP,
           updateTOTP,
-          storeTOTP,
           sendTOTP,
           handleTOTP,
           validateEmail,
@@ -370,10 +360,7 @@ describe('[ TOTP ]', () => {
         })
         .catch((error) => error)
 
-      // Called 2 times:
-      // - 1st: Inside 'Re-send TOTP'.
-      // - 2nd: Inside 'First TOTP request' after storing the TOTP.
-      expect(handleTOTP).toHaveBeenCalledTimes(2)
+      expect(handleTOTP).toHaveBeenCalledTimes(1)
       expect(validateEmail).toHaveBeenCalledTimes(1)
     })
   })
@@ -395,7 +382,6 @@ describe('[ TOTP ]', () => {
           createTOTP,
           readTOTP,
           updateTOTP,
-          storeTOTP,
           sendTOTP,
           handleTOTP,
         },
@@ -428,7 +414,6 @@ describe('[ TOTP ]', () => {
           createTOTP,
           readTOTP,
           updateTOTP,
-          storeTOTP,
           sendTOTP,
           handleTOTP,
         },
@@ -463,7 +448,6 @@ describe('[ TOTP ]', () => {
           createTOTP,
           readTOTP,
           updateTOTP,
-          storeTOTP,
           sendTOTP,
           handleTOTP,
           customErrors: {
@@ -509,7 +493,6 @@ describe('[ TOTP ]', () => {
           createTOTP,
           readTOTP,
           updateTOTP,
-          storeTOTP,
           sendTOTP,
           handleTOTP,
         },
@@ -556,7 +539,6 @@ describe('[ TOTP ]', () => {
           createTOTP,
           readTOTP,
           updateTOTP,
-          storeTOTP,
           sendTOTP,
           handleTOTP,
         },
@@ -605,7 +587,6 @@ describe('[ TOTP ]', () => {
           createTOTP,
           readTOTP,
           updateTOTP,
-          storeTOTP,
           sendTOTP,
           handleTOTP,
         },
@@ -664,7 +645,6 @@ describe('[ TOTP ]', () => {
           createTOTP,
           readTOTP,
           updateTOTP,
-          storeTOTP,
           sendTOTP,
           handleTOTP,
         },
@@ -727,7 +707,6 @@ describe('[ TOTP ]', () => {
           createTOTP,
           readTOTP,
           updateTOTP,
-          storeTOTP,
           sendTOTP,
           handleTOTP,
         },
@@ -765,7 +744,6 @@ describe('[ TOTP ]', () => {
           createTOTP,
           readTOTP,
           updateTOTP,
-          storeTOTP,
           sendTOTP,
           handleTOTP,
         },
@@ -814,7 +792,6 @@ describe('[ TOTP ]', () => {
           createTOTP,
           readTOTP,
           updateTOTP,
-          storeTOTP,
           sendTOTP,
           handleTOTP,
         },
@@ -865,7 +842,6 @@ describe('[ TOTP ]', () => {
           createTOTP,
           readTOTP,
           updateTOTP,
-          storeTOTP,
           sendTOTP,
           handleTOTP,
         },
