@@ -164,27 +164,6 @@ export interface SendTOTP {
 }
 
 /**
- * The handle TOTP method.
- *
- * If `data` argument is provided, it will trigger a database update.
- * Otherwise, it will retrieve the encrypted TOTP from database.
- *
- * @param hash The stored TOTP from database.
- * @param data The data to update.
- */
-export interface HandleTOTP {
-  (
-    hash: string,
-    data?: { active?: boolean; attempts?: number; expiresAt?: Date | string },
-  ): Promise<{
-    hash?: string
-    attempts: number
-    active: boolean
-    expiresAt?: Date | string | null
-  } | null>
-}
-
-/**
  * The validate email method.
  * This can be useful to ensure it's not a disposable email address.
  *
@@ -270,11 +249,6 @@ export interface TOTPStrategyOptions {
   sendTOTP: SendTOTP
 
   /**
-   * The handle TOTP method.
-   */
-  handleTOTP: HandleTOTP
-
-  /**
    * The validate email method.
    */
   validateEmail?: ValidateEmail
@@ -357,7 +331,6 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   private readonly readTOTP: ReadTOTP
   private readonly updateTOTP: UpdateTOTP
   private readonly sendTOTP: SendTOTP
-  private readonly handleTOTP: HandleTOTP
   private readonly validateEmail: ValidateEmail
   private readonly customErrors: CustomErrorsOptions
   private readonly emailFieldKey: string
@@ -397,7 +370,6 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     this.readTOTP = options.readTOTP
     this.updateTOTP = options.updateTOTP
     this.sendTOTP = options.sendTOTP
-    this.handleTOTP = options.handleTOTP
     this.validateEmail = options.validateEmail ?? this._validateEmailDefaults
     this.emailFieldKey = options.emailFieldKey ?? FORM_FIELDS.EMAIL
     this.totpFieldKey = options.totpFieldKey ?? FORM_FIELDS.TOTP
@@ -437,6 +409,12 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     const sessionTotpExpiresAt = session.get(this.sessionTotpExpiresAtKey)
 
     let user: User | null = session.get(options.sessionKey) ?? null
+    console.log('authenticate:', {
+      sessionEmail,
+      sessionTotp,
+      sessionTotpExpiresAt,
+      user,
+    })
 
     let formData: FormData | undefined = undefined
     let formDataEmail: string | undefined = undefined
@@ -454,13 +432,22 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
 
           formDataEmail = form[this.emailFieldKey] && String(form[this.emailFieldKey])
           formDataTotp = form[this.totpFieldKey] && String(form[this.totpFieldKey])
+          console.log('authenticate: isPost:', { formDataEmail, formDataTotp })
 
           /**
            * Re-send TOTP - User has requested a new TOTP.
            * This will invalidate previous TOTP and assign session email to form email.
            */
-          if (!formDataEmail && !formDataTotp && sessionEmail && sessionTotp) {
-            await this.handleTOTP(sessionTotp, { active: false })
+          if (
+            !formDataEmail &&
+            !formDataTotp &&
+            sessionEmail &&
+            sessionTotp &&
+            sessionTotpExpiresAt
+          ) {
+            console.log('authenticate: re-send totp: deactivate sessionTotp')
+            const expiresAt = new Date(sessionTotpExpiresAt)
+            await this.updateTOTP(sessionTotp, { active: false }, expiresAt)
             formDataEmail = sessionEmail
           }
 
@@ -471,9 +458,12 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
             formDataEmail &&
             sessionEmail &&
             formDataEmail !== sessionEmail &&
-            sessionTotp
+            sessionTotp &&
+            sessionTotpExpiresAt
           ) {
-            await this.handleTOTP(sessionTotp, { active: false })
+            console.log('authenticate: new email: deactivate sessionTotp')
+            const expiresAt = new Date(sessionTotpExpiresAt)
+            await this.updateTOTP(sessionTotp, { active: false }, expiresAt)
           }
 
           /**
@@ -554,11 +544,14 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
 
         if ((isPOST && formDataTotp) || (isGET && magicLinkTotp)) {
           // Validation.
-          if (isPOST && formDataTotp) await this._validateTOTP(sessionTotp, formDataTotp)
-          if (isGET && magicLinkTotp) await this._validateTOTP(sessionTotp, magicLinkTotp)
+          const expiresAt = new Date(sessionTotpExpiresAt)
+          if (isPOST && formDataTotp)
+            await this._validateTOTP(sessionTotp, formDataTotp, expiresAt)
+          if (isGET && magicLinkTotp)
+            await this._validateTOTP(sessionTotp, magicLinkTotp, expiresAt)
 
           // Invalidation.
-          await this.handleTOTP(sessionTotp, { active: false })
+          await this.updateTOTP(sessionTotp, { active: false }, expiresAt)
 
           // Allow developer to handle user validation.
           user = await this.verify({
@@ -571,6 +564,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
           session.set(options.sessionKey, user)
           session.unset(this.sessionEmailKey)
           session.unset(this.sessionTotpKey)
+          session.unset(this.sessionTotpExpiresAtKey)
           session.unset(options.sessionErrorKey)
 
           throw redirect(options.successRedirect, {
@@ -587,10 +581,11 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       if (error instanceof Response && error.status === 302) throw error
       if (error instanceof Error) {
         if (error.message === ERRORS.INVALID_JWT) {
-          const dbTOTP = await this.handleTOTP(sessionTotp)
+          const dbTOTP = await this.readTOTP(sessionTotp)
           if (!dbTOTP || !dbTOTP.hash) throw new Error(this.customErrors.totpNotFound)
 
-          await this.handleTOTP(sessionTotp, { active: false })
+          const expiresAt = new Date(sessionTotpExpiresAt)
+          await this.updateTOTP(sessionTotp, { active: false }, expiresAt)
 
           return await this.failure(
             this.customErrors.inactiveTotp || ERRORS.INACTIVE_TOTP,
@@ -635,9 +630,10 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     await this.sendTOTP({ ...data })
   }
 
-  private async _validateTOTP(sessionTotp: string, otp: string) {
+  private async _validateTOTP(sessionTotp: string, otp: string, expiresAt: Date) {
     // Retrieve encrypted TOTP from database.
-    const dbTOTP = await this.handleTOTP(sessionTotp)
+    const dbTOTP = await this.readTOTP(sessionTotp)
+    console.log('_validateTOTP:', { sessionTotp, otp, expiresAt, dbTOTP })
     if (!dbTOTP || !dbTOTP.hash) throw new Error(this.customErrors.totpNotFound)
 
     if (dbTOTP.active !== true) {
@@ -648,7 +644,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       this.totpGeneration.maxAttempts ?? this._totpGenerationDefaults.maxAttempts
 
     if (dbTOTP.attempts >= maxAttempts) {
-      await this.handleTOTP(sessionTotp, { active: false })
+      await this.updateTOTP(sessionTotp, { active: false }, expiresAt)
       throw new Error(this.customErrors.inactiveTotp)
     }
 
@@ -661,37 +657,8 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     // Verify TOTP (@epic-web/totp).
     const isValid = verifyTOTP({ ...totp, otp })
     if (!isValid) {
-      await this.handleTOTP(sessionTotp, { attempts: dbTOTP.attempts + 1 })
+      await this.updateTOTP(sessionTotp, { attempts: dbTOTP.attempts + 1 }, expiresAt)
       throw new Error(this.customErrors.invalidTotp)
-    }
-  }
-
-  private async _handleExpiresAt(
-    sessionTotp: string,
-    totp: Partial<TOTPGenerationOptions>,
-  ) {
-    // Retrieve encrypted TOTP from database.
-    const dbTOTP = await this.handleTOTP(sessionTotp)
-
-    if (dbTOTP && 'expiresAt' in dbTOTP) {
-      const newExpiresAt =
-        Date.now() + (totp.period ?? this._totpGenerationDefaults.period) * 1000
-
-      let formattedExpiresAt
-
-      if (dbTOTP.expiresAt instanceof Date) {
-        formattedExpiresAt = new Date(newExpiresAt)
-      } else if (typeof dbTOTP.expiresAt === 'string') {
-        formattedExpiresAt = new Date(newExpiresAt).toISOString()
-      } else if (dbTOTP.expiresAt === null) {
-        throw new Error(
-          "Please initialize 'expiresAt' field in your database to either a Date or String type.",
-        )
-      }
-
-      await this.handleTOTP(sessionTotp, {
-        expiresAt: formattedExpiresAt,
-      })
     }
   }
 }

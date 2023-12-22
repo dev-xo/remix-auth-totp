@@ -1,7 +1,7 @@
 import { describe, test, expect, afterEach, vi } from 'vitest'
 import { AuthorizationError } from 'remix-auth'
 
-import { TOTPStrategy } from '../src/index'
+import { SendTOTPOptions, TOTPData, TOTPStrategy } from '../src/index'
 import { generateTOTP, generateMagicLink, signJWT } from '../src/utils'
 import { STRATEGY_NAME, FORM_FIELDS, SESSION_KEYS, ERRORS } from '../src/constants'
 
@@ -14,6 +14,7 @@ import {
   DEFAULT_EMAIL,
   sessionStorage,
 } from './utils'
+import { Session } from '@remix-run/server-runtime'
 
 /**
  * Mocks.
@@ -22,9 +23,7 @@ export const verify = vi.fn()
 export const createTOTP = vi.fn()
 export const readTOTP = vi.fn()
 export const updateTOTP = vi.fn()
-export const storeTOTP = vi.fn()
 export const sendTOTP = vi.fn()
-export const handleTOTP = vi.fn()
 export const validateEmail = vi.fn()
 
 afterEach(() => {
@@ -40,7 +39,6 @@ describe('[ Basics ]', () => {
         readTOTP,
         updateTOTP,
         sendTOTP,
-        handleTOTP,
       },
       verify,
     )
@@ -53,8 +51,11 @@ describe('[ Basics ]', () => {
       method: 'POST',
     })
 
-    // @ts-expect-error - Error is expected.
-    const strategy = new TOTPStrategy({ storeTOTP, sendTOTP, handleTOTP }, verify)
+    const strategy = new TOTPStrategy(
+      // @ts-expect-error - Error is expected since missing secret option.
+      { createTOTP, readTOTP, updateTOTP, sendTOTP },
+      verify,
+    )
     const result = await strategy
       .authenticate(request, sessionStorage, { ...AUTH_OPTIONS, throwOnError: true })
       .catch((error) => error)
@@ -74,7 +75,6 @@ describe('[ Basics ]', () => {
         readTOTP,
         updateTOTP,
         sendTOTP,
-        handleTOTP,
       },
       verify,
     )
@@ -104,7 +104,6 @@ describe('[ Basics ]', () => {
         readTOTP,
         updateTOTP,
         sendTOTP,
-        handleTOTP,
         customErrors: {
           requiredEmail: CUSTOM_ERROR,
         },
@@ -142,7 +141,6 @@ describe('[ TOTP ]', () => {
           readTOTP,
           updateTOTP,
           sendTOTP,
-          handleTOTP,
         },
         verify,
       )
@@ -174,7 +172,6 @@ describe('[ TOTP ]', () => {
           readTOTP,
           updateTOTP,
           sendTOTP,
-          handleTOTP,
         },
         verify,
       )
@@ -189,7 +186,7 @@ describe('[ TOTP ]', () => {
       expect(result).toEqual(new AuthorizationError(ERRORS.INVALID_EMAIL))
     })
 
-    test('Should call storeTOTP function.', async () => {
+    test('Should call createTOTP function.', async () => {
       const formData = new FormData()
       formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
 
@@ -206,7 +203,6 @@ describe('[ TOTP ]', () => {
           readTOTP,
           updateTOTP,
           sendTOTP,
-          handleTOTP,
         },
         verify,
       )
@@ -238,7 +234,6 @@ describe('[ TOTP ]', () => {
           readTOTP,
           updateTOTP,
           sendTOTP,
-          handleTOTP,
         },
         verify,
       )
@@ -253,7 +248,7 @@ describe('[ TOTP ]', () => {
       expect(sendTOTP).toHaveBeenCalledTimes(1)
     })
 
-    test('Should contain auth:email and auth:totp properties in session.', async () => {
+    test('Should contain auth:email, auth:totp, and auth:totpExpiresAt properties in session.', async () => {
       const formData = new FormData()
       formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
 
@@ -270,7 +265,6 @@ describe('[ TOTP ]', () => {
           readTOTP,
           updateTOTP,
           sendTOTP,
-          handleTOTP,
         },
         verify,
       )
@@ -288,6 +282,7 @@ describe('[ TOTP ]', () => {
 
       expect(session.data).toHaveProperty(SESSION_KEYS.EMAIL)
       expect(session.data).toHaveProperty(SESSION_KEYS.TOTP)
+      expect(session.data).toHaveProperty(SESSION_KEYS.TOTP_EXPIRES_AT)
     })
 
     test('Should contain Location header pointing to provided successRedirect url.', async () => {
@@ -307,7 +302,6 @@ describe('[ TOTP ]', () => {
           readTOTP,
           updateTOTP,
           sendTOTP,
-          handleTOTP,
         },
         verify,
       )
@@ -322,16 +316,149 @@ describe('[ TOTP ]', () => {
     })
 
     test('Re-send TOTP - Should invalidate previous TOTP.', async () => {
-      const mockedStoreTOTP = storeTOTP.mockImplementation(() =>
-        Promise.resolve('JWT-Signed'),
-      )
-      const signedTotp = await mockedStoreTOTP()
-
-      const formData = new FormData()
       const session = await sessionStorage.getSession()
-
       session.set(SESSION_KEYS.EMAIL, DEFAULT_EMAIL)
-      session.set(SESSION_KEYS.TOTP, signedTotp)
+      session.set(SESSION_KEYS.TOTP, 'JWT-SIGNED')
+      session.set(
+        SESSION_KEYS.TOTP_EXPIRES_AT,
+        new Date(Date.now() + TOTP_GENERATION_DEFAULTS.period * 1000).toISOString(),
+      )
+
+      const request = new Request(`${HOST_URL}`, {
+        method: 'POST',
+        headers: {
+          cookie: await sessionStorage.commitSession(session),
+        },
+        body: new FormData(), // Empty form data indicates re-send new TOTP
+      })
+
+      const strategy = new TOTPStrategy(
+        {
+          secret: SECRET_ENV,
+          createTOTP,
+          readTOTP,
+          updateTOTP,
+          sendTOTP,
+          validateEmail,
+        },
+        verify,
+      )
+      await strategy
+        .authenticate(request, sessionStorage, {
+          ...AUTH_OPTIONS,
+          successRedirect: '/',
+        })
+        .catch((error) => console.error(error))
+
+      expect(updateTOTP).toHaveBeenCalledTimes(1)
+      expect(validateEmail).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('2nd Authentication Phase', () => {
+    test.only('Should authenticate user with valid TOTP.', async () => {
+      let totpData: TOTPData
+      let totpDataExpiresAt: Date
+      let sendTOTPOptions: SendTOTPOptions
+      let session: Session
+      const strategy = new TOTPStrategy(
+        {
+          secret: SECRET_ENV,
+          createTOTP: async (data, expiresAt) => {
+            console.log('createTOTP:', { data })
+            expect(data.active).toBeTruthy()
+            expect(data.attempts).toEqual(0)
+            totpData = data
+            totpDataExpiresAt = expiresAt
+          },
+          readTOTP: async (hash) => {
+            console.log('readTOTP:', { hash, totpData })
+            expect(totpData).toBeDefined()
+            expect(totpData.hash).toEqual(hash)
+            return totpData
+          },
+          updateTOTP: async (hash, data, expiresAt) => {
+            console.log('updateTOTP:', { hash, data })
+            expect(totpData).toBeDefined()
+            expect(totpData.hash).toEqual(hash)
+            expect(totpDataExpiresAt).toEqual(expiresAt)
+            totpData = { ...totpData, ...data }
+          },
+          sendTOTP: async (options) => {
+            console.log('sendTOTP:', options)
+            sendTOTPOptions = options
+            expect(options.email).toBe(DEFAULT_EMAIL)
+          },
+        },
+        verify,
+      )
+      {
+        const formData = new FormData()
+        formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
+        const request = new Request(`${HOST_URL}`, {
+          method: 'POST',
+          body: formData,
+        })
+
+        await strategy
+          .authenticate(request, sessionStorage, {
+            ...AUTH_OPTIONS,
+            successRedirect: '/verify',
+          })
+          .catch(async (reason) => {
+            console.log('reason:', reason)
+            expect(reason).toBeInstanceOf(Response)
+            expect(reason.status).toEqual(302)
+            expect(reason.headers.get('location')).toEqual(`/verify`)
+            session = await sessionStorage.getSession(
+              reason.headers.get('set-cookie') ?? '',
+            )
+            expect(session.get(SESSION_KEYS.EMAIL)).toEqual(DEFAULT_EMAIL)
+            expect(session.get(SESSION_KEYS.TOTP)).toEqual(totpData.hash)
+            expect(session.get(SESSION_KEYS.TOTP_EXPIRES_AT)).toEqual(
+              totpDataExpiresAt.toISOString(),
+            )
+            console.log('session:', { data: session.data })
+          })
+      }
+      {
+        const formData = new FormData()
+        // @ts-expect-error - sendTOTPOptions is set in callback.
+        formData.append(FORM_FIELDS.TOTP, sendTOTPOptions.code)
+        const request = new Request(`${HOST_URL}`, {
+          method: 'POST',
+          headers: {
+            // @ts-expect-error - session is defined in catch.
+            cookie: await sessionStorage.commitSession(session),
+          },
+          body: formData,
+        })
+
+        await strategy
+          .authenticate(request, sessionStorage, {
+            ...AUTH_OPTIONS,
+            successRedirect: '/',
+          })
+          .catch(async (reason) => {
+            expect(reason).toBeInstanceOf(Response)
+            expect(reason.status).toEqual(302)
+            expect(reason.headers.get('location')).toEqual(`/`)
+          })
+      }
+    })
+
+    test('Should invalidate current TOTP.', async () => {
+      const session = await sessionStorage.getSession()
+      session.set(SESSION_KEYS.EMAIL, DEFAULT_EMAIL)
+      session.set(SESSION_KEYS.TOTP, 'JWT-SIGNED')
+      session.set(
+        SESSION_KEYS.TOTP_EXPIRES_AT,
+        new Date(Date.now() + TOTP_GENERATION_DEFAULTS.period * 1000).toISOString(),
+      )
+
+      const totp = generateTOTP(TOTP_GENERATION_DEFAULTS)
+      const formData = new FormData()
+      formData.append(FORM_FIELDS.TOTP, totp.otp)
 
       const request = new Request(`${HOST_URL}`, {
         method: 'POST',
@@ -348,42 +475,6 @@ describe('[ TOTP ]', () => {
           readTOTP,
           updateTOTP,
           sendTOTP,
-          handleTOTP,
-          validateEmail,
-        },
-        verify,
-      )
-      await strategy
-        .authenticate(request, sessionStorage, {
-          ...AUTH_OPTIONS,
-          successRedirect: '/',
-        })
-        .catch((error) => error)
-
-      expect(handleTOTP).toHaveBeenCalledTimes(1)
-      expect(validateEmail).toHaveBeenCalledTimes(1)
-    })
-  })
-
-  describe('2nd Authentication Phase', () => {
-    test('Should invalidate current TOTP.', async () => {
-      const totp = generateTOTP(TOTP_GENERATION_DEFAULTS)
-      const formData = new FormData()
-      formData.append(FORM_FIELDS.TOTP, totp.otp)
-
-      const request = new Request(`${HOST_URL}`, {
-        method: 'POST',
-        body: formData,
-      })
-
-      const strategy = new TOTPStrategy(
-        {
-          secret: SECRET_ENV,
-          createTOTP,
-          readTOTP,
-          updateTOTP,
-          sendTOTP,
-          handleTOTP,
         },
         verify,
       )
@@ -393,9 +484,9 @@ describe('[ TOTP ]', () => {
           throwOnError: true,
           successRedirect: '/',
         })
-        .catch((error) => error)
+        .catch((error) => console.error(error))
 
-      expect(handleTOTP).toHaveBeenCalledTimes(1)
+      expect(updateTOTP).toHaveBeenCalledTimes(1)
     })
 
     test('Should throw an Error on missing TOTP from database.', async () => {
@@ -415,7 +506,6 @@ describe('[ TOTP ]', () => {
           readTOTP,
           updateTOTP,
           sendTOTP,
-          handleTOTP,
         },
         verify,
       )
@@ -449,7 +539,6 @@ describe('[ TOTP ]', () => {
           readTOTP,
           updateTOTP,
           sendTOTP,
-          handleTOTP,
           customErrors: {
             totpNotFound: CUSTOM_ERROR,
           },
@@ -494,7 +583,6 @@ describe('[ TOTP ]', () => {
           readTOTP,
           updateTOTP,
           sendTOTP,
-          handleTOTP,
         },
         verify,
       )
@@ -540,7 +628,6 @@ describe('[ TOTP ]', () => {
           readTOTP,
           updateTOTP,
           sendTOTP,
-          handleTOTP,
         },
         verify,
       )
@@ -588,7 +675,6 @@ describe('[ TOTP ]', () => {
           readTOTP,
           updateTOTP,
           sendTOTP,
-          handleTOTP,
         },
         verify,
       )
@@ -646,7 +732,6 @@ describe('[ TOTP ]', () => {
           readTOTP,
           updateTOTP,
           sendTOTP,
-          handleTOTP,
         },
         verify,
       )
@@ -708,7 +793,6 @@ describe('[ TOTP ]', () => {
           readTOTP,
           updateTOTP,
           sendTOTP,
-          handleTOTP,
         },
         verify,
       )
@@ -745,7 +829,6 @@ describe('[ TOTP ]', () => {
           readTOTP,
           updateTOTP,
           sendTOTP,
-          handleTOTP,
         },
         verify,
       )
@@ -793,7 +876,6 @@ describe('[ TOTP ]', () => {
           readTOTP,
           updateTOTP,
           sendTOTP,
-          handleTOTP,
         },
         verify,
       )
@@ -843,7 +925,6 @@ describe('[ TOTP ]', () => {
           readTOTP,
           updateTOTP,
           sendTOTP,
-          handleTOTP,
         },
         verify,
       )
