@@ -409,12 +409,6 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     const sessionTotpExpiresAt = session.get(this.sessionTotpExpiresAtKey)
 
     let user: User | null = session.get(options.sessionKey) ?? null
-    console.log('authenticate:', {
-      sessionEmail,
-      sessionTotp,
-      sessionTotpExpiresAt,
-      user,
-    })
 
     let formData: FormData | undefined = undefined
     let formDataEmail: string | undefined = undefined
@@ -432,7 +426,6 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
 
           formDataEmail = form[this.emailFieldKey] && String(form[this.emailFieldKey])
           formDataTotp = form[this.totpFieldKey] && String(form[this.totpFieldKey])
-          console.log('authenticate: isPost:', { formDataEmail, formDataTotp })
 
           /**
            * Re-send TOTP - User has requested a new TOTP.
@@ -445,7 +438,6 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
             sessionTotp &&
             sessionTotpExpiresAt
           ) {
-            console.log('authenticate: re-send totp: deactivate sessionTotp')
             const expiresAt = new Date(sessionTotpExpiresAt)
             await this.updateTOTP(sessionTotp, { active: false }, expiresAt)
             formDataEmail = sessionEmail
@@ -461,7 +453,6 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
             sessionTotp &&
             sessionTotpExpiresAt
           ) {
-            console.log('authenticate: new email: deactivate sessionTotp')
             const expiresAt = new Date(sessionTotpExpiresAt)
             await this.updateTOTP(sessionTotp, { active: false }, expiresAt)
           }
@@ -633,7 +624,6 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   private async _validateTOTP(sessionTotp: string, otp: string, expiresAt: Date) {
     // Retrieve encrypted TOTP from database.
     const dbTOTP = await this.readTOTP(sessionTotp)
-    console.log('_validateTOTP:', { sessionTotp, otp, expiresAt, dbTOTP })
     if (!dbTOTP || !dbTOTP.hash) throw new Error(this.customErrors.totpNotFound)
 
     if (dbTOTP.active !== true) {

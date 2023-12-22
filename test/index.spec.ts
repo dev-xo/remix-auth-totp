@@ -348,7 +348,7 @@ describe('[ TOTP ]', () => {
           ...AUTH_OPTIONS,
           successRedirect: '/',
         })
-        .catch((error) => console.error(error))
+        .catch((error) => error)
 
       expect(updateTOTP).toHaveBeenCalledTimes(1)
       expect(validateEmail).toHaveBeenCalledTimes(1)
@@ -356,7 +356,7 @@ describe('[ TOTP ]', () => {
   })
 
   describe('2nd Authentication Phase', () => {
-    test.only('Should authenticate user with valid TOTP.', async () => {
+    test('Should authenticate user with valid TOTP.', async () => {
       let totpData: TOTPData
       let totpDataExpiresAt: Date
       let sendTOTPOptions: SendTOTPOptions
@@ -365,29 +365,28 @@ describe('[ TOTP ]', () => {
         {
           secret: SECRET_ENV,
           createTOTP: async (data, expiresAt) => {
-            console.log('createTOTP:', { data })
             expect(data.active).toBeTruthy()
             expect(data.attempts).toEqual(0)
             totpData = data
             totpDataExpiresAt = expiresAt
           },
           readTOTP: async (hash) => {
-            console.log('readTOTP:', { hash, totpData })
             expect(totpData).toBeDefined()
             expect(totpData.hash).toEqual(hash)
             return totpData
           },
           updateTOTP: async (hash, data, expiresAt) => {
-            console.log('updateTOTP:', { hash, data })
             expect(totpData).toBeDefined()
             expect(totpData.hash).toEqual(hash)
             expect(totpDataExpiresAt).toEqual(expiresAt)
             totpData = { ...totpData, ...data }
           },
           sendTOTP: async (options) => {
-            console.log('sendTOTP:', options)
             sendTOTPOptions = options
-            expect(options.email).toBe(DEFAULT_EMAIL)
+            expect(options.email).toEqual(DEFAULT_EMAIL)
+            expect(options.magicLink).toEqual(
+              `${HOST_URL}/magic-link?code=${options.code}`,
+            )
           },
         },
         verify,
@@ -403,22 +402,26 @@ describe('[ TOTP ]', () => {
         await strategy
           .authenticate(request, sessionStorage, {
             ...AUTH_OPTIONS,
+            throwOnError: true,
             successRedirect: '/verify',
           })
           .catch(async (reason) => {
-            console.log('reason:', reason)
+            if (reason instanceof Response) {
+              expect(reason.status).toEqual(302)
+              expect(reason.headers.get('location')).toEqual(`/verify`)
+              session = await sessionStorage.getSession(
+                reason.headers.get('set-cookie') ?? '',
+              )
+              expect(session.get(SESSION_KEYS.EMAIL)).toEqual(DEFAULT_EMAIL)
+              expect(session.get(SESSION_KEYS.TOTP)).toEqual(totpData.hash)
+              expect(session.get(SESSION_KEYS.TOTP_EXPIRES_AT)).toEqual(
+                totpDataExpiresAt.toISOString(),
+              )
+            } else if (reason instanceof AuthorizationError) {
+              console.error('cause:', reason.cause)
+              expect(reason.cause?.message).toEqual('')
+            }
             expect(reason).toBeInstanceOf(Response)
-            expect(reason.status).toEqual(302)
-            expect(reason.headers.get('location')).toEqual(`/verify`)
-            session = await sessionStorage.getSession(
-              reason.headers.get('set-cookie') ?? '',
-            )
-            expect(session.get(SESSION_KEYS.EMAIL)).toEqual(DEFAULT_EMAIL)
-            expect(session.get(SESSION_KEYS.TOTP)).toEqual(totpData.hash)
-            expect(session.get(SESSION_KEYS.TOTP_EXPIRES_AT)).toEqual(
-              totpDataExpiresAt.toISOString(),
-            )
-            console.log('session:', { data: session.data })
           })
       }
       {
@@ -437,34 +440,31 @@ describe('[ TOTP ]', () => {
         await strategy
           .authenticate(request, sessionStorage, {
             ...AUTH_OPTIONS,
+            throwOnError: true,
             successRedirect: '/',
           })
           .catch(async (reason) => {
+            if (reason instanceof Response) {
+              expect(reason.status).toEqual(302)
+              expect(reason.headers.get('location')).toEqual(`/`)
+              expect(totpData.active).toBeFalsy()
+              expect(totpData.attempts).toEqual(0)
+            } else if (reason instanceof AuthorizationError) {
+              console.error('cause:', reason.cause)
+              expect(reason.cause?.message).toEqual('')
+            }
             expect(reason).toBeInstanceOf(Response)
-            expect(reason.status).toEqual(302)
-            expect(reason.headers.get('location')).toEqual(`/`)
           })
       }
     })
 
     test('Should invalidate current TOTP.', async () => {
-      const session = await sessionStorage.getSession()
-      session.set(SESSION_KEYS.EMAIL, DEFAULT_EMAIL)
-      session.set(SESSION_KEYS.TOTP, 'JWT-SIGNED')
-      session.set(
-        SESSION_KEYS.TOTP_EXPIRES_AT,
-        new Date(Date.now() + TOTP_GENERATION_DEFAULTS.period * 1000).toISOString(),
-      )
-
       const totp = generateTOTP(TOTP_GENERATION_DEFAULTS)
       const formData = new FormData()
       formData.append(FORM_FIELDS.TOTP, totp.otp)
 
       const request = new Request(`${HOST_URL}`, {
         method: 'POST',
-        headers: {
-          cookie: await sessionStorage.commitSession(session),
-        },
         body: formData,
       })
 
@@ -472,7 +472,9 @@ describe('[ TOTP ]', () => {
         {
           secret: SECRET_ENV,
           createTOTP,
-          readTOTP,
+          readTOTP: async () => {
+            return { hash: 'JWT-SIGNED', active: true, attempts: 0 }
+          },
           updateTOTP,
           sendTOTP,
         },
@@ -484,7 +486,7 @@ describe('[ TOTP ]', () => {
           throwOnError: true,
           successRedirect: '/',
         })
-        .catch((error) => console.error(error))
+        .catch((error) => error)
 
       expect(updateTOTP).toHaveBeenCalledTimes(1)
     })
@@ -557,7 +559,7 @@ describe('[ TOTP ]', () => {
     })
 
     test('Should throw an Error on inactive TOTP.', async () => {
-      handleTOTP.mockImplementation(() =>
+      readTOTP.mockImplementation(() =>
         Promise.resolve({ hash: signedTotp, attempts: 0, active: false }),
       )
 
@@ -598,7 +600,7 @@ describe('[ TOTP ]', () => {
     })
 
     test('Should throw an Error on max TOTP attempts.', async () => {
-      handleTOTP.mockImplementation(() =>
+      readTOTP.mockImplementation(() =>
         Promise.resolve({
           hash: signedTotp,
           attempts: TOTP_GENERATION_DEFAULTS.maxAttempts,
@@ -643,7 +645,7 @@ describe('[ TOTP ]', () => {
     })
 
     test('Should throw an Error on invalid (expired) JWT.', async () => {
-      handleTOTP.mockImplementation(() =>
+      readTOTP.mockImplementation(() =>
         Promise.resolve({ hash: signedTotp, attempts: 0, active: true }),
       )
 
@@ -690,7 +692,7 @@ describe('[ TOTP ]', () => {
     })
 
     test('Should throw an Error on invalid (expired) TOTP verification.', async () => {
-      handleTOTP.mockImplementation(() =>
+      readTOTP.mockImplementation(() =>
         Promise.resolve({ hash: signedTotp, attempts: 0, active: true }),
       )
 
@@ -747,7 +749,7 @@ describe('[ TOTP ]', () => {
     })
 
     test('Should throw an Error on invalid (expired) magic-link TOTP verification.', async () => {
-      handleTOTP.mockImplementation(() =>
+      readTOTP.mockImplementation(() =>
         Promise.resolve({ hash: signedTotp, attempts: 0, active: true }),
       )
 
@@ -844,7 +846,7 @@ describe('[ TOTP ]', () => {
     })
 
     test('Should successfully validate TOTP.', async () => {
-      handleTOTP.mockImplementation(() =>
+      readTOTP.mockImplementation(() =>
         Promise.resolve({ hash: signedTotp, attempts: 0, active: true }),
       )
 
@@ -892,7 +894,7 @@ describe('[ TOTP ]', () => {
     })
 
     test('Should contain user property in session.', async () => {
-      handleTOTP.mockImplementation(() =>
+      readTOTP.mockImplementation(() =>
         Promise.resolve({ hash: signedTotp, attempts: 0, active: true }),
       )
       verify.mockImplementation(() => Promise.resolve({ name: 'John Doe' }))
