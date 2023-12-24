@@ -14,7 +14,8 @@ import {
 import { STRATEGY_NAME, FORM_FIELDS, SESSION_KEYS, ERRORS } from './constants.js'
 
 /**
- * The TOTP data which the application stores and uses in CRUD functions provided by the application.
+ * The TOTP data the application stores.
+ * Used in CRUD functions provided by the application.
  */
 export interface TOTPData {
   /**
@@ -79,7 +80,7 @@ export interface TOTPGenerationOptions {
 }
 
 /**
- * The Magic Link configuration.
+ * The magic-link configuration.
  */
 export interface MagicLinkGenerationOptions {
   /**
@@ -97,6 +98,7 @@ export interface MagicLinkGenerationOptions {
 
 /**
  * The create TOTP CRUD method.
+ *
  * @param data The TOTP data.
  * @param expiresAt The TOTP expiration date.
  */
@@ -106,7 +108,6 @@ export interface CreateTOTP {
 
 /**
  * The read TOTP CRUD method.
- *
  *  @param hash The hash of the TOTP.
  */
 export interface ReadTOTP {
@@ -463,7 +464,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
             if (!formDataEmail) throw new Error(this.customErrors.requiredEmail)
             await this.validateEmail(formDataEmail)
 
-            // Generate and Sign TOTP.
+            // Generate, Sign and create Magic Link.
             const { otp: _otp, ...totp } = generateTOTP({
               ...this.totpGeneration,
               secret: generateSecret(),
@@ -474,8 +475,6 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
                 this.totpGeneration.period ?? this._totpGenerationDefaults.period,
               secretKey: this.secret,
             })
-
-            // Generate Magic Link.
             const magicLink = generateMagicLink({
               ...this.magicLinkGeneration,
               param: this.totpFieldKey,
@@ -483,10 +482,11 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
               request,
             })
 
-            // Create TOTP in application storage.
+            // Create TOTP in application storage. (Milliseconds since Unix epoch).
             const expiresAtEpochMs =
-              Date.now() + (totp.period ?? this._totpGenerationDefaults.period) * 1000 // milliseconds since Unix epoch
+              Date.now() + (totp.period ?? this._totpGenerationDefaults.period) * 1000
             const expiresAt = new Date(expiresAtEpochMs)
+
             await this.createTOTP(
               { hash: signedTotp, active: true, attempts: 0 },
               expiresAt,
@@ -634,10 +634,10 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     }
 
     // Decryption and Verification.
-    const { iat, exp, ...totp } = (await verifyJWT({
+    const { ...totp } = (await verifyJWT({
       jwt: sessionTotp,
       secretKey: this.secret,
-    })) as Required<TOTPGenerationOptions> & { iat: number; exp: number }
+    })) as Required<TOTPGenerationOptions>
 
     // Verify TOTP (@epic-web/totp).
     const isValid = verifyTOTP({ ...totp, otp })

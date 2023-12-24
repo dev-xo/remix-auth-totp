@@ -1,7 +1,10 @@
+import type { Session } from '@remix-run/server-runtime'
+import type { SendTOTPOptions, TOTPData } from '../src/index'
+
 import { describe, test, expect, afterEach, vi } from 'vitest'
 import { AuthorizationError } from 'remix-auth'
 
-import { type SendTOTPOptions, type TOTPData, TOTPStrategy } from '../src/index'
+import { TOTPStrategy } from '../src/index'
 import { generateTOTP, generateMagicLink, signJWT } from '../src/utils'
 import { STRATEGY_NAME, FORM_FIELDS, SESSION_KEYS, ERRORS } from '../src/constants'
 
@@ -14,7 +17,6 @@ import {
   DEFAULT_EMAIL,
   sessionStorage,
 } from './utils'
-import { type Session } from '@remix-run/server-runtime'
 
 /**
  * Mocks.
