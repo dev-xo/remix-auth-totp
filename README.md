@@ -78,12 +78,10 @@ For this example we'll use Prisma ORM with a SQLite database. As long as your da
 
 ```ts
 /**
- * Required Fields:
+ * Fields:
  * - `hash`: String
  * - `active`: Boolean, default: true
  * - `attempts`: Int (Number), default: 0
- *
- * Optional Fields:
  * - `expiresAt`: DateTime (Date)
  */
 model Totp {

@@ -60,7 +60,7 @@ export interface TOTPGenerationOptions {
 }
 
 authenticator.use(
-  new OTPStrategy({
+  new TOTPStrategy({
     codeGeneration: {
       digits: 6,
       period: 60,
@@ -124,7 +124,7 @@ export interface CustomErrorsOptions {
 }
 
 authenticator.use(
-  new OTPStrategy({
+  new TOTPStrategy({
     customErrors: {
       requiredEmail: 'Whoops, email is required.',
     },
@@ -167,6 +167,12 @@ export interface TOTPStrategyOptions<User> {
    * @default "auth:totp"
    */
   sessionTotpKey?: string
+  /**
+   * The session key that stores the expiration of the TOTP.
+   * @default "auth:totpExpiresAt"
+   */
+  sessionTotpExpiresAtKey?: string
+
 }
 ```
 
