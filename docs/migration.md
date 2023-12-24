@@ -12,8 +12,9 @@ model Totp {
   active Boolean
   attempts Int
 
-  // Add `expiresAt` field.
+  // Add `expiresAt` field and index.
   expiresAt DateTime
+  @@index([expiresAt])
 }
 ```
 
@@ -31,8 +32,15 @@ authenticator.use(
       // ❗`storeTOTP` and `handleTOTP` are no longer needed (removed).
 
       createTOTP: async (data, expiresAt) => {
-        // Create the TOTP data in the database along with `expiresAt`.
-        await db.totp.create({ data, expiresAt })
+        await prisma.totp.create({ data: { ...data, expiresAt } })
+
+        try {
+          // Delete expired TOTP records.
+          // Better if this were in scheduled task.
+          await prisma.totp.deleteMany({ where: { expiresAt: { lt: new Date() } } })
+        } catch (error) {
+          console.warn('Error deleting expired TOTP records', error)
+        }
       },
       readTOTP: async (hash) => {
         // Get the TOTP data from the database.
