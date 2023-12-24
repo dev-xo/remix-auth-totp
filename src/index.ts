@@ -12,7 +12,6 @@ import {
   verifyJWT,
 } from './utils.js'
 import { STRATEGY_NAME, FORM_FIELDS, SESSION_KEYS, ERRORS } from './constants.js'
-import { CreateContextOptions } from 'vm'
 
 /**
  * The TOTP data which the application stores and uses in CRUD functions provided by the application.
