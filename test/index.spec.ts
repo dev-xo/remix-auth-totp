@@ -1,7 +1,7 @@
 import { describe, test, expect, afterEach, vi } from 'vitest'
 import { AuthorizationError } from 'remix-auth'
 
-import { SendTOTPOptions, TOTPData, TOTPStrategy } from '../src/index'
+import { type SendTOTPOptions, type TOTPData, TOTPStrategy } from '../src/index'
 import { generateTOTP, generateMagicLink, signJWT } from '../src/utils'
 import { STRATEGY_NAME, FORM_FIELDS, SESSION_KEYS, ERRORS } from '../src/constants'
 
@@ -14,7 +14,7 @@ import {
   DEFAULT_EMAIL,
   sessionStorage,
 } from './utils'
-import { Session } from '@remix-run/server-runtime'
+import { type Session } from '@remix-run/server-runtime'
 
 /**
  * Mocks.
