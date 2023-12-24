@@ -85,19 +85,19 @@ For this example we'll use Prisma ORM with a SQLite database. As long as your da
  * - `expiresAt`: DateTime (Date)
  */
 model Totp {
-  /// The encrypted data used to generate the OTP.
+  // The encrypted data used to generate the OTP.
   hash String @unique
 
-  /// The status of the TOTP.
-  /// Used internally / programmatically to invalidate TOTPs.
+  // The status of the TOTP.
+  // Used internally / programmatically to invalidate TOTPs.
   active Boolean
 
-  /// The input attempts of the TOTP.
-  /// Used internally to invalidate TOTPs after a certain amount of attempts.
+  // The input attempts of the TOTP.
+  // Used internally to invalidate TOTPs after a certain amount of attempts.
   attempts Int
 
-  /// The expiration date of the TOTP.
-  /// Used programmatically to invalidate unused TOTPs.
+  // The expiration date of the TOTP.
+  // Used programmatically to invalidate unused TOTPs.
   expiresAt DateTime
 }
 ```
@@ -204,27 +204,30 @@ The Strategy Instance requires the following four methods: `createTOTP`, `readTO
 
 ```ts
 authenticator.use(
-  new TOTPStrategy({
-    secret: process.env.ENCRYPTION_SECRET,
+  new TOTPStrategy(
+    {
+      secret: process.env.ENCRYPTION_SECRET,
 
-    createTOTP: async (data, expiresAt) => {
-      // Create the TOTP data in the database along with expiresAt.
-      await db.totp.create({ data, expiresAt })
+      createTOTP: async (data, expiresAt) => {
+        // Create the TOTP data in the database along with expiresAt.
+        await db.totp.create({ data, expiresAt })
+      },
+      readTOTP: async (hash) => {
+        // Get the TOTP data from the database.
+        return await db.totp.findUnique({ where: { hash } })
+      },
+      updateTOTP: async (hash, data, expiresAt) => {
+        // Update the TOTP data in the database.
+        // No need to update expiresAt since it does not change after createTOTP().
+        await db.totp.update({ where: { hash }, data })
+      },
+      sendTOTP: async ({ email, code, magicLink }) => {
+        // Send the TOTP code to the user.
+        await sendEmail({ email, code, magicLink })
+      },
     },
-    readTOTP: async (hash) => {
-      return await db.totp.findUnique({ where: { hash } })
-    },
-    updateTOTP: async (hash, data, expiresAt) => {
-      // No need to update expiresAt since it does not change after createTOTP().
-      await db.totp.update({ where: { hash }, data })
-    },
-    sendTOTP: async ({ email, code, magicLink }) => {
-      // Send the TOTP code to the user.
-      await sendEmail({ email, code, magicLink })
-    },
-
     async ({ email, code, magicLink, form, request }) => {},
-  }),
+  ),
 )
 ```
 
