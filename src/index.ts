@@ -493,7 +493,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
             )
 
             // Send TOTP.
-            await this._sendTOTP({
+            await this.sendTOTP({
               email: formDataEmail,
               code: _otp,
               magicLink,
@@ -614,10 +614,6 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   private async _validateEmailDefaults(email: string) {
     const regexEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/gm
     if (!regexEmail.test(email)) throw new Error(this.customErrors.invalidEmail)
-  }
-
-  private async _sendTOTP(data: SendTOTPOptions) {
-    await this.sendTOTP({ ...data })
   }
 
   private async _validateTOTP(sessionTotp: string, otp: string, expiresAt: Date) {
