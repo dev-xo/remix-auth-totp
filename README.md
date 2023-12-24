@@ -209,8 +209,15 @@ authenticator.use(
       secret: process.env.ENCRYPTION_SECRET,
 
       createTOTP: async (data, expiresAt) => {
-        // Create the TOTP data in the database along with expiresAt.
-        await db.totp.create({ data, expiresAt })
+        await prisma.totp.create({ data: { ...data, expiresAt } })
+
+        try {
+          // Delete expired TOTP records.
+          // Better if this were in scheduled task.
+          await prisma.totp.deleteMany({ where: { expiresAt: { lt: new Date() } } })
+        } catch (error) {
+          console.warn('Error deleting expired TOTP records', error)
+        }
       },
       readTOTP: async (hash) => {
         // Get the TOTP data from the database.
@@ -231,7 +238,7 @@ authenticator.use(
 )
 ```
 
-All of this CRUD methods should be replaced and adapted with the ones provided by our database.
+All these CRUD methods should be replaced and adapted with the ones provided by our database.
 
 ### 3. Creating and Storing the User.
 
