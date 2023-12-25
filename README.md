@@ -1,9 +1,3 @@
-<!-- <div align="center">
-  <a href="https://github.com/dev-xo/remix-auth-totp" target="_blank">
-    <img alt="Remix Auth TOTP" src="https://raw.githubusercontent.com/dev-xo/dev-xo/main/remix-auth-totp/logo-4.png" width="200" />
-  </a>
-</div> -->
-
 <h1 align="center">
   💿 Remix Auth TOTP
 </h1>
@@ -16,7 +10,6 @@
 
 <div align="center">
   <p>
-    <!-- <br /> -->
     <a href="https://github.com/dev-xo/remix-auth-totp?tab=readme-ov-file#features"><strong>Explore Docs »</strong></a>
     <br/><br/>
     <a href="https://totp.fly.dev">Live Demo</a>
@@ -171,7 +164,6 @@ import { sessionStorage } from './session.server'
 import { sendEmail } from './email.server'
 import { db } from '~/db'
 
-// The User type should match the one from database.
 type User = {
   id: string
   email: string
@@ -212,8 +204,8 @@ authenticator.use(
         await prisma.totp.create({ data: { ...data, expiresAt } })
 
         try {
-          // Delete expired TOTP records.
-          // Better if this were in scheduled task.
+          // Optional - Delete expired TOTP records.
+          // Feel free to handle this on a scheduled task.
           await prisma.totp.deleteMany({ where: { expiresAt: { lt: new Date() } } })
         } catch (error) {
           console.warn('Error deleting expired TOTP records', error)
@@ -446,7 +438,9 @@ If you found this library helpful, please consider leaving us a ⭐ [star](https
 
 ### Acknowledgments
 
-Big thanks to [@w00fz](https://github.com/w00fz) for its amazing implementation of the **Magic Link feature** and to [@mw10013](https://github.com/mw10013) for the **Cloudflare support** and the dedication set into the implementation.
+Big thanks to [@w00fz](https://github.com/w00fz) for its amazing implementation of the **Magic Link feature**.
+
+Special thanks to [@mw10013](https://github.com/mw10013) for the **Cloudflare Support** implementation, the `v2` **Release**, and all the dedication and effort set into the project.
 
 ## License
 
