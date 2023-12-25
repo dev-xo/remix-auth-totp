@@ -32,12 +32,12 @@ authenticator.use(
       // ❗`storeTOTP` and `handleTOTP` are no longer needed (removed).
 
       createTOTP: async (data, expiresAt) => {
-        await prisma.totp.create({ data: { ...data, expiresAt } })
+        await db.totp.create({ data: { ...data, expiresAt } })
 
         try {
           // Delete expired TOTP records.
           // Better if this were in scheduled task.
-          await prisma.totp.deleteMany({ where: { expiresAt: { lt: new Date() } } })
+          await db.totp.deleteMany({ where: { expiresAt: { lt: new Date() } } })
         } catch (error) {
           console.warn('Error deleting expired TOTP records', error)
         }
