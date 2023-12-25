@@ -50,18 +50,19 @@ npm install remix-auth-totp
 
 ## Usage
 
-Remix Auth TOTP exports three required methods:
+Remix Auth TOTP exports four required methods:
 
-- `storeTOTP` - Stores the generated OTP into database.
-- `sendTOTP` - Sends the OTP to the user via email or any other method.
-- `handleTOTP` - Handles / Updates the already stored OTP from database.
+- `createTOTP` - Create the TOTP data in the database.
+- `readTOTP` - Read the TOTP data from the database.
+- `updateTOTP` - Update the TOTP data in the database.
+- `sendTOTP` - Sends the TOTP code to the user via email or any other method.
 
 Here's a basic overview of the authentication process.
 
 1. The user signs-up / logs-in via email address.
-2. The Strategy generates a new OTP, stores it and sends it to the user.
+2. The Strategy generates a new TOTP, stores it and sends it to the user.
 3. The user submits the code via form submission / magic-link click.
-4. The Strategy validates the OTP code and authenticates the user.
+4. The Strategy validates the TOTP code and authenticates the user.
    <br />
 
 > [!NOTE]
@@ -71,37 +72,33 @@ Let's see how we can implement the Strategy into our Remix App.
 
 ## Database
 
-We'll require a database to store our encrypted OTP codes.
+We'll require a database to store our TOTP data.
 
 For this example we'll use Prisma ORM with a SQLite database. As long as your database supports the following fields, you can use any database of choice.
 
 ```ts
 /**
- * Required Fields:
+ * Fields:
  * - `hash`: String
  * - `active`: Boolean, default: true
  * - `attempts`: Int (Number), default: 0
- *
- * Optional Fields:
- * - `expiresAt`: DateTime (Date), @default(now()) | String, @default("")
+ * - `expiresAt`: DateTime (Date)
  */
 model Totp {
-  id String @id @default(uuid())
-
-  /// The encrypted data used to generate the OTP.
+  // The encrypted data used to generate the OTP.
   hash String @unique
 
-  /// The status of the OTP.
-  /// Used internally / programmatically to invalidate OTPs.
-  active Boolean @default(true)
+  // The status of the TOTP.
+  // Used internally / programmatically to invalidate TOTPs.
+  active Boolean
 
-  /// The input attempts of the OTP.
-  /// Used internally to invalidate OTPs after a certain amount of attempts.
-  attempts Int @default(0)
+  // The input attempts of the TOTP.
+  // Used internally to invalidate TOTPs after a certain amount of attempts.
+  attempts Int
 
-  /// The expiration date of the OTP.
-  /// Used programmatically to invalidate unused OTPs.
-  expiresAt DateTime? @default(now())
+  // The expiration date of the TOTP.
+  // Used programmatically to invalidate unused TOTPs.
+  expiresAt DateTime
 }
 ```
 
@@ -188,9 +185,10 @@ authenticator.use(
   new TOTPStrategy(
     {
       secret: process.env.ENCRYPTION_SECRET || 'NOT_A_STRONG_SECRET',
-      storeTOTP: async (data) => {},
+      createTOTP: async (data, expiresAt) => {},
+      readTOTP: async (hash) => {},
+      updateTOTP: async (hash, data, expiresAt) => {},
       sendTOTP: async ({ email, code, magicLink, user, form, request }) => {},
-      handleTOTP: async (hash, data) => {},
     },
     async ({ email, code, form, magicLink, request }) => {},
   ),
@@ -202,44 +200,45 @@ authenticator.use(
 
 ### 2: Implementing the Strategy Logic.
 
-The Strategy Instance requires the following three methods: `storeTOTP`, `sendTOTP`, `handleTOTP`.
+The Strategy Instance requires the following four methods: `createTOTP`, `readTOTP`, `updateTOTP`, `sendTOTP`.
 
 ```ts
 authenticator.use(
-  new TOTPStrategy({
-    secret: process.env.ENCRYPTION_SECRET,
+  new TOTPStrategy(
+    {
+      secret: process.env.ENCRYPTION_SECRET,
 
-    storeTOTP: async (data) => {
-      // Store the generated OTP into database.
-      await db.totp.create({ data })
+      createTOTP: async (data, expiresAt) => {
+        await prisma.totp.create({ data: { ...data, expiresAt } })
+
+        try {
+          // Delete expired TOTP records.
+          // Better if this were in scheduled task.
+          await prisma.totp.deleteMany({ where: { expiresAt: { lt: new Date() } } })
+        } catch (error) {
+          console.warn('Error deleting expired TOTP records', error)
+        }
+      },
+      readTOTP: async (hash) => {
+        // Get the TOTP data from the database.
+        return await db.totp.findUnique({ where: { hash } })
+      },
+      updateTOTP: async (hash, data, expiresAt) => {
+        // Update the TOTP data in the database.
+        // No need to update expiresAt since it does not change after createTOTP().
+        await db.totp.update({ where: { hash }, data })
+      },
+      sendTOTP: async ({ email, code, magicLink }) => {
+        // Send the TOTP code to the user.
+        await sendEmail({ email, code, magicLink })
+      },
     },
-    sendTOTP: async ({ email, code, magicLink }) => {
-      // Send the generated OTP to the user.
-      await sendEmail({ email, code, magicLink })
-    },
-    handleTOTP: async (hash, data) => {
-      const totp = await db.totp.findUnique({ where: { hash } })
-
-      // If `data` is provided, the Strategy will update the totp.
-      // Used for internal checks / invalidations.
-      if (data) {
-        return await db.totp.update({
-          where: { hash },
-          data: { ...data },
-        })
-      }
-
-      // Otherwise, we'll return it.
-      // Used for internal checks / validations.
-      return totp
-    },
-
     async ({ email, code, magicLink, form, request }) => {},
-  }),
+  ),
 )
 ```
 
-All of this CRUD methods should be replaced and adapted with the ones provided by our database.
+All these CRUD methods should be replaced and adapted with the ones provided by our database.
 
 ### 3. Creating and Storing the User.
 
@@ -249,10 +248,10 @@ This should return the user data that will be stored in Session.
 
 ```ts
 authenticator.use(
-  new OTPStrategy(
+  new TOTPStrategy(
     {
       // We've already set up these options.
-      // storeTOTP: async (data) => {},
+      // createTOTP: async (data) => {},
       // ...
     },
     async ({ email, code, magicLink, form, request }) => {
@@ -447,7 +446,7 @@ If you found this library helpful, please consider leaving us a ⭐ [star](https
 
 ### Acknowledgments
 
-Bit thanks to [@w00fz](https://github.com/w00fz) for its amazing implementation of the **Magic Link feature** and to [@mw10013](https://github.com/mw10013) for the **Cloudflare support** and the dedication set into the implementation.
+Big thanks to [@w00fz](https://github.com/w00fz) for its amazing implementation of the **Magic Link feature** and to [@mw10013](https://github.com/mw10013) for the **Cloudflare support** and the dedication set into the implementation.
 
 ## License
 

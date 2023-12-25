@@ -11,3 +11,4 @@ Welcome to the Remix Auth TOTP documentation! Here you'll find everything you ne
 - [Getting Started](https://github.com/dev-xo/remix-auth-totp/blob/main/README.md) - A quick start guide to get you up and running.
 - [Examples](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/examples.md) - A list of community examples using Remix Auth TOTP.
 - [Customization](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/customization.md) - A detailed guide of all the available options and customizations.
+- [Migration](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/migration.md) - v1 to v2 migration guide.

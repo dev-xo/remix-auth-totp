@@ -1,8 +1,6 @@
 import type { TOTPGenerationOptions, MagicLinkGenerationOptions } from './index.js'
-
 import { SignJWT, jwtVerify } from 'jose'
 import { generateTOTP as _generateTOTP } from '@epic-web/totp'
-
 import { ERRORS } from './constants.js'
 
 // @ts-expect-error - `thirty-two` is not typed.
@@ -31,10 +29,7 @@ export function generateMagicLink(
     return undefined
   }
 
-  const url = new URL(
-    options.callbackPath ?? '/',
-    new URL(options.request.url).origin,
-  )
+  const url = new URL(options.callbackPath ?? '/', new URL(options.request.url).origin)
   url.searchParams.set(options.param, options.code)
 
   return url.toString()

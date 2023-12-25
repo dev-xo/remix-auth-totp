@@ -14,6 +14,29 @@ import {
 import { STRATEGY_NAME, FORM_FIELDS, SESSION_KEYS, ERRORS } from './constants.js'
 
 /**
+ * The TOTP data the application stores.
+ * Used in CRUD functions provided by the application.
+ */
+export interface TOTPData {
+  /**
+   * The encrypted TOTP.
+   */
+  hash: string
+
+  /**
+   * The status of the TOTP.
+   * @default true
+   */
+  active: boolean
+
+  /**
+   * The number of attempts the user tried to verify the TOTP.
+   * @default 0
+   */
+  attempts: number
+}
+
+/**
  * The TOTP generation configuration.
  */
 export interface TOTPGenerationOptions {
@@ -57,7 +80,7 @@ export interface TOTPGenerationOptions {
 }
 
 /**
- * The Magic Link configuration.
+ * The magic-link configuration.
  */
 export interface MagicLinkGenerationOptions {
   /**
@@ -74,39 +97,32 @@ export interface MagicLinkGenerationOptions {
 }
 
 /**
- * The store TOTP configuration.
+ * The create TOTP CRUD method.
+ *
+ * @param data The TOTP data.
+ * @param expiresAt The TOTP expiration date.
  */
-export interface StoreTOTPOptions {
-  /**
-   * The encrypted TOTP.
-   */
-  hash: string
-
-  /**
-   * The status of the TOTP.
-   * @default true
-   */
-  active: boolean
-
-  /**
-   * The number of attempts the user tried to verify the TOTP.
-   * @default 0
-   */
-  attempts: number
-
-  /**
-   * The TOTP expiration date.
-   * @default Date.now() + TOTP generation period.
-   */
-  expiresAt?: Date | string
+export interface CreateTOTP {
+  (data: TOTPData, expiresAt: Date): Promise<void>
 }
 
 /**
- * The store TOTP method.
- * @param data The encrypted TOTP.
+ * The read TOTP CRUD method.
+ *  @param hash The hash of the TOTP.
  */
-export interface StoreTOTP {
-  (data: StoreTOTPOptions): Promise<void>
+export interface ReadTOTP {
+  (hash: string): Promise<TOTPData | null>
+}
+
+/**
+ * The update TOTP CRUD method.
+ *
+ * @param hash The hash of the TOTP.
+ * @param data The TOTP data to be updated.
+ * @param expiresAt The TOTP expiration date. It is always the same as the expiration passed into createTOTP().
+ */
+export interface UpdateTOTP {
+  (hash: string, data: Partial<Omit<TOTPData, 'hash'>>, expiresAt: Date): Promise<void>
 }
 
 /**
@@ -145,27 +161,6 @@ export interface SendTOTPOptions {
  */
 export interface SendTOTP {
   (options: SendTOTPOptions): Promise<void>
-}
-
-/**
- * The handle TOTP method.
- *
- * If `data` argument is provided, it will trigger a database update.
- * Otherwise, it will retrieve the encrypted TOTP from database.
- *
- * @param hash The stored TOTP from database.
- * @param data The data to update.
- */
-export interface HandleTOTP {
-  (
-    hash: string,
-    data?: { active?: boolean; attempts?: number; expiresAt?: Date | string },
-  ): Promise<{
-    hash?: string
-    attempts: number
-    active: boolean
-    expiresAt?: Date | string | null
-  } | null>
 }
 
 /**
@@ -234,19 +229,24 @@ export interface TOTPStrategyOptions {
   magicLinkGeneration?: MagicLinkGenerationOptions
 
   /**
-   * The store TOTP method.
+   * The create TOTP method.
    */
-  storeTOTP: StoreTOTP
+  createTOTP: CreateTOTP
+
+  /**
+   * The read TOTP method.
+   */
+  readTOTP: ReadTOTP
+
+  /**
+   * The update TOTP method.
+   */
+  updateTOTP: UpdateTOTP
 
   /**
    * The send TOTP method.
    */
   sendTOTP: SendTOTP
-
-  /**
-   * The handle TOTP method.
-   */
-  handleTOTP: HandleTOTP
 
   /**
    * The validate email method.
@@ -281,6 +281,12 @@ export interface TOTPStrategyOptions {
    * @default "auth:totp"
    */
   sessionTotpKey?: string
+
+  /**
+   * The session key that stores the expiration of the TOTP.
+   * @default "auth:totpExpiresAt"
+   */
+  sessionTotpExpiresAtKey?: string
 }
 
 /**
@@ -321,15 +327,17 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   private readonly maxAge: number | undefined
   private readonly totpGeneration: TOTPGenerationOptions
   private readonly magicLinkGeneration: MagicLinkGenerationOptions
-  private readonly storeTOTP: StoreTOTP
+  private readonly createTOTP: CreateTOTP
+  private readonly readTOTP: ReadTOTP
+  private readonly updateTOTP: UpdateTOTP
   private readonly sendTOTP: SendTOTP
-  private readonly handleTOTP: HandleTOTP
   private readonly validateEmail: ValidateEmail
   private readonly customErrors: CustomErrorsOptions
   private readonly emailFieldKey: string
   private readonly totpFieldKey: string
   private readonly sessionEmailKey: string
   private readonly sessionTotpKey: string
+  private readonly sessionTotpExpiresAtKey: string
 
   private readonly _totpGenerationDefaults = {
     secret: generateSecret(),
@@ -358,14 +366,17 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     super(verify)
     this.secret = options.secret
     this.maxAge = options.maxAge ?? undefined
-    this.storeTOTP = options.storeTOTP
+    this.createTOTP = options.createTOTP
+    this.readTOTP = options.readTOTP
+    this.updateTOTP = options.updateTOTP
     this.sendTOTP = options.sendTOTP
-    this.handleTOTP = options.handleTOTP
     this.validateEmail = options.validateEmail ?? this._validateEmailDefaults
     this.emailFieldKey = options.emailFieldKey ?? FORM_FIELDS.EMAIL
     this.totpFieldKey = options.totpFieldKey ?? FORM_FIELDS.TOTP
     this.sessionEmailKey = options.sessionEmailKey ?? SESSION_KEYS.EMAIL
     this.sessionTotpKey = options.sessionTotpKey ?? SESSION_KEYS.TOTP
+    this.sessionTotpExpiresAtKey =
+      options.sessionTotpExpiresAtKey ?? SESSION_KEYS.TOTP_EXPIRES_AT
 
     this.totpGeneration = {
       ...this._totpGenerationDefaults,
@@ -395,6 +406,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     const session = await sessionStorage.getSession(request.headers.get('cookie'))
     const sessionEmail = session.get(this.sessionEmailKey)
     const sessionTotp = session.get(this.sessionTotpKey)
+    const sessionTotpExpiresAt = session.get(this.sessionTotpExpiresAtKey)
 
     let user: User | null = session.get(options.sessionKey) ?? null
 
@@ -419,8 +431,15 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
            * Re-send TOTP - User has requested a new TOTP.
            * This will invalidate previous TOTP and assign session email to form email.
            */
-          if (!formDataEmail && !formDataTotp && sessionEmail && sessionTotp) {
-            await this.handleTOTP(sessionTotp, { active: false })
+          if (
+            !formDataEmail &&
+            !formDataTotp &&
+            sessionEmail &&
+            sessionTotp &&
+            sessionTotpExpiresAt
+          ) {
+            const expiresAt = new Date(sessionTotpExpiresAt)
+            await this.updateTOTP(sessionTotp, { active: false }, expiresAt)
             formDataEmail = sessionEmail
           }
 
@@ -431,9 +450,11 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
             formDataEmail &&
             sessionEmail &&
             formDataEmail !== sessionEmail &&
-            sessionTotp
+            sessionTotp &&
+            sessionTotpExpiresAt
           ) {
-            await this.handleTOTP(sessionTotp, { active: false })
+            const expiresAt = new Date(sessionTotpExpiresAt)
+            await this.updateTOTP(sessionTotp, { active: false }, expiresAt)
           }
 
           /**
@@ -443,7 +464,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
             if (!formDataEmail) throw new Error(this.customErrors.requiredEmail)
             await this.validateEmail(formDataEmail)
 
-            // Generate and Sign TOTP.
+            // Generate, Sign and create Magic Link.
             const { otp: _otp, ...totp } = generateTOTP({
               ...this.totpGeneration,
               secret: generateSecret(),
@@ -454,8 +475,6 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
                 this.totpGeneration.period ?? this._totpGenerationDefaults.period,
               secretKey: this.secret,
             })
-
-            // Generate Magic Link.
             const magicLink = generateMagicLink({
               ...this.magicLinkGeneration,
               param: this.totpFieldKey,
@@ -463,14 +482,18 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
               request,
             })
 
-            // Store TOTP.
-            await this._storeTOTP({ hash: signedTotp, active: true, attempts: 0 })
+            // Create TOTP in application storage. (Milliseconds since Unix epoch).
+            const expiresAtEpochMs =
+              Date.now() + (totp.period ?? this._totpGenerationDefaults.period) * 1000
+            const expiresAt = new Date(expiresAtEpochMs)
 
-            // Update `expiresAt` database field - If exists.
-            await this._handleExpiresAt(signedTotp, totp)
+            await this.createTOTP(
+              { hash: signedTotp, active: true, attempts: 0 },
+              expiresAt,
+            )
 
             // Send TOTP.
-            await this._sendTOTP({
+            await this.sendTOTP({
               email: formDataEmail,
               code: _otp,
               magicLink,
@@ -480,6 +503,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
 
             session.set(this.sessionEmailKey, formDataEmail)
             session.set(this.sessionTotpKey, signedTotp)
+            session.set(this.sessionTotpExpiresAtKey, expiresAt.toISOString())
             session.unset(options.sessionErrorKey)
 
             throw redirect(options.successRedirect, {
@@ -510,11 +534,14 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
 
         if ((isPOST && formDataTotp) || (isGET && magicLinkTotp)) {
           // Validation.
-          if (isPOST && formDataTotp) await this._validateTOTP(sessionTotp, formDataTotp)
-          if (isGET && magicLinkTotp) await this._validateTOTP(sessionTotp, magicLinkTotp)
+          const expiresAt = new Date(sessionTotpExpiresAt)
+          if (isPOST && formDataTotp)
+            await this._validateTOTP(sessionTotp, formDataTotp, expiresAt)
+          if (isGET && magicLinkTotp)
+            await this._validateTOTP(sessionTotp, magicLinkTotp, expiresAt)
 
           // Invalidation.
-          await this.handleTOTP(sessionTotp, { active: false })
+          await this.updateTOTP(sessionTotp, { active: false }, expiresAt)
 
           // Allow developer to handle user validation.
           user = await this.verify({
@@ -527,6 +554,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
           session.set(options.sessionKey, user)
           session.unset(this.sessionEmailKey)
           session.unset(this.sessionTotpKey)
+          session.unset(this.sessionTotpExpiresAtKey)
           session.unset(options.sessionErrorKey)
 
           throw redirect(options.successRedirect, {
@@ -543,10 +571,11 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       if (error instanceof Response && error.status === 302) throw error
       if (error instanceof Error) {
         if (error.message === ERRORS.INVALID_JWT) {
-          const dbTOTP = await this.handleTOTP(sessionTotp)
+          const dbTOTP = await this.readTOTP(sessionTotp)
           if (!dbTOTP || !dbTOTP.hash) throw new Error(this.customErrors.totpNotFound)
 
-          await this.handleTOTP(sessionTotp, { active: false })
+          const expiresAt = new Date(sessionTotpExpiresAt)
+          await this.updateTOTP(sessionTotp, { active: false }, expiresAt)
 
           return await this.failure(
             this.customErrors.inactiveTotp || ERRORS.INACTIVE_TOTP,
@@ -587,17 +616,9 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     if (!regexEmail.test(email)) throw new Error(this.customErrors.invalidEmail)
   }
 
-  private async _storeTOTP(totp: StoreTOTPOptions) {
-    await this.storeTOTP(totp)
-  }
-
-  private async _sendTOTP(data: SendTOTPOptions) {
-    await this.sendTOTP({ ...data })
-  }
-
-  private async _validateTOTP(sessionTotp: string, otp: string) {
+  private async _validateTOTP(sessionTotp: string, otp: string, expiresAt: Date) {
     // Retrieve encrypted TOTP from database.
-    const dbTOTP = await this.handleTOTP(sessionTotp)
+    const dbTOTP = await this.readTOTP(sessionTotp)
     if (!dbTOTP || !dbTOTP.hash) throw new Error(this.customErrors.totpNotFound)
 
     if (dbTOTP.active !== true) {
@@ -608,50 +629,21 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       this.totpGeneration.maxAttempts ?? this._totpGenerationDefaults.maxAttempts
 
     if (dbTOTP.attempts >= maxAttempts) {
-      await this.handleTOTP(sessionTotp, { active: false })
+      await this.updateTOTP(sessionTotp, { active: false }, expiresAt)
       throw new Error(this.customErrors.inactiveTotp)
     }
 
     // Decryption and Verification.
-    const { iat, exp, ...totp } = (await verifyJWT({
+    const { ...totp } = (await verifyJWT({
       jwt: sessionTotp,
       secretKey: this.secret,
-    })) as Required<TOTPGenerationOptions> & { iat: number; exp: number }
+    })) as Required<TOTPGenerationOptions>
 
     // Verify TOTP (@epic-web/totp).
     const isValid = verifyTOTP({ ...totp, otp })
     if (!isValid) {
-      await this.handleTOTP(sessionTotp, { attempts: dbTOTP.attempts + 1 })
+      await this.updateTOTP(sessionTotp, { attempts: dbTOTP.attempts + 1 }, expiresAt)
       throw new Error(this.customErrors.invalidTotp)
-    }
-  }
-
-  private async _handleExpiresAt(
-    sessionTotp: string,
-    totp: Partial<TOTPGenerationOptions>,
-  ) {
-    // Retrieve encrypted TOTP from database.
-    const dbTOTP = await this.handleTOTP(sessionTotp)
-
-    if (dbTOTP && 'expiresAt' in dbTOTP) {
-      const newExpiresAt =
-        Date.now() + (totp.period ?? this._totpGenerationDefaults.period) * 1000
-
-      let formattedExpiresAt
-
-      if (dbTOTP.expiresAt instanceof Date) {
-        formattedExpiresAt = new Date(newExpiresAt)
-      } else if (typeof dbTOTP.expiresAt === 'string') {
-        formattedExpiresAt = new Date(newExpiresAt).toISOString()
-      } else if (dbTOTP.expiresAt === null) {
-        throw new Error(
-          "Please initialize 'expiresAt' field in your database to either a Date or String type.",
-        )
-      }
-
-      await this.handleTOTP(sessionTotp, {
-        expiresAt: formattedExpiresAt,
-      })
     }
   }
 }

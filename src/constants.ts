@@ -8,6 +8,7 @@ export const FORM_FIELDS = {
 export const SESSION_KEYS = {
   EMAIL: 'auth:email',
   TOTP: 'auth:totp',
+  TOTP_EXPIRES_AT: 'auth:totp:expiresAt',
 } as const
 
 export const ERRORS = {
@@ -20,12 +21,9 @@ export const ERRORS = {
 
   // Miscellaneous errors.
   REQUIRED_ENV_SECRET: 'Missing required .env secret.',
-  REQUIRED_SUCCESS_REDIRECT_URL: 'Missing required successRedirect URL.',
-
   USER_NOT_FOUND: 'User not found.',
-
-  INVALID_MAGIC_LINK_PATH: 'Invalid magic-link expected path.',
   INVALID_JWT: 'Invalid JWT.',
-
+  INVALID_MAGIC_LINK_PATH: 'Invalid magic-link expected path.',
+  REQUIRED_SUCCESS_REDIRECT_URL: 'Missing required successRedirect URL.',
   UNKNOWN_ERROR: 'Unknown error.',
 } as const
