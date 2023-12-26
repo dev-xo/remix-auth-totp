@@ -58,11 +58,10 @@ describe('[ Basics ]', () => {
       { createTOTP, readTOTP, updateTOTP, sendTOTP },
       verify,
     )
-    const result = await strategy
-      .authenticate(request, sessionStorage, { ...AUTH_OPTIONS })
-      .catch((error) => error)
 
-    expect(result).toEqual(new AuthorizationError(ERRORS.REQUIRED_ENV_SECRET))
+    await expect(() =>
+      strategy.authenticate(request, sessionStorage, { ...AUTH_OPTIONS }),
+    ).rejects.toThrow(ERRORS.REQUIRED_ENV_SECRET)
   })
 
   test('Should throw an Error on missing required successRedirect option.', async () => {
@@ -80,11 +79,10 @@ describe('[ Basics ]', () => {
       },
       verify,
     )
-    const result = await strategy
-      .authenticate(request, sessionStorage, { ...AUTH_OPTIONS })
-      .catch((error) => error)
 
-    expect(result).toEqual(new AuthorizationError(ERRORS.REQUIRED_SUCCESS_REDIRECT_URL))
+    await expect(() =>
+      strategy.authenticate(request, sessionStorage, { ...AUTH_OPTIONS }),
+    ).rejects.toThrow(ERRORS.REQUIRED_SUCCESS_REDIRECT_URL)
   })
 
   test('Should throw a custom Error message.', async () => {
@@ -111,14 +109,13 @@ describe('[ Basics ]', () => {
       },
       verify,
     )
-    const result = await strategy
-      .authenticate(request, sessionStorage, {
+
+    await expect(() =>
+      strategy.authenticate(request, sessionStorage, {
         ...AUTH_OPTIONS,
         successRedirect: '/',
-      })
-      .catch((error) => error)
-
-    expect(result).toEqual(new AuthorizationError(CUSTOM_ERROR))
+      }),
+    ).rejects.toThrow(CUSTOM_ERROR)
   })
 })
 
@@ -143,14 +140,13 @@ describe('[ TOTP ]', () => {
         },
         verify,
       )
-      const result = await strategy
-        .authenticate(request, sessionStorage, {
+
+      await expect(() =>
+        strategy.authenticate(request, sessionStorage, {
           ...AUTH_OPTIONS,
           successRedirect: '/',
-        })
-        .catch((error) => error)
-
-      expect(result).toEqual(new AuthorizationError(ERRORS.REQUIRED_EMAIL))
+        }),
+      ).rejects.toThrow(ERRORS.REQUIRED_EMAIL)
     })
 
     test('Should throw an Error on invalid form email.', async () => {
