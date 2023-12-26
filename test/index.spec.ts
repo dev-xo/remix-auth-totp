@@ -59,7 +59,7 @@ describe('[ Basics ]', () => {
       verify,
     )
     const result = await strategy
-      .authenticate(request, sessionStorage, { ...AUTH_OPTIONS, throwOnError: true })
+      .authenticate(request, sessionStorage, { ...AUTH_OPTIONS })
       .catch((error) => error)
 
     expect(result).toEqual(new AuthorizationError(ERRORS.REQUIRED_ENV_SECRET))
@@ -81,7 +81,7 @@ describe('[ Basics ]', () => {
       verify,
     )
     const result = await strategy
-      .authenticate(request, sessionStorage, { ...AUTH_OPTIONS, throwOnError: true })
+      .authenticate(request, sessionStorage, { ...AUTH_OPTIONS })
       .catch((error) => error)
 
     expect(result).toEqual(new AuthorizationError(ERRORS.REQUIRED_SUCCESS_REDIRECT_URL))
@@ -95,7 +95,6 @@ describe('[ Basics ]', () => {
 
     const request = new Request(`${HOST_URL}`, {
       method: 'POST',
-      headers: { host: HOST_URL },
       body: formData,
     })
 
@@ -115,7 +114,6 @@ describe('[ Basics ]', () => {
     const result = await strategy
       .authenticate(request, sessionStorage, {
         ...AUTH_OPTIONS,
-        throwOnError: true,
         successRedirect: '/',
       })
       .catch((error) => error)
@@ -132,7 +130,6 @@ describe('[ TOTP ]', () => {
 
       const request = new Request(`${HOST_URL}`, {
         method: 'POST',
-        headers: { host: HOST_URL },
         body: formData,
       })
 
@@ -149,7 +146,6 @@ describe('[ TOTP ]', () => {
       const result = await strategy
         .authenticate(request, sessionStorage, {
           ...AUTH_OPTIONS,
-          throwOnError: true,
           successRedirect: '/',
         })
         .catch((error) => error)
@@ -163,7 +159,6 @@ describe('[ TOTP ]', () => {
 
       const request = new Request(`${HOST_URL}`, {
         method: 'POST',
-        headers: { host: HOST_URL },
         body: formData,
       })
 
@@ -180,7 +175,6 @@ describe('[ TOTP ]', () => {
       const result = await strategy
         .authenticate(request, sessionStorage, {
           ...AUTH_OPTIONS,
-          throwOnError: true,
           successRedirect: '/',
         })
         .catch((error) => error)
@@ -194,7 +188,6 @@ describe('[ TOTP ]', () => {
 
       const request = new Request(`${HOST_URL}`, {
         method: 'POST',
-        headers: { host: HOST_URL },
         body: formData,
       })
 
@@ -211,7 +204,6 @@ describe('[ TOTP ]', () => {
       await strategy
         .authenticate(request, sessionStorage, {
           ...AUTH_OPTIONS,
-          throwOnError: true,
           successRedirect: '/',
         })
         .catch((error) => error)
@@ -225,7 +217,6 @@ describe('[ TOTP ]', () => {
 
       const request = new Request(`${HOST_URL}`, {
         method: 'POST',
-        headers: { host: HOST_URL },
         body: formData,
       })
 
@@ -242,7 +233,6 @@ describe('[ TOTP ]', () => {
       await strategy
         .authenticate(request, sessionStorage, {
           ...AUTH_OPTIONS,
-          throwOnError: true,
           successRedirect: '/',
         })
         .catch((error) => error)
@@ -256,7 +246,6 @@ describe('[ TOTP ]', () => {
 
       const request = new Request(`${HOST_URL}`, {
         method: 'POST',
-        headers: { host: HOST_URL },
         body: formData,
       })
 
@@ -273,7 +262,6 @@ describe('[ TOTP ]', () => {
       const result = (await strategy
         .authenticate(request, sessionStorage, {
           ...AUTH_OPTIONS,
-          throwOnError: true,
           successRedirect: '/',
         })
         .catch((error) => error)) as Response
@@ -293,7 +281,6 @@ describe('[ TOTP ]', () => {
 
       const request = new Request(`${HOST_URL}`, {
         method: 'POST',
-        headers: { host: HOST_URL },
         body: formData,
       })
 
@@ -383,7 +370,6 @@ describe('[ TOTP ]', () => {
       await strategy
         .authenticate(request, sessionStorage, {
           ...AUTH_OPTIONS,
-          throwOnError: true,
           successRedirect: '/',
         })
         .catch((error) => error)
@@ -414,7 +400,6 @@ describe('[ TOTP ]', () => {
       const result = (await strategy
         .authenticate(request, sessionStorage, {
           ...AUTH_OPTIONS,
-          throwOnError: true,
           successRedirect: '/',
         })
         .catch((error) => error)) as Response
@@ -450,7 +435,6 @@ describe('[ TOTP ]', () => {
       const result = (await strategy
         .authenticate(request, sessionStorage, {
           ...AUTH_OPTIONS,
-          throwOnError: true,
           successRedirect: '/',
         })
         .catch((error) => error)) as Response
@@ -491,7 +475,6 @@ describe('[ TOTP ]', () => {
       const result = (await strategy
         .authenticate(request, sessionStorage, {
           ...AUTH_OPTIONS,
-          throwOnError: true,
           successRedirect: '/',
         })
         .catch((error) => error)) as Response
@@ -536,7 +519,6 @@ describe('[ TOTP ]', () => {
       const result = (await strategy
         .authenticate(request, sessionStorage, {
           ...AUTH_OPTIONS,
-          throwOnError: true,
           successRedirect: '/',
         })
         .catch((error) => error)) as Response
@@ -583,7 +565,6 @@ describe('[ TOTP ]', () => {
       const result = (await strategy
         .authenticate(request, sessionStorage, {
           ...AUTH_OPTIONS,
-          throwOnError: true,
           successRedirect: '/',
         })
         .catch((error) => error)) as Response
@@ -640,7 +621,6 @@ describe('[ TOTP ]', () => {
       const result = (await strategy
         .authenticate(request, sessionStorage, {
           ...AUTH_OPTIONS,
-          throwOnError: true,
           successRedirect: '/',
         })
         .catch((error) => error)) as Response
@@ -701,7 +681,6 @@ describe('[ TOTP ]', () => {
       const result = (await strategy
         .authenticate(request, sessionStorage, {
           ...AUTH_OPTIONS,
-          throwOnError: true,
           successRedirect: '/',
         })
         .catch((error) => error)) as Response
@@ -737,7 +716,6 @@ describe('[ TOTP ]', () => {
       const result = (await strategy
         .authenticate(request, sessionStorage, {
           ...AUTH_OPTIONS,
-          throwOnError: true,
           successRedirect: '/',
         })
         .catch((error) => error)) as Response
@@ -784,7 +762,6 @@ describe('[ TOTP ]', () => {
       const result = (await strategy
         .authenticate(request, sessionStorage, {
           ...AUTH_OPTIONS,
-          throwOnError: true,
           successRedirect: '/',
         })
         .catch((error) => error)) as Response
@@ -833,7 +810,6 @@ describe('[ TOTP ]', () => {
       const result = (await strategy
         .authenticate(request, sessionStorage, {
           ...AUTH_OPTIONS,
-          throwOnError: true,
           successRedirect: '/',
         })
         .catch((error) => error)) as Response
