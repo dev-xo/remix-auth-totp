@@ -852,7 +852,7 @@ describe('[ TOTP ]', () => {
       expect(result).toEqual(new AuthorizationError(ERRORS.INVALID_MAGIC_LINK_PATH))
     })
 
-    test.only('Should successfully validate TOTP.', async () => {
+    test('Should successfully validate TOTP.', async () => {
       let totpData: TOTPData | undefined
       let sendTOTPOptions: SendTOTPOptions | undefined
       let session: Session | undefined
@@ -923,54 +923,82 @@ describe('[ TOTP ]', () => {
       }
     })
 
-    test('Should contain user property in session.', async () => {
-      readTOTP.mockImplementation(() =>
-        Promise.resolve({ hash: signedTotp, attempts: 0, active: true }),
-      )
-      verify.mockImplementation(() => Promise.resolve({ name: 'John Doe' }))
-
-      const { otp: _otp, ...totp } = generateTOTP(TOTP_GENERATION_DEFAULTS)
-      const signedTotp = await signJWT({
-        payload: totp,
-        expiresIn: TOTP_GENERATION_DEFAULTS.period,
-        secretKey: SECRET_ENV,
-      })
-
-      const formData = new FormData()
-      formData.append(FORM_FIELDS.TOTP, _otp)
-
-      let session = await sessionStorage.getSession()
-      session.set(SESSION_KEYS.TOTP, signedTotp)
-
-      const request = new Request(`${HOST_URL}`, {
-        method: 'POST',
-        headers: {
-          cookie: await sessionStorage.commitSession(session),
-        },
-        body: formData,
-      })
-
+    test .only('Should contain user property in session.', async () => {
+      const NAME = "Joe Schmoe"
+      let totpData: TOTPData | undefined
+      let sendTOTPOptions: SendTOTPOptions | undefined
+      let session: Session | undefined
       const strategy = new TOTPStrategy(
         {
           secret: SECRET_ENV,
-          createTOTP,
-          readTOTP,
+          createTOTP: async (data) => {
+            expect(totpData).not.toBeDefined()
+            totpData = data
+          },
+          readTOTP: async (hash) => {
+            expect(totpData).toBeDefined()
+            expect(totpData?.hash).toBe(hash)
+            return totpData!
+          },
           updateTOTP,
-          sendTOTP,
+          sendTOTP: async (options) => {
+            sendTOTPOptions = options
+          },
         },
-        verify,
+        () => {
+          return Promise.resolve({ name: NAME})
+        },
       )
-      const result = (await strategy
-        .authenticate(request, sessionStorage, {
-          ...AUTH_OPTIONS,
-          successRedirect: '/',
+      {
+        const formData = new FormData()
+        formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
+        const request = new Request(`${HOST_URL}/login`, {
+          method: 'POST',
+          body: formData,
         })
-        .catch((error) => error)) as Response
 
-      session = await sessionStorage.getSession(result.headers.get('set-cookie') ?? '')
-
-      expect(session.data).toHaveProperty('user')
-      expect(session.data.user.name).toBe('John Doe')
+        await strategy
+          .authenticate(request, sessionStorage, {
+            ...AUTH_OPTIONS,
+            successRedirect: '/verify',
+          })
+          .catch(async (reason) => {
+            if (reason instanceof Response) {
+              expect(reason.status).toBe(302)
+              session = await sessionStorage.getSession(
+                reason.headers.get('set-cookie') ?? '',
+              )
+            } else throw reason
+          })
+      }
+      expect(totpData).toBeDefined()
+      expect(sendTOTPOptions).toBeDefined()
+      expect(session).toBeDefined()
+      {
+        const formData = new FormData()
+        formData.append(FORM_FIELDS.TOTP, sendTOTPOptions!.code)
+        const request = new Request(`${HOST_URL}/verify`, {
+          method: 'POST',
+          headers: {
+            cookie: await sessionStorage.commitSession(session!),
+          },
+          body: formData,
+        })
+        await strategy
+          .authenticate(request, sessionStorage, {
+            ...AUTH_OPTIONS,
+            successRedirect: '/account',
+          })
+          .catch(async (reason) => {
+            if (reason instanceof Response) {
+              expect(reason.status).toBe(302)
+              session = await sessionStorage.getSession(reason.headers.get('set-cookie') ?? '')
+            } else throw reason
+          })
+      }
+      expect(session).toBeDefined()
+      expect(session!.data).toHaveProperty('user')
+      expect(session!.data.user.name).toBe(NAME)
     })
   })
 
