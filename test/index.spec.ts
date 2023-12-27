@@ -492,6 +492,7 @@ describe('[ TOTP ]', () => {
 
     test('Should throw a custom Error message on missing TOTP from database.', async () => {
       const CUSTOM_ERROR = 'Custom error message.'
+      let session: Session | undefined
       const strategy = new TOTPStrategy(
         {
           secret: SECRET_ENV,
@@ -505,7 +506,6 @@ describe('[ TOTP ]', () => {
         },
         verify,
       )
-      let session: Session | undefined
       {
         const formData = new FormData()
         formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
@@ -923,8 +923,8 @@ describe('[ TOTP ]', () => {
       }
     })
 
-    test .only('Should contain user property in session.', async () => {
-      const NAME = "Joe Schmoe"
+    test('Should contain user property in session.', async () => {
+      const user = { name: 'Joe Schmoe' }
       let totpData: TOTPData | undefined
       let sendTOTPOptions: SendTOTPOptions | undefined
       let session: Session | undefined
@@ -946,7 +946,7 @@ describe('[ TOTP ]', () => {
           },
         },
         () => {
-          return Promise.resolve({ name: NAME})
+          return Promise.resolve(user)
         },
       )
       {
@@ -992,23 +992,25 @@ describe('[ TOTP ]', () => {
           .catch(async (reason) => {
             if (reason instanceof Response) {
               expect(reason.status).toBe(302)
-              session = await sessionStorage.getSession(reason.headers.get('set-cookie') ?? '')
+              session = await sessionStorage.getSession(
+                reason.headers.get('set-cookie') ?? '',
+              )
             } else throw reason
           })
       }
       expect(session).toBeDefined()
       expect(session!.data).toHaveProperty('user')
-      expect(session!.data.user.name).toBe(NAME)
+      expect(session!.get('user')).toEqual(user)
     })
   })
 
   describe('End to End', () => {
     test('Should authenticate user with valid TOTP.', async () => {
+      const user = { name: 'Joe Schmoe' }
       let totpData: TOTPData | undefined
       let totpDataExpiresAt: Date | undefined
       let sendTOTPOptions: SendTOTPOptions | undefined
       let session: Session | undefined
-
       const strategy = new TOTPStrategy(
         {
           secret: SECRET_ENV,
@@ -1036,7 +1038,9 @@ describe('[ TOTP ]', () => {
             expect(options.magicLink).toBe(`${HOST_URL}/magic-link?code=${options.code}`)
           },
         },
-        verify,
+        () => {
+          return Promise.resolve(user)
+        },
       )
       {
         const formData = new FormData()
@@ -1045,40 +1049,33 @@ describe('[ TOTP ]', () => {
           method: 'POST',
           body: formData,
         })
-
-        const result = await strategy
+        await strategy
           .authenticate(request, sessionStorage, {
             ...AUTH_OPTIONS,
             successRedirect: '/verify',
           })
-          .catch((reason) => {
+          .catch(async (reason) => {
             if (reason instanceof Response) {
-              return reason
-            }
-            throw reason
+              expect(reason.status).toBe(302)
+              expect(reason.headers.get('location')).toBe('/verify')
+              session = await sessionStorage.getSession(
+                reason.headers.get('set-cookie') ?? '',
+              )
+            } else throw reason
           })
-        expect(result).toBeInstanceOf(Response)
-        if (result instanceof Response) {
-          expect(result.status).toBe(302)
-          expect(result.headers.get('location')).toBe('/verify')
-          session = await sessionStorage.getSession(
-            result.headers.get('set-cookie') ?? '',
-          )
-          expect(totpData).toBeDefined()
-          expect(totpData!.active).toBeTruthy()
-          expect(totpData!.attempts).toBe(0)
-          expect(totpDataExpiresAt).toBeDefined()
-          expect(session.get(SESSION_KEYS.EMAIL)).toBe(DEFAULT_EMAIL)
-          expect(session.get(SESSION_KEYS.TOTP)).toBe(totpData?.hash)
-          expect(session.get(SESSION_KEYS.TOTP_EXPIRES_AT)).toBe(
-            totpDataExpiresAt?.toISOString(),
-          )
-        }
       }
+      expect(totpData).toBeDefined()
+      expect(totpData!.active).toBeTruthy()
+      expect(totpData!.attempts).toBe(0)
+      expect(totpDataExpiresAt).toBeDefined()
+      expect(sendTOTPOptions).toBeDefined()
+      expect(session).toBeDefined()
+      expect(session!.get(SESSION_KEYS.EMAIL)).toBe(DEFAULT_EMAIL)
+      expect(session!.get(SESSION_KEYS.TOTP)).toBe(totpData?.hash)
+      expect(session!.get(SESSION_KEYS.TOTP_EXPIRES_AT)).toBe(
+        totpDataExpiresAt?.toISOString(),
+      )
       {
-        expect(totpData).toBeDefined()
-        expect(sendTOTPOptions).toBeDefined()
-        expect(session).toBeDefined()
         const formData = new FormData()
         formData.append(FORM_FIELDS.TOTP, sendTOTPOptions!.code)
         const request = new Request(`${HOST_URL}`, {
@@ -1089,26 +1086,26 @@ describe('[ TOTP ]', () => {
           body: formData,
         })
 
-        const result = await strategy
+        await strategy
           .authenticate(request, sessionStorage, {
             ...AUTH_OPTIONS,
-            successRedirect: '/',
+            successRedirect: '/account',
           })
-          .catch((reason) => {
+          .catch(async (reason) => {
             if (reason instanceof Response) {
-              return reason
-            }
-            throw reason
+              expect(reason.status).toBe(302)
+              expect(reason.headers.get('location')).toBe('/account')
+              session = await sessionStorage.getSession(
+                reason.headers.get('set-cookie') ?? '',
+              )
+            } else throw reason
           })
-        expect(result).toBeInstanceOf(Response)
-        if (result instanceof Response) {
-          expect(result.status).toBe(302)
-          expect(result.headers.get('location')).toBe(`/`)
-          expect(totpData).toBeDefined()
-          expect(totpData!.active).toBeFalsy()
-          expect(totpData!.attempts).toBe(0)
-        }
       }
+      expect(totpData).toBeDefined()
+      expect(totpData!.active).toBeFalsy()
+      expect(totpData!.attempts).toBe(0)
+      expect(session).toBeDefined()
+      expect(session!.get('user')).toEqual(user)
     })
   })
 })
