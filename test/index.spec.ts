@@ -340,7 +340,7 @@ describe('[ TOTP ]', () => {
   })
 
   describe('2nd Authentication Phase', () => {
-    test.only('Should invalidate current TOTP.', async () => {
+    test('Should invalidate current TOTP.', async () => {
       let totpData: TOTPData | undefined
       let session: Session | undefined
       const strategy = new TOTPStrategy(
@@ -383,7 +383,7 @@ describe('[ TOTP ]', () => {
                 reason.headers.get('set-cookie') ?? '',
               )
             }
-            if (reason instanceof Error) throw reason
+            else throw reason
           })
       }
       expect(totpData).toBeDefined()
@@ -432,16 +432,8 @@ describe('[ TOTP ]', () => {
       expect(totpData?.active).toBeFalsy()
     })
 
-    test('Should throw an Error on missing TOTP from database.', async () => {
-      const totp = generateTOTP(TOTP_GENERATION_DEFAULTS)
-      const formData = new FormData()
-      formData.append(FORM_FIELDS.TOTP, totp.otp)
-
-      const request = new Request(`${HOST_URL}`, {
-        method: 'POST',
-        body: formData,
-      })
-
+    test.only('Should throw an Error on missing TOTP from database.', async () => {
+      let session: Session | undefined
       const strategy = new TOTPStrategy(
         {
           secret: SECRET_ENV,
@@ -452,14 +444,47 @@ describe('[ TOTP ]', () => {
         },
         verify,
       )
-      const result = (await strategy
-        .authenticate(request, sessionStorage, {
-          ...AUTH_OPTIONS,
-          successRedirect: '/',
+      {
+        const formData = new FormData()
+        formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
+        const request = new Request(`${HOST_URL}`, {
+          method: 'POST',
+          body: formData,
         })
-        .catch((error) => error)) as Response
+        await strategy
+          .authenticate(request, sessionStorage, {
+            ...AUTH_OPTIONS,
+            successRedirect: '/',
+          })
+          .catch(async (reason) => {
+            if (reason instanceof Response) {
+              expect(reason.status).toBe(302)
+              session = await sessionStorage.getSession(
+                reason.headers.get('set-cookie') ?? '',
+              )
+            }
+            else throw reason
+          })
+      }
+      {
+        const totp = generateTOTP(TOTP_GENERATION_DEFAULTS)
+        const formData = new FormData()
+        formData.append(FORM_FIELDS.TOTP, totp.otp)
 
-      expect(result).toEqual(new AuthorizationError(ERRORS.TOTP_NOT_FOUND))
+        const request = new Request(`${HOST_URL}`, {
+          method: 'POST',
+          headers: {
+            cookie: await sessionStorage.commitSession(session!),
+          },
+          body: formData,
+        })
+        await expect(() =>
+          strategy.authenticate(request, sessionStorage, {
+            ...AUTH_OPTIONS,
+            successRedirect: '/',
+          }),
+        ).rejects.toThrowError(ERRORS.TOTP_NOT_FOUND)
+      }
     })
 
     test('Should throw a custom Error message on missing TOTP from database.', async () => {
