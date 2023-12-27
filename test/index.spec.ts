@@ -382,8 +382,7 @@ describe('[ TOTP ]', () => {
               session = await sessionStorage.getSession(
                 reason.headers.get('set-cookie') ?? '',
               )
-            }
-            else throw reason
+            } else throw reason
           })
       }
       expect(totpData).toBeDefined()
@@ -432,8 +431,7 @@ describe('[ TOTP ]', () => {
       expect(totpData?.active).toBeFalsy()
     })
 
-    test.only('Should throw an Error on missing TOTP from database.', async () => {
-      let session: Session | undefined
+    test('Should throw an Error on missing TOTP from database.', async () => {
       const strategy = new TOTPStrategy(
         {
           secret: SECRET_ENV,
@@ -444,6 +442,7 @@ describe('[ TOTP ]', () => {
         },
         verify,
       )
+      let session: Session | undefined
       {
         const formData = new FormData()
         formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
@@ -462,8 +461,7 @@ describe('[ TOTP ]', () => {
               session = await sessionStorage.getSession(
                 reason.headers.get('set-cookie') ?? '',
               )
-            }
-            else throw reason
+            } else throw reason
           })
       }
       {
@@ -487,18 +485,8 @@ describe('[ TOTP ]', () => {
       }
     })
 
-    test('Should throw a custom Error message on missing TOTP from database.', async () => {
+    test.only('Should throw a custom Error message on missing TOTP from database.', async () => {
       const CUSTOM_ERROR = 'Custom error message.'
-
-      const totp = generateTOTP(TOTP_GENERATION_DEFAULTS)
-      const formData = new FormData()
-      formData.append(FORM_FIELDS.TOTP, totp.otp)
-
-      const request = new Request(`${HOST_URL}`, {
-        method: 'POST',
-        body: formData,
-      })
-
       const strategy = new TOTPStrategy(
         {
           secret: SECRET_ENV,
@@ -512,14 +500,47 @@ describe('[ TOTP ]', () => {
         },
         verify,
       )
-      const result = (await strategy
-        .authenticate(request, sessionStorage, {
-          ...AUTH_OPTIONS,
-          successRedirect: '/',
+      let session: Session | undefined
+      {
+        const formData = new FormData()
+        formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
+        const request = new Request(`${HOST_URL}`, {
+          method: 'POST',
+          body: formData,
         })
-        .catch((error) => error)) as Response
+        await strategy
+          .authenticate(request, sessionStorage, {
+            ...AUTH_OPTIONS,
+            successRedirect: '/',
+          })
+          .catch(async (reason) => {
+            if (reason instanceof Response) {
+              expect(reason.status).toBe(302)
+              session = await sessionStorage.getSession(
+                reason.headers.get('set-cookie') ?? '',
+              )
+            } else throw reason
+          })
+      }
+      {
+        const totp = generateTOTP(TOTP_GENERATION_DEFAULTS)
+        const formData = new FormData()
+        formData.append(FORM_FIELDS.TOTP, totp.otp)
 
-      expect(result).toEqual(new AuthorizationError(CUSTOM_ERROR))
+        const request = new Request(`${HOST_URL}`, {
+          method: 'POST',
+          headers: {
+            cookie: await sessionStorage.commitSession(session!),
+          },
+          body: formData,
+        })
+        await expect(() =>
+          strategy.authenticate(request, sessionStorage, {
+            ...AUTH_OPTIONS,
+            successRedirect: '/',
+          }),
+        ).rejects.toThrowError(CUSTOM_ERROR)
+      }
     })
 
     test('Should throw an Error on inactive TOTP.', async () => {
