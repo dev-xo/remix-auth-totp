@@ -1,7 +1,7 @@
 import type { Session } from '@remix-run/server-runtime'
 import type { SendTOTPOptions, TOTPData } from '../src/index'
 
-import { describe, test, expect, afterEach, vi } from 'vitest'
+import { describe, test, expect, afterEach, vi, beforeEach } from 'vitest'
 import { AuthorizationError } from 'remix-auth'
 
 import { TOTPStrategy } from '../src/index'
@@ -28,7 +28,12 @@ export const updateTOTP = vi.fn()
 export const sendTOTP = vi.fn()
 export const validateEmail = vi.fn()
 
+beforeEach(() => {
+  vi.useFakeTimers()
+})
+
 afterEach(() => {
+  vi.useRealTimers()
   vi.restoreAllMocks()
 })
 
@@ -485,7 +490,7 @@ describe('[ TOTP ]', () => {
       }
     })
 
-    test.only('Should throw a custom Error message on missing TOTP from database.', async () => {
+    test('Should throw a custom Error message on missing TOTP from database.', async () => {
       const CUSTOM_ERROR = 'Custom error message.'
       const strategy = new TOTPStrategy(
         {
@@ -673,60 +678,73 @@ describe('[ TOTP ]', () => {
       expect(result).toEqual(new AuthorizationError(ERRORS.INACTIVE_TOTP))
     })
 
-    test('Should throw an Error on invalid (expired) TOTP verification.', async () => {
-      readTOTP.mockImplementation(() =>
-        Promise.resolve({ hash: signedTotp, attempts: 0, active: true }),
-      )
-
-      const { otp: _otp, ...totp } = generateTOTP({
-        ...TOTP_GENERATION_DEFAULTS,
-        period: 0.1,
-      })
-      const signedTotp = await signJWT({
-        payload: totp,
-        expiresIn: TOTP_GENERATION_DEFAULTS.period,
-        secretKey: SECRET_ENV,
-      })
-
-      const formData = new FormData()
-      formData.append(FORM_FIELDS.TOTP, _otp)
-
-      const session = await sessionStorage.getSession()
-      session.set(SESSION_KEYS.TOTP, signedTotp)
-
-      const request = new Request(`${HOST_URL}`, {
-        method: 'POST',
-        headers: {
-          cookie: await sessionStorage.commitSession(session),
-        },
-        body: formData,
-      })
-
-      // Wait for TOTP expiration.
-      await new Promise((resolve) => {
-        setTimeout(() => {
-          resolve(true)
-        }, 200)
-      })
-
+    test.only('Should throw an Error on invalid (expired) TOTP verification.', async () => {
+      let totpData: TOTPData | undefined
+      let sendTOTPOptions: SendTOTPOptions | undefined
+      let session: Session | undefined
       const strategy = new TOTPStrategy(
         {
           secret: SECRET_ENV,
-          createTOTP,
-          readTOTP,
+          createTOTP: async (data) => {
+            expect(totpData).not.toBeDefined()
+            totpData = data
+          },
+          readTOTP: async (hash) => {
+            expect(totpData).toBeDefined()
+            expect(totpData?.hash).toBe(hash)
+            return totpData!
+          },
           updateTOTP,
-          sendTOTP,
+          sendTOTP: async (options) => {
+            sendTOTPOptions = options
+          },
         },
         verify,
       )
-      const result = (await strategy
-        .authenticate(request, sessionStorage, {
-          ...AUTH_OPTIONS,
-          successRedirect: '/',
+      {
+        const formData = new FormData()
+        formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
+        const request = new Request(`${HOST_URL}/login`, {
+          method: 'POST',
+          body: formData,
         })
-        .catch((error) => error)) as Response
 
-      expect(result).toEqual(new AuthorizationError(ERRORS.INVALID_TOTP))
+        await strategy
+          .authenticate(request, sessionStorage, {
+            ...AUTH_OPTIONS,
+            successRedirect: '/verify',
+          })
+          .catch(async (reason) => {
+            if (reason instanceof Response) {
+              expect(reason.status).toBe(302)
+              session = await sessionStorage.getSession(
+                reason.headers.get('set-cookie') ?? '',
+              )
+            } else throw reason
+          })
+      }
+      expect(totpData).toBeDefined()
+      expect(totpData?.active).toBeTruthy()
+      expect(sendTOTPOptions).toBeDefined()
+      expect(session).toBeDefined()
+      vi.setSystemTime(new Date(Date.now() + 1000 * 60 * (TOTP_GENERATION_DEFAULTS.period + 1)))
+      {
+        const formData = new FormData()
+        formData.append(FORM_FIELDS.TOTP, sendTOTPOptions!.code)
+        const request = new Request(`${HOST_URL}/verify`, {
+          method: 'POST',
+          headers: {
+            cookie: await sessionStorage.commitSession(session!),
+          },
+          body: formData,
+        })
+        await expect(() =>
+          strategy.authenticate(request, sessionStorage, {
+            ...AUTH_OPTIONS,
+            successRedirect: '/',
+          }),
+        ).rejects.toThrow(ERRORS.INACTIVE_TOTP)
+      }
     })
 
     test('Should throw an Error on invalid (expired) magic-link TOTP verification.', async () => {
