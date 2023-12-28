@@ -73,8 +73,8 @@ For this example we'll use Prisma ORM with a SQLite database. As long as your da
 /**
  * Fields:
  * - `hash`: String
- * - `active`: Boolean, default: true
- * - `attempts`: Int (Number), default: 0
+ * - `active`: Boolean
+ * - `attempts`: Int (Number)
  * - `expiresAt`: DateTime (Date)
  */
 model Totp {
@@ -92,6 +92,9 @@ model Totp {
   // The expiration date of the TOTP.
   // Used programmatically to invalidate unused TOTPs.
   expiresAt DateTime
+
+  // Index for expiresAt
+  @@index([expiresAt])
 }
 ```
 
