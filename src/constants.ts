@@ -9,6 +9,8 @@ export const SESSION_KEYS = {
   EMAIL: 'auth:email',
   TOTP: 'auth:totp',
   TOTP_EXPIRES_AT: 'auth:totp:expiresAt',
+  FIRST_OTP_REQUESTED: 'auth:totp:firstOtpRequested',
+  OTP_RESENT: "auth:totp:resent"
 } as const
 
 export const ERRORS = {

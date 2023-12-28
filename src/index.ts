@@ -287,6 +287,12 @@ export interface TOTPStrategyOptions {
    * @default "auth:totpExpiresAt"
    */
   sessionTotpExpiresAtKey?: string
+
+  /**
+   * The session key that stores flag that first otp has been requested.
+   * @default "auth:firstOtpRequested"
+   */
+  sessionFirstOTPRequestedKey?: string
 }
 
 /**
@@ -338,6 +344,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   private readonly sessionEmailKey: string
   private readonly sessionTotpKey: string
   private readonly sessionTotpExpiresAtKey: string
+  private readonly sessionFirstOTPRequestedKey: string
 
   private readonly _totpGenerationDefaults = {
     secret: generateSecret(),
@@ -377,6 +384,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     this.sessionTotpKey = options.sessionTotpKey ?? SESSION_KEYS.TOTP
     this.sessionTotpExpiresAtKey =
       options.sessionTotpExpiresAtKey ?? SESSION_KEYS.TOTP_EXPIRES_AT
+    this.sessionFirstOTPRequestedKey = SESSION_KEYS.FIRST_OTP_REQUESTED
 
     this.totpGeneration = {
       ...this._totpGenerationDefaults,
@@ -407,6 +415,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     const sessionEmail = session.get(this.sessionEmailKey)
     const sessionTotp = session.get(this.sessionTotpKey)
     const sessionTotpExpiresAt = session.get(this.sessionTotpExpiresAtKey)
+    const sessionFirstOtpRequested = session.get(SESSION_KEYS.FIRST_OTP_REQUESTED)
 
     let user: User | null = session.get(options.sessionKey) ?? null
 
@@ -455,6 +464,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
           ) {
             const expiresAt = new Date(sessionTotpExpiresAt)
             await this.updateTOTP(sessionTotp, { active: false }, expiresAt)
+            session.unset(this.sessionFirstOTPRequestedKey)
           }
 
           /**
@@ -501,9 +511,17 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
               request,
             })
 
+            if(sessionFirstOtpRequested) {
+              session.flash(SESSION_KEYS.OTP_RESENT, "OTP Has been resent")
+            }
+
             session.set(this.sessionEmailKey, formDataEmail)
             session.set(this.sessionTotpKey, signedTotp)
             session.set(this.sessionTotpExpiresAtKey, expiresAt.toISOString())
+
+            if (!sessionFirstOtpRequested) {
+              session.set(this.sessionFirstOTPRequestedKey, 'true')
+            }
             session.unset(options.sessionErrorKey)
 
             throw redirect(options.successRedirect, {
