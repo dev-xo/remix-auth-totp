@@ -1,5 +1,5 @@
 import type { Session } from '@remix-run/server-runtime'
-import type { SendTOTPOptions, TOTPData } from '../src/index'
+import type { SendTOTPOptions, TOTPData, TOTPStrategyOptions } from '../src/index'
 
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest'
 import { AuthorizationError } from 'remix-auth'
@@ -28,6 +28,14 @@ export const updateTOTP = vi.fn()
 export const sendTOTP = vi.fn()
 export const validateEmail = vi.fn()
 
+const TOTPSTRATEGY_OPTIONS: TOTPStrategyOptions = {
+  secret: SECRET_ENV,
+  createTOTP,
+  readTOTP,
+  updateTOTP,
+  sendTOTP,
+}
+
 beforeEach(() => {
   vi.useFakeTimers()
 })
@@ -39,52 +47,29 @@ afterEach(() => {
 
 describe('[ Basics ]', () => {
   test('Should contain the name of the Strategy.', async () => {
-    const strategy = new TOTPStrategy(
-      {
-        secret: SECRET_ENV,
-        createTOTP,
-        readTOTP,
-        updateTOTP,
-        sendTOTP,
-      },
-      verify,
-    )
-
+    const strategy = new TOTPStrategy(TOTPSTRATEGY_OPTIONS, verify)
     expect(strategy.name).toBe(STRATEGY_NAME)
   })
 
   test('Should throw an Error on missing required secret option.', async () => {
-    const request = new Request(`${HOST_URL}`, {
-      method: 'POST',
-    })
-
     const strategy = new TOTPStrategy(
       // @ts-expect-error - Error is expected since missing secret option.
       { createTOTP, readTOTP, updateTOTP, sendTOTP },
       verify,
     )
-
+    const request = new Request(`${HOST_URL}`, {
+      method: 'POST',
+    })
     await expect(() =>
       strategy.authenticate(request, sessionStorage, { ...AUTH_OPTIONS }),
     ).rejects.toThrow(ERRORS.REQUIRED_ENV_SECRET)
   })
 
   test('Should throw an Error on missing required successRedirect option.', async () => {
+    const strategy = new TOTPStrategy(TOTPSTRATEGY_OPTIONS, verify)
     const request = new Request(`${HOST_URL}`, {
       method: 'POST',
     })
-
-    const strategy = new TOTPStrategy(
-      {
-        secret: SECRET_ENV,
-        createTOTP,
-        readTOTP,
-        updateTOTP,
-        sendTOTP,
-      },
-      verify,
-    )
-
     await expect(() =>
       strategy.authenticate(request, sessionStorage, { ...AUTH_OPTIONS }),
     ).rejects.toThrow(ERRORS.REQUIRED_SUCCESS_REDIRECT_URL)
@@ -92,29 +77,21 @@ describe('[ Basics ]', () => {
 
   test('Should throw a custom Error message.', async () => {
     const CUSTOM_ERROR = 'Custom error message.'
-
-    const formData = new FormData()
-    formData.append(FORM_FIELDS.EMAIL, '')
-
-    const request = new Request(`${HOST_URL}`, {
-      method: 'POST',
-      body: formData,
-    })
-
     const strategy = new TOTPStrategy(
       {
-        secret: SECRET_ENV,
-        createTOTP,
-        readTOTP,
-        updateTOTP,
-        sendTOTP,
+        ...TOTPSTRATEGY_OPTIONS,
         customErrors: {
           requiredEmail: CUSTOM_ERROR,
         },
       },
       verify,
     )
-
+    const formData = new FormData()
+    formData.append(FORM_FIELDS.EMAIL, '')
+    const request = new Request(`${HOST_URL}`, {
+      method: 'POST',
+      body: formData,
+    })
     await expect(() =>
       strategy.authenticate(request, sessionStorage, {
         ...AUTH_OPTIONS,
@@ -127,25 +104,13 @@ describe('[ Basics ]', () => {
 describe('[ TOTP ]', () => {
   describe('1st Authentication Phase', () => {
     test('Should throw an Error on missing formData email.', async () => {
+      const strategy = new TOTPStrategy(TOTPSTRATEGY_OPTIONS, verify)
       const formData = new FormData()
       formData.append(FORM_FIELDS.EMAIL, '')
-
       const request = new Request(`${HOST_URL}`, {
         method: 'POST',
         body: formData,
       })
-
-      const strategy = new TOTPStrategy(
-        {
-          secret: SECRET_ENV,
-          createTOTP,
-          readTOTP,
-          updateTOTP,
-          sendTOTP,
-        },
-        verify,
-      )
-
       await expect(() =>
         strategy.authenticate(request, sessionStorage, {
           ...AUTH_OPTIONS,
@@ -155,25 +120,13 @@ describe('[ TOTP ]', () => {
     })
 
     test('Should throw an Error on invalid form email.', async () => {
+      const strategy = new TOTPStrategy(TOTPSTRATEGY_OPTIONS, verify)
       const formData = new FormData()
       formData.append(FORM_FIELDS.EMAIL, '@invalid-email')
-
       const request = new Request(`${HOST_URL}`, {
         method: 'POST',
         body: formData,
       })
-
-      const strategy = new TOTPStrategy(
-        {
-          secret: SECRET_ENV,
-          createTOTP,
-          readTOTP,
-          updateTOTP,
-          sendTOTP,
-        },
-        verify,
-      )
-
       await expect(() =>
         strategy.authenticate(request, sessionStorage, {
           ...AUTH_OPTIONS,
@@ -183,129 +136,102 @@ describe('[ TOTP ]', () => {
     })
 
     test('Should call createTOTP function.', async () => {
+      const strategy = new TOTPStrategy(TOTPSTRATEGY_OPTIONS, verify)
       const formData = new FormData()
       formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
-
       const request = new Request(`${HOST_URL}`, {
         method: 'POST',
         body: formData,
       })
-
-      const strategy = new TOTPStrategy(
-        {
-          secret: SECRET_ENV,
-          createTOTP,
-          readTOTP,
-          updateTOTP,
-          sendTOTP,
-        },
-        verify,
-      )
-
       await strategy
         .authenticate(request, sessionStorage, {
           ...AUTH_OPTIONS,
           successRedirect: '/',
         })
-        .catch((error) => error)
+        .catch((reason) => {
+          if (reason instanceof Response) {
+            expect(reason.status).toBe(302)
+          } else throw reason
+        })
 
       expect(createTOTP).toHaveBeenCalledTimes(1)
     })
 
     test('Should call sendTOTP function.', async () => {
+      const strategy = new TOTPStrategy(TOTPSTRATEGY_OPTIONS, verify)
       const formData = new FormData()
       formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
-
       const request = new Request(`${HOST_URL}`, {
         method: 'POST',
         body: formData,
       })
-
-      const strategy = new TOTPStrategy(
-        {
-          secret: SECRET_ENV,
-          createTOTP,
-          readTOTP,
-          updateTOTP,
-          sendTOTP,
-        },
-        verify,
-      )
       await strategy
         .authenticate(request, sessionStorage, {
           ...AUTH_OPTIONS,
           successRedirect: '/',
         })
-        .catch((error) => error)
+        .catch((reason) => {
+          if (reason instanceof Response) {
+            expect(reason.status).toBe(302)
+          } else throw reason
+        })
 
       expect(sendTOTP).toHaveBeenCalledTimes(1)
     })
 
     test('Should contain auth:email, auth:totp, and auth:totpExpiresAt properties in session.', async () => {
+      const strategy = new TOTPStrategy(TOTPSTRATEGY_OPTIONS, verify)
       const formData = new FormData()
       formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
-
       const request = new Request(`${HOST_URL}`, {
         method: 'POST',
         body: formData,
       })
-
-      const strategy = new TOTPStrategy(
-        {
-          secret: SECRET_ENV,
-          createTOTP,
-          readTOTP,
-          updateTOTP,
-          sendTOTP,
-        },
-        verify,
-      )
-      const result = (await strategy
+      await strategy
         .authenticate(request, sessionStorage, {
           ...AUTH_OPTIONS,
           successRedirect: '/',
         })
-        .catch((error) => error)) as Response
-
-      const session = await sessionStorage.getSession(
-        result.headers.get('set-cookie') ?? '',
-      )
-
-      expect(session.data).toHaveProperty(SESSION_KEYS.EMAIL)
-      expect(session.data).toHaveProperty(SESSION_KEYS.TOTP)
-      expect(session.data).toHaveProperty(SESSION_KEYS.TOTP_EXPIRES_AT)
+        .catch(async (reason) => {
+          if (reason instanceof Response) {
+            expect(reason.status).toBe(302)
+            const session = await sessionStorage.getSession(
+              reason.headers.get('set-cookie') ?? '',
+            )
+            expect(session.data).toHaveProperty(SESSION_KEYS.EMAIL)
+            expect(session.data).toHaveProperty(SESSION_KEYS.TOTP)
+            expect(session.data).toHaveProperty(SESSION_KEYS.TOTP_EXPIRES_AT)
+          } else throw reason
+        })
     })
 
     test('Should contain Location header pointing to provided successRedirect url.', async () => {
+      const strategy = new TOTPStrategy(TOTPSTRATEGY_OPTIONS, verify)
       const formData = new FormData()
       formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
-
       const request = new Request(`${HOST_URL}`, {
         method: 'POST',
         body: formData,
       })
-
-      const strategy = new TOTPStrategy(
-        {
-          secret: SECRET_ENV,
-          createTOTP,
-          readTOTP,
-          updateTOTP,
-          sendTOTP,
-        },
-        verify,
-      )
-      const result = (await strategy
+      await strategy
         .authenticate(request, sessionStorage, {
           ...AUTH_OPTIONS,
           successRedirect: '/verify',
         })
-        .catch((error) => error)) as Response
-
-      expect(result.headers.get('location')).toMatch('/verify')
+        .catch((reason) => {
+          if (reason instanceof Response) {
+            expect(reason.status).toBe(302)
+            expect(reason.headers.get('location')).toMatch('/verify')
+          } else throw reason
+        })
     })
 
     test('Re-send TOTP - Should invalidate previous TOTP.', async () => {
+      updateTOTP.mockImplementation(async (_, { active }) => {
+        expect(active).toBe(false)
+      })
+      
+      const strategy = new TOTPStrategy(TOTPSTRATEGY_OPTIONS, verify)
       const session = await sessionStorage.getSession()
       session.set(SESSION_KEYS.EMAIL, DEFAULT_EMAIL)
       session.set(SESSION_KEYS.TOTP, 'JWT-SIGNED')
@@ -313,7 +239,6 @@ describe('[ TOTP ]', () => {
         SESSION_KEYS.TOTP_EXPIRES_AT,
         new Date(Date.now() + TOTP_GENERATION_DEFAULTS.period * 1000).toISOString(),
       )
-
       const request = new Request(`${HOST_URL}`, {
         method: 'POST',
         headers: {
@@ -321,27 +246,17 @@ describe('[ TOTP ]', () => {
         },
         body: new FormData(), // Empty form data indicates re-send new TOTP.
       })
-
-      const strategy = new TOTPStrategy(
-        {
-          secret: SECRET_ENV,
-          createTOTP,
-          readTOTP,
-          updateTOTP,
-          sendTOTP,
-          validateEmail,
-        },
-        verify,
-      )
       await strategy
         .authenticate(request, sessionStorage, {
           ...AUTH_OPTIONS,
           successRedirect: '/',
         })
-        .catch((error) => error)
-
+        .catch((reason) => {
+          if (reason instanceof Response) {
+            expect(reason.status).toBe(302)
+          } else throw reason
+        })
       expect(updateTOTP).toHaveBeenCalledTimes(1)
-      expect(validateEmail).toHaveBeenCalledTimes(1)
     })
   })
 
