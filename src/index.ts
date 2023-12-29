@@ -10,6 +10,7 @@ import {
   generateMagicLink,
   signJWT,
   verifyJWT,
+  ensureStringOrUndefined,
 } from './utils.js'
 import { STRATEGY_NAME, FORM_FIELDS, SESSION_KEYS, ERRORS } from './constants.js'
 
@@ -536,13 +537,18 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
 
         if ((isPOST && formDataTotp) || (isGET && magicLinkTotp)) {
           // Validation.
-          if (!sessionEmail || !sessionTotp || !sessionTotpExpiresAt)
+          if (!sessionEmail || !sessionTotp || !sessionTotpExpiresAt) {
             throw new Error(this.customErrors.inactiveTotp)
+          }
+
           const expiresAt = new Date(sessionTotpExpiresAt)
-          if (isPOST && formDataTotp)
+
+          if (isPOST && formDataTotp) {
             await this._validateTOTP(sessionTotp, formDataTotp, expiresAt)
-          if (isGET && magicLinkTotp)
+          }
+          if (isGET && magicLinkTotp) {
             await this._validateTOTP(sessionTotp, magicLinkTotp, expiresAt)
+          }
 
           // Invalidation.
           await this.updateTOTP(sessionTotp, { active: false }, expiresAt)
@@ -651,11 +657,4 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       throw new Error(this.customErrors.invalidTotp)
     }
   }
-}
-
-function ensureStringOrUndefined(value: unknown) {
-  if (typeof value !== 'string' && value !== undefined) {
-    throw new Error('Value must be a string or undefined')
-  }
-  return value
 }

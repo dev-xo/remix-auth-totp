@@ -1,7 +1,7 @@
 import type { Session } from '@remix-run/server-runtime'
 import type { SendTOTPOptions, TOTPData } from '../src/index'
 
-import { describe, test, expect, afterEach, vi, beforeEach } from 'vitest'
+import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest'
 import { AuthorizationError } from 'remix-auth'
 
 import { TOTPStrategy } from '../src/index'
@@ -201,6 +201,7 @@ describe('[ TOTP ]', () => {
         },
         verify,
       )
+
       await strategy
         .authenticate(request, sessionStorage, {
           ...AUTH_OPTIONS,
@@ -318,7 +319,7 @@ describe('[ TOTP ]', () => {
         headers: {
           cookie: await sessionStorage.commitSession(session),
         },
-        body: new FormData(), // Empty form data indicates re-send new TOTP
+        body: new FormData(), // Empty form data indicates re-send new TOTP.
       })
 
       const strategy = new TOTPStrategy(
@@ -348,6 +349,7 @@ describe('[ TOTP ]', () => {
     test('Should invalidate current TOTP.', async () => {
       let totpData: TOTPData | undefined
       let session: Session | undefined
+
       const strategy = new TOTPStrategy(
         {
           secret: SECRET_ENV,
@@ -372,10 +374,12 @@ describe('[ TOTP ]', () => {
       {
         const formData = new FormData()
         formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
+
         const request = new Request(`${HOST_URL}`, {
           method: 'POST',
           body: formData,
         })
+
         await strategy
           .authenticate(request, sessionStorage, {
             ...AUTH_OPTIONS,
@@ -390,6 +394,7 @@ describe('[ TOTP ]', () => {
             } else throw reason
           })
       }
+
       expect(totpData).toBeDefined()
       expect(totpData?.active).toBeTruthy()
       expect(session).toBeDefined()
@@ -398,6 +403,7 @@ describe('[ TOTP ]', () => {
         const { otp } = generateTOTP(TOTP_GENERATION_DEFAULTS)
         const formData = new FormData()
         formData.append(FORM_FIELDS.TOTP, otp)
+
         const request = new Request(`${HOST_URL}`, {
           method: 'POST',
           headers: {
@@ -405,6 +411,7 @@ describe('[ TOTP ]', () => {
           },
           body: formData,
         })
+
         await expect(() =>
           strategy.authenticate(request, sessionStorage, {
             ...AUTH_OPTIONS,
@@ -412,12 +419,15 @@ describe('[ TOTP ]', () => {
           }),
         ).rejects.toThrowError(ERRORS.INVALID_TOTP)
       }
+
       expect(totpData).toBeDefined()
       expect(totpData?.active).toBeTruthy()
+
       {
         const { otp } = generateTOTP(TOTP_GENERATION_DEFAULTS)
         const formData = new FormData()
         formData.append(FORM_FIELDS.TOTP, otp)
+
         const request = new Request(`${HOST_URL}`, {
           method: 'POST',
           headers: {
@@ -425,6 +435,7 @@ describe('[ TOTP ]', () => {
           },
           body: formData,
         })
+
         await expect(() =>
           strategy.authenticate(request, sessionStorage, {
             ...AUTH_OPTIONS,
@@ -432,6 +443,7 @@ describe('[ TOTP ]', () => {
           }),
         ).rejects.toThrowError(ERRORS.INACTIVE_TOTP)
       }
+
       expect(totpData).toBeDefined()
       expect(totpData?.active).toBeFalsy()
     })
@@ -451,10 +463,12 @@ describe('[ TOTP ]', () => {
       {
         const formData = new FormData()
         formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
+
         const request = new Request(`${HOST_URL}`, {
           method: 'POST',
           body: formData,
         })
+
         await strategy
           .authenticate(request, sessionStorage, {
             ...AUTH_OPTIONS,
@@ -481,6 +495,7 @@ describe('[ TOTP ]', () => {
           },
           body: formData,
         })
+
         await expect(() =>
           strategy.authenticate(request, sessionStorage, {
             ...AUTH_OPTIONS,
@@ -493,6 +508,7 @@ describe('[ TOTP ]', () => {
     test('Should throw a custom Error message on missing TOTP from database.', async () => {
       const CUSTOM_ERROR = 'Custom error message.'
       let session: Session | undefined
+
       const strategy = new TOTPStrategy(
         {
           secret: SECRET_ENV,
@@ -509,10 +525,12 @@ describe('[ TOTP ]', () => {
       {
         const formData = new FormData()
         formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
+
         const request = new Request(`${HOST_URL}`, {
           method: 'POST',
           body: formData,
         })
+
         await strategy
           .authenticate(request, sessionStorage, {
             ...AUTH_OPTIONS,
@@ -539,6 +557,7 @@ describe('[ TOTP ]', () => {
           },
           body: formData,
         })
+
         await expect(() =>
           strategy.authenticate(request, sessionStorage, {
             ...AUTH_OPTIONS,
@@ -682,6 +701,7 @@ describe('[ TOTP ]', () => {
       let totpData: TOTPData | undefined
       let sendTOTPOptions: SendTOTPOptions | undefined
       let session: Session | undefined
+
       const strategy = new TOTPStrategy(
         {
           secret: SECRET_ENV,
@@ -704,6 +724,7 @@ describe('[ TOTP ]', () => {
       {
         const formData = new FormData()
         formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
+
         const request = new Request(`${HOST_URL}/login`, {
           method: 'POST',
           body: formData,
@@ -723,6 +744,7 @@ describe('[ TOTP ]', () => {
             } else throw reason
           })
       }
+
       expect(totpData).toBeDefined()
       expect(totpData?.active).toBeTruthy()
       expect(sendTOTPOptions).toBeDefined()
@@ -733,6 +755,7 @@ describe('[ TOTP ]', () => {
       {
         const formData = new FormData()
         formData.append(FORM_FIELDS.TOTP, sendTOTPOptions!.code)
+
         const request = new Request(`${HOST_URL}/verify`, {
           method: 'POST',
           headers: {
@@ -753,6 +776,7 @@ describe('[ TOTP ]', () => {
       let totpData: TOTPData | undefined
       let sendTOTPOptions: SendTOTPOptions | undefined
       let session: Session | undefined
+
       const strategy = new TOTPStrategy(
         {
           secret: SECRET_ENV,
@@ -775,6 +799,7 @@ describe('[ TOTP ]', () => {
       {
         const formData = new FormData()
         formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
+
         const request = new Request(`${HOST_URL}/login`, {
           method: 'POST',
           body: formData,
@@ -793,6 +818,7 @@ describe('[ TOTP ]', () => {
             } else throw reason
           })
       }
+
       expect(totpData).toBeDefined()
       expect(totpData?.active).toBeTruthy()
       expect(sendTOTPOptions).toBeDefined()
@@ -856,6 +882,7 @@ describe('[ TOTP ]', () => {
       let totpData: TOTPData | undefined
       let sendTOTPOptions: SendTOTPOptions | undefined
       let session: Session | undefined
+
       const strategy = new TOTPStrategy(
         {
           secret: SECRET_ENV,
@@ -878,6 +905,7 @@ describe('[ TOTP ]', () => {
       {
         const formData = new FormData()
         formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
+
         const request = new Request(`${HOST_URL}/login`, {
           method: 'POST',
           body: formData,
@@ -896,12 +924,15 @@ describe('[ TOTP ]', () => {
             } else throw reason
           })
       }
+
       expect(totpData).toBeDefined()
       expect(sendTOTPOptions).toBeDefined()
       expect(session).toBeDefined()
+
       {
         const formData = new FormData()
         formData.append(FORM_FIELDS.TOTP, sendTOTPOptions!.code)
+
         const request = new Request(`${HOST_URL}/verify`, {
           method: 'POST',
           headers: {
@@ -925,9 +956,11 @@ describe('[ TOTP ]', () => {
 
     test('Should contain user property in session.', async () => {
       const user = { name: 'Joe Schmoe' }
+
       let totpData: TOTPData | undefined
       let sendTOTPOptions: SendTOTPOptions | undefined
       let session: Session | undefined
+
       const strategy = new TOTPStrategy(
         {
           secret: SECRET_ENV,
@@ -971,9 +1004,11 @@ describe('[ TOTP ]', () => {
             } else throw reason
           })
       }
+
       expect(totpData).toBeDefined()
       expect(sendTOTPOptions).toBeDefined()
       expect(session).toBeDefined()
+
       {
         const formData = new FormData()
         formData.append(FORM_FIELDS.TOTP, sendTOTPOptions!.code)
@@ -998,6 +1033,7 @@ describe('[ TOTP ]', () => {
             } else throw reason
           })
       }
+
       expect(session).toBeDefined()
       expect(session!.data).toHaveProperty('user')
       expect(session!.get('user')).toEqual(user)
@@ -1045,10 +1081,12 @@ describe('[ TOTP ]', () => {
       {
         const formData = new FormData()
         formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
+
         const request = new Request(`${HOST_URL}`, {
           method: 'POST',
           body: formData,
         })
+
         await strategy
           .authenticate(request, sessionStorage, {
             ...AUTH_OPTIONS,
@@ -1078,6 +1116,7 @@ describe('[ TOTP ]', () => {
       {
         const formData = new FormData()
         formData.append(FORM_FIELDS.TOTP, sendTOTPOptions!.code)
+
         const request = new Request(`${HOST_URL}`, {
           method: 'POST',
           headers: {

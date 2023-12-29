@@ -76,3 +76,13 @@ export async function verifyJWT({ jwt, secretKey }: VerifyJWTOptions) {
     throw new Error(ERRORS.INVALID_JWT)
   }
 }
+
+/**
+ * Miscellaneous.
+ */
+export function ensureStringOrUndefined(value: unknown) {
+  if (typeof value !== 'string' && value !== undefined) {
+    throw new Error('Value must be a string or undefined.')
+  }
+  return value
+}
