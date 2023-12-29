@@ -10,7 +10,7 @@ import * as crypto from 'crypto'
  * Constants.
  */
 export const SECRET_ENV = 'SECRET_ENV'
-export const HOST_URL = 'http://localhost:3000'
+export const HOST_URL = 'https://prodserver.com'
 export const DEFAULT_EMAIL = 'localhost@3000.com'
 
 /**
@@ -21,6 +21,7 @@ export const AUTH_OPTIONS = {
   sessionKey: 'user',
   sessionErrorKey: 'error',
   sessionStrategyKey: 'strategy',
+  throwOnError: true,
 } satisfies AuthenticateOptions
 
 export const TOTP_GENERATION_DEFAULTS = {

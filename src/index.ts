@@ -10,6 +10,7 @@ import {
   generateMagicLink,
   signJWT,
   verifyJWT,
+  ensureStringOrUndefined,
 } from './utils.js'
 import { STRATEGY_NAME, FORM_FIELDS, SESSION_KEYS, ERRORS } from './constants.js'
 
@@ -404,9 +405,11 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     const isGET = request.method === 'GET'
 
     const session = await sessionStorage.getSession(request.headers.get('cookie'))
-    const sessionEmail = session.get(this.sessionEmailKey)
-    const sessionTotp = session.get(this.sessionTotpKey)
-    const sessionTotpExpiresAt = session.get(this.sessionTotpExpiresAtKey)
+    const sessionEmail = ensureStringOrUndefined(session.get(this.sessionEmailKey))
+    const sessionTotp = ensureStringOrUndefined(session.get(this.sessionTotpKey))
+    const sessionTotpExpiresAt = ensureStringOrUndefined(
+      session.get(this.sessionTotpExpiresAtKey),
+    )
 
     let user: User | null = session.get(options.sessionKey) ?? null
 
@@ -534,11 +537,18 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
 
         if ((isPOST && formDataTotp) || (isGET && magicLinkTotp)) {
           // Validation.
+          if (!sessionEmail || !sessionTotp || !sessionTotpExpiresAt) {
+            throw new Error(this.customErrors.inactiveTotp)
+          }
+
           const expiresAt = new Date(sessionTotpExpiresAt)
-          if (isPOST && formDataTotp)
+
+          if (isPOST && formDataTotp) {
             await this._validateTOTP(sessionTotp, formDataTotp, expiresAt)
-          if (isGET && magicLinkTotp)
+          }
+          if (isGET && magicLinkTotp) {
             await this._validateTOTP(sessionTotp, magicLinkTotp, expiresAt)
+          }
 
           // Invalidation.
           await this.updateTOTP(sessionTotp, { active: false }, expiresAt)
@@ -571,12 +581,13 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       if (error instanceof Response && error.status === 302) throw error
       if (error instanceof Error) {
         if (error.message === ERRORS.INVALID_JWT) {
-          const dbTOTP = await this.readTOTP(sessionTotp)
-          if (!dbTOTP || !dbTOTP.hash) throw new Error(this.customErrors.totpNotFound)
+          if (sessionTotp && sessionTotpExpiresAt) {
+            const dbTOTP = await this.readTOTP(sessionTotp)
+            if (!dbTOTP || !dbTOTP.hash) throw new Error(this.customErrors.totpNotFound)
 
-          const expiresAt = new Date(sessionTotpExpiresAt)
-          await this.updateTOTP(sessionTotp, { active: false }, expiresAt)
-
+            const expiresAt = new Date(sessionTotpExpiresAt)
+            await this.updateTOTP(sessionTotp, { active: false }, expiresAt)
+          }
           return await this.failure(
             this.customErrors.inactiveTotp || ERRORS.INACTIVE_TOTP,
             request,
