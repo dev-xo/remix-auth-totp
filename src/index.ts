@@ -393,6 +393,24 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     }
   }
 
+  /**
+   * Authenticates a user using TOTP.
+   *
+   * If the user is already authenticated, simply returns the user.
+   * 
+   * | Method | Email | TOTP | Sess. Email | Sess. TOTP | Action/Logic                                                                                                    |
+   * |--------|-------|------|-------------|------------|----------------------------------------------------------------------------------------------------------------|
+   * | POST   | ✓     | ✗    | -           | -          | Generate new TOTP, send to user, store email and TOTP in session.                                               |
+   * | POST   | ✗     | ✓    | ✓           | ✓          | Validate TOTP against session. If valid, authenticate user.                                                     |
+   * | POST   | ✗     | ✗    | ✓           | ✓          | Invalidate previous TOTP, generate new one if session has email and TOTP.                                       |
+   * | POST   | ≠     | -    | ✓           | ✓          | Invalidate previous TOTP, generate new TOTP for new email.                                                      |
+   * | GET    | -     | -    | -           | -          | If magic-link enabled and URL has TOTP, validate it. If valid, authenticate user.                               |
+   *
+   * @param {Request} request - The request object.
+   * @param {SessionStorage} sessionStorage - The session storage instance.
+   * @param {AuthenticateOptions} options - The authentication options.
+   * @returns {Promise<User>} The authenticated user.
+   */
   async authenticate(
     request: Request,
     sessionStorage: SessionStorage,
