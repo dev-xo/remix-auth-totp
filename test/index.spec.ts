@@ -28,7 +28,7 @@ export const updateTOTP = vi.fn()
 export const sendTOTP = vi.fn()
 export const validateEmail = vi.fn()
 
-const TOTPSTRATEGY_OPTIONS: TOTPStrategyOptions = {
+const TOTP_STRATEGY_OPTIONS: TOTPStrategyOptions = {
   secret: SECRET_ENV,
   createTOTP,
   readTOTP,
@@ -47,7 +47,7 @@ afterEach(() => {
 
 describe('[ Basics ]', () => {
   test('Should contain the name of the Strategy.', async () => {
-    const strategy = new TOTPStrategy(TOTPSTRATEGY_OPTIONS, verify)
+    const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
     expect(strategy.name).toBe(STRATEGY_NAME)
   })
 
@@ -66,7 +66,7 @@ describe('[ Basics ]', () => {
   })
 
   test('Should throw an Error on missing required successRedirect option.', async () => {
-    const strategy = new TOTPStrategy(TOTPSTRATEGY_OPTIONS, verify)
+    const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
     const request = new Request(`${HOST_URL}`, {
       method: 'POST',
     })
@@ -79,7 +79,7 @@ describe('[ Basics ]', () => {
     const CUSTOM_ERROR = 'Custom error message.'
     const strategy = new TOTPStrategy(
       {
-        ...TOTPSTRATEGY_OPTIONS,
+        ...TOTP_STRATEGY_OPTIONS,
         customErrors: {
           requiredEmail: CUSTOM_ERROR,
         },
@@ -104,7 +104,7 @@ describe('[ Basics ]', () => {
 describe('[ TOTP ]', () => {
   describe('1st Authentication Phase', () => {
     test('Should throw an Error on missing formData email.', async () => {
-      const strategy = new TOTPStrategy(TOTPSTRATEGY_OPTIONS, verify)
+      const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
       const formData = new FormData()
       formData.append(FORM_FIELDS.EMAIL, '')
       const request = new Request(`${HOST_URL}`, {
@@ -120,7 +120,7 @@ describe('[ TOTP ]', () => {
     })
 
     test('Should throw an Error on invalid form email.', async () => {
-      const strategy = new TOTPStrategy(TOTPSTRATEGY_OPTIONS, verify)
+      const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
       const formData = new FormData()
       formData.append(FORM_FIELDS.EMAIL, '@invalid-email')
       const request = new Request(`${HOST_URL}`, {
@@ -136,7 +136,7 @@ describe('[ TOTP ]', () => {
     })
 
     test('Should call createTOTP function.', async () => {
-      const strategy = new TOTPStrategy(TOTPSTRATEGY_OPTIONS, verify)
+      const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
       const formData = new FormData()
       formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
       const request = new Request(`${HOST_URL}`, {
@@ -158,7 +158,7 @@ describe('[ TOTP ]', () => {
     })
 
     test('Should call sendTOTP function.', async () => {
-      const strategy = new TOTPStrategy(TOTPSTRATEGY_OPTIONS, verify)
+      const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
       const formData = new FormData()
       formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
       const request = new Request(`${HOST_URL}`, {
@@ -180,7 +180,7 @@ describe('[ TOTP ]', () => {
     })
 
     test('Should contain auth:email, auth:totp, and auth:totpExpiresAt properties in session.', async () => {
-      const strategy = new TOTPStrategy(TOTPSTRATEGY_OPTIONS, verify)
+      const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
       const formData = new FormData()
       formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
       const request = new Request(`${HOST_URL}`, {
@@ -206,7 +206,7 @@ describe('[ TOTP ]', () => {
     })
 
     test('Should contain Location header pointing to provided successRedirect url.', async () => {
-      const strategy = new TOTPStrategy(TOTPSTRATEGY_OPTIONS, verify)
+      const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
       const formData = new FormData()
       formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
       const request = new Request(`${HOST_URL}`, {
@@ -231,7 +231,7 @@ describe('[ TOTP ]', () => {
         expect(active).toBe(false)
       })
 
-      const strategy = new TOTPStrategy(TOTPSTRATEGY_OPTIONS, verify)
+      const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
       const session = await sessionStorage.getSession()
       session.set(SESSION_KEYS.EMAIL, DEFAULT_EMAIL)
       session.set(SESSION_KEYS.TOTP, 'JWT-SIGNED')
@@ -337,7 +337,7 @@ describe('[ TOTP ]', () => {
     }
 
     test('Should throw an Error on invalid and max TOTP attempts.', async () => {
-      let { strategy, session, sendTOTPOptions } = await setupFirstAuthPhase()
+      const { strategy, session, sendTOTPOptions } = await setupFirstAuthPhase()
       for (let i = 0; i < TOTP_GENERATION_DEFAULTS.maxAttempts + 1; i++) {
         const formData = new FormData()
         formData.append(FORM_FIELDS.TOTP, sendTOTPOptions.code + i)
@@ -471,7 +471,7 @@ describe('[ TOTP ]', () => {
     })
 
     test('Should throw an Error on invalid magic-link path.', async () => {
-      const { strategy, session, sendTOTPOptions } = await setupFirstAuthPhase()
+      const { strategy, sendTOTPOptions } = await setupFirstAuthPhase()
       expect(sendTOTPOptions.magicLink).toBeDefined()
       invariant(sendTOTPOptions.magicLink, 'Magic link is undefined.')
       expect(sendTOTPOptions.magicLink).toMatch(/\/magic-link/)
