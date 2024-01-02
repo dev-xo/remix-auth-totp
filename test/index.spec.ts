@@ -171,7 +171,7 @@ describe('[ TOTP ]', () => {
       expect(sendTOTP).toHaveBeenCalledTimes(1)
     })
 
-    test('Should generate/send TOTP for form email ignoring any form totp code.', async () => {
+    test('Should generate/send TOTP for form email ignoring form totp code.', async () => {
       sendTOTP.mockImplementation(async (options: SendTOTPOptions) => {
         expect(options.email).toBe(DEFAULT_EMAIL)
         expect(options.code).to.not.equal('')
@@ -204,7 +204,72 @@ describe('[ TOTP ]', () => {
       expect(sendTOTP).toHaveBeenCalledTimes(1)
     })
 
-    test.only('Should generate/send TOTP for empty form data with session email.', async () => {
+    test('Should generate/send TOTP for form email ignoring session email.', async () => {
+      let session: Session | undefined
+      let sessionTotp: unknown
+      const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
+      const formDataToPopulateSessionEmail = new FormData()
+      formDataToPopulateSessionEmail.append(FORM_FIELDS.EMAIL, 'email@session.com')
+      const requestToPopulateSessionEmail = new Request(`${HOST_URL}/login`, {
+        method: 'POST',
+        body: formDataToPopulateSessionEmail,
+      })
+      await strategy
+        .authenticate(requestToPopulateSessionEmail, sessionStorage, {
+          ...AUTH_OPTIONS,
+          successRedirect: '/verify',
+        })
+        .catch(async (reason) => {
+          if (reason instanceof Response) {
+            expect(reason.status).toBe(302)
+            expect(reason.headers.get('location')).toMatch('/verify')
+            session = await sessionStorage.getSession(
+              reason.headers.get('set-cookie') ?? '',
+            )
+            expect(session.get(SESSION_KEYS.EMAIL)).toBe('email@session.com')
+            expect(session.get(SESSION_KEYS.TOTP)).toBeDefined()
+            sessionTotp = session.get(SESSION_KEYS.TOTP)
+          } else throw reason
+        })
+      sendTOTP.mockImplementation(async (options: SendTOTPOptions) => {
+        expect(options.email).toBe(DEFAULT_EMAIL)
+        expect(options.code).to.not.equal('')
+      })
+      if (!session) throw new Error('Undefined session.')
+      const formData = new FormData()
+      formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
+      const request = new Request(`${HOST_URL}/login`, {
+        method: 'POST',
+        headers: {
+          cookie: await sessionStorage.commitSession(session),
+        },
+        body: formData,
+      })
+      await strategy
+        .authenticate(request, sessionStorage, {
+          ...AUTH_OPTIONS,
+          successRedirect: '/verify',
+        })
+        .catch(async (reason) => {
+          if (reason instanceof Response) {
+            expect(reason.status).toBe(302)
+            expect(reason.headers.get('location')).toMatch('/verify')
+            const session = await sessionStorage.getSession(
+              reason.headers.get('set-cookie') ?? '',
+            )
+            expect(session.get(SESSION_KEYS.EMAIL)).toBe(DEFAULT_EMAIL)
+            expect(session.get(SESSION_KEYS.TOTP)).toBeDefined()
+            expect(session.get(SESSION_KEYS.TOTP)).not.toEqual(sessionTotp)
+          } else throw reason
+        })
+      expect(sendTOTP).toHaveBeenCalledTimes(2)
+    })
+
+    test('Should generate/send TOTP for empty form data with session email.', async () => {
+      sendTOTP.mockImplementation(async (options: SendTOTPOptions) => {
+        expect(options.email).toBe(DEFAULT_EMAIL)
+        expect(options.code).to.not.equal('')
+      })
       let session: Session | undefined
       let sessionTotp: unknown
       const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
@@ -231,7 +296,7 @@ describe('[ TOTP ]', () => {
             sessionTotp = session.get(SESSION_KEYS.TOTP)
           } else throw reason
         })
-      if (!session) throw new Error('Undefined session.') 
+      if (!session) throw new Error('Undefined session.')
       const emptyFormRequest = new Request(`${HOST_URL}/login`, {
         method: 'POST',
         headers: {
@@ -256,40 +321,7 @@ describe('[ TOTP ]', () => {
             expect(session.get(SESSION_KEYS.TOTP)).not.toEqual(sessionTotp)
           } else throw reason
         })
-        expect(sendTOTP).toHaveBeenCalledTimes(2)
-    })
-
-    test.skip('Re-send TOTP - Should invalidate previous TOTP.', async () => {
-      updateTOTP.mockImplementation(async (_, { active }) => {
-        expect(active).toBe(false)
-      })
-
-      const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
-      const session = await sessionStorage.getSession()
-      session.set(SESSION_KEYS.EMAIL, DEFAULT_EMAIL)
-      session.set(SESSION_KEYS.TOTP, 'JWT-SIGNED')
-      session.set(
-        SESSION_KEYS.TOTP_EXPIRES_AT,
-        new Date(Date.now() + TOTP_GENERATION_DEFAULTS.period * 1000).toISOString(),
-      )
-      const request = new Request(`${HOST_URL}`, {
-        method: 'POST',
-        headers: {
-          cookie: await sessionStorage.commitSession(session),
-        },
-        body: new FormData(), // Empty form data indicates re-send new TOTP.
-      })
-      await strategy
-        .authenticate(request, sessionStorage, {
-          ...AUTH_OPTIONS,
-          successRedirect: '/',
-        })
-        .catch((reason) => {
-          if (reason instanceof Response) {
-            expect(reason.status).toBe(302)
-          } else throw reason
-        })
-      expect(updateTOTP).toHaveBeenCalledTimes(1)
+      expect(sendTOTP).toHaveBeenCalledTimes(2)
     })
   })
 
