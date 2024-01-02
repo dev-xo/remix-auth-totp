@@ -401,6 +401,67 @@ describe('[ TOTP ]', () => {
         })
     })
 
+    test.only('Should throw an Error on invalid magic-link code', async () => {
+      const { strategy, sendTOTPOptions, session } = await setupGenerateSendTOTP()
+      expect(sendTOTPOptions.magicLink).toBeDefined()
+      invariant(sendTOTPOptions.magicLink, 'Magic link is undefined.')
+      const request = new Request(sendTOTPOptions.magicLink + "INVALID", {
+        method: 'GET',
+        headers: {
+          cookie: await sessionStorage.commitSession(session),
+        },
+      })
+      await expect(() =>
+        strategy.authenticate(request, sessionStorage, {
+          ...AUTH_OPTIONS,
+          successRedirect: '/',
+        }),
+      ).rejects.toThrow(ERRORS.INVALID_TOTP)
+    })
+
+    test.only('Should successfully validate totp code', async () => {
+      const { strategy, sendTOTPOptions, session } = await setupGenerateSendTOTP()
+      const formData = new FormData()
+      formData.append(FORM_FIELDS.TOTP, sendTOTPOptions.code)
+      const request = new Request(`${HOST_URL}/verify`, {
+        method: 'POST',
+        headers: {
+          cookie: await sessionStorage.commitSession(session),
+        },
+        body: formData,
+      })
+      await strategy
+        .authenticate(request, sessionStorage, {
+          ...AUTH_OPTIONS,
+          successRedirect: '/account',
+        })
+        .catch((reason) => {
+          if (reason instanceof Response) {
+            expect(reason.status).toBe(302)
+            expect(reason.headers.get('location')).toBe(`/account`)
+          } else throw reason
+        })
+    })
+
+    test.only('Should throw an Error on invalid totp code', async () => {
+      const { strategy, sendTOTPOptions, session } = await setupGenerateSendTOTP()
+      const formData = new FormData()
+      formData.append(FORM_FIELDS.TOTP, sendTOTPOptions.code + "INVALID")
+      const request = new Request(`${HOST_URL}/verify`, {
+        method: 'POST',
+        headers: {
+          cookie: await sessionStorage.commitSession(session),
+        },
+        body: formData,
+      })
+      await expect(() =>
+        strategy.authenticate(request, sessionStorage, {
+          ...AUTH_OPTIONS,
+          successRedirect: '/',
+        }),
+      ).rejects.toThrow(ERRORS.INVALID_TOTP)
+    })
+
     async function setupFirstAuthPhase(
       totpStrategyOptions: Partial<TOTPStrategyOptions> = {},
     ) {
