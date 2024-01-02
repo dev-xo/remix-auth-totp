@@ -106,7 +106,7 @@ describe('[ Basics ]', () => {
 })
 
 describe('[ TOTP ]', () => {
-  describe('1st Authentication Phase', () => {
+  describe('Generate/Send TOTP', () => {
     test.skip('Should throw an Error on missing formData email.', async () => {
       const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
       const formData = new FormData()
@@ -325,7 +325,7 @@ describe('[ TOTP ]', () => {
     })
   })
 
-  describe.skip('2nd Authentication Phase', () => {
+  describe.skip('Validate TOTP', () => {
     async function setupFirstAuthPhase(
       totpStrategyOptions: Partial<TOTPStrategyOptions> = {},
     ) {

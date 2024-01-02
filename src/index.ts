@@ -431,20 +431,20 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
    *
    * If the user is already authenticated, simply returns the user.
    *
-   * | Method | Email | TOTP | Sess. Email | Sess. TOTP | Action/Logic                                                                                                    |
+   * | Method | Email | TOTP | Sess. Email | Sess. TOTP | Action/Logic                                                                                                   |
    * |--------|-------|------|-------------|------------|----------------------------------------------------------------------------------------------------------------|
-   * | POST   | ✓     | ✗    | -           | -          | Generate new TOTP, send to user, store email and TOTP in session.                                               |
-   * | POST   | ✗     | ✓    | ✓           | ✓          | Validate TOTP against session. If valid, authenticate user.                                                     |
-   * | POST   | ✗     | ✗    | ✓           | ✓          | Invalidate previous TOTP, generate new one if session has email and TOTP.                                       |
-   * | POST   | ≠     | -    | ✓           | ✓          | Invalidate previous TOTP, generate new TOTP for new email.                                                      |
-   * | GET    | -     | -    | -           | -          | If magic-link enabled and URL has TOTP, validate it. If valid, authenticate user.                               |
+   * | POST   | ✓     | ✗    | -           | -          | Generate new TOTP, send to user, store email and TOTP in session.                                              |
+   * | POST   | ✗     | ✓    | ✓           | ✓          | Validate TOTP against session. If valid, authenticate user.                                                    |
+   * | POST   | ✗     | ✗    | ✓           | ✓          | Invalidate previous TOTP, generate new one if session has email and TOTP.                                      |
+   * | POST   | ≠     | -    | ✓           | ✓          | Invalidate previous TOTP, generate new TOTP for new email.                                                     |
+   * | GET    | -     | -    | -           | -          | If magic-link enabled and URL has TOTP, validate it. If valid, authenticate user.                              |
    *
-   * | Method | Email | TOTP | Sess. Email | Sess. TOTP | Action/Logic                                                                                                    |
-   * |--------|-------|------|-------------|------------|----------------------------------------------------------------------------------------------------------------|
-   * | POST   | ✓     | -    | -           | -          | Generate new TOTP, send to user, store email and TOTP in session.                                               |
-   * | POST   | ✗     | ✗    | ✓           | -          | Generate new TOTP for session email, send to user, store TOTP in session.                                    |
-   * | POST   | ✗     | ✓    | ✓           | ✓          | Validate TOTP against session. If valid, authenticate user.                                                     |
-   * | GET    | -     | -    | ✓           | ✓          | If magic-link enabled and URL has TOTP, validate against session. If valid, authenticate user.                               |
+   * | Method | Email | TOTP | Sess. Email | Sess. TOTP | Action/Logic                             |
+   * |--------|-------|------|-------------|------------|------------------------------------------|
+   * | POST   | ✓     | -    | -           | -          | Generate/send TOTP using form email.     |
+   * | POST   | ✗     | ✗    | ✓           | -          | Generate/send TOTP for session email.    |
+   * | POST   | ✗     | ✓    | ✓           | ✓          | Validate form TOTP.                      |
+   * | GET    | -     | -    | ✓           | ✓          | Validate magic link TOTP.                |
    *
    * @param {Request} request - The request object.
    * @param {SessionStorage} sessionStorage - The session storage instance.
