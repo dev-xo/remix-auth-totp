@@ -16,6 +16,7 @@ export const ERRORS = {
   REQUIRED_EMAIL: 'Email is required.',
   INVALID_EMAIL: 'Email is not valid.',
   INVALID_TOTP: 'Code is not valid.',
+  EXPIRED_TOTP: 'Code has expired.',
   INACTIVE_TOTP: 'Code is no longer active.',
   TOTP_NOT_FOUND: 'Database TOTP not found.',
 

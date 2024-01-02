@@ -11,7 +11,7 @@ import * as crypto from 'crypto'
  */
 export const SECRET_ENV = 'SECRET_ENV'
 export const HOST_URL = 'https://prodserver.com'
-export const DEFAULT_EMAIL = 'localhost@3000.com'
+export const DEFAULT_EMAIL = 'user@gmail.com'
 
 /**
  * Strategy Defaults.

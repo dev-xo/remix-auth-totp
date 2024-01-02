@@ -86,3 +86,9 @@ export function ensureStringOrUndefined(value: unknown) {
   }
   return value
 }
+export function ensureObjectOrUndefined(value: unknown) {
+  if ((typeof value !== 'object' && value !== undefined) || value === null) {
+    throw new Error('Value must be a object or undefined.')
+  }
+  return value
+}
