@@ -106,7 +106,7 @@ describe('[ Basics ]', () => {
 })
 
 describe('[ TOTP ]', () => {
-  describe('Generate/Send TOTP', () => {
+  describe.only('Generate/Send TOTP', () => {
     test.skip('Should throw an Error on missing formData email.', async () => {
       const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
       const formData = new FormData()
@@ -325,7 +325,82 @@ describe('[ TOTP ]', () => {
     })
   })
 
-  describe.skip('Validate TOTP', () => {
+  describe('Validate TOTP', () => {
+    async function setupGenerateSendTOTP(
+      totpStrategyOptions: Partial<TOTPStrategyOptions> = {},
+    ) {
+      const user = { name: 'Joe Schmoe' }
+      let sendTOTPOptions: SendTOTPOptions | undefined
+      let session: Session | undefined
+
+      const strategy = new TOTPStrategy<typeof user>(
+        {
+          secret: SECRET_ENV,
+          createTOTP,
+          readTOTP,
+          updateTOTP,
+          sendTOTP: async (options) => {
+            sendTOTPOptions = options
+            expect(options.email).toBe(DEFAULT_EMAIL)
+            expect(options.magicLink).toBe(`${HOST_URL}/magic-link?code=${options.code}`)
+          },
+          ...totpStrategyOptions,
+        },
+        () => {
+          return Promise.resolve(user)
+        },
+      )
+      const formData = new FormData()
+      formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
+      const request = new Request(`${HOST_URL}/login`, {
+        method: 'POST',
+        body: formData,
+      })
+      await strategy
+        .authenticate(request, sessionStorage, {
+          ...AUTH_OPTIONS,
+          successRedirect: '/verify',
+        })
+        .catch(async (reason) => {
+          if (reason instanceof Response) {
+            expect(reason.status).toBe(302)
+            expect(reason.headers.get('location')).toBe('/verify')
+            session = await sessionStorage.getSession(
+              reason.headers.get('set-cookie') ?? '',
+            )
+          } else throw reason
+        })
+
+      expect(sendTOTPOptions).toBeDefined()
+      invariant(sendTOTPOptions, 'Undefined sendTOTPOptions')
+      expect(session).toBeDefined()
+      invariant(session, 'Undefined session')
+      return { strategy, sendTOTPOptions, session, user }
+    }
+
+    test.only('Should successfully validate magic-link', async () => {
+      const { strategy, sendTOTPOptions, session } = await setupGenerateSendTOTP()
+      expect(sendTOTPOptions.magicLink).toBeDefined()
+      invariant(sendTOTPOptions.magicLink, 'Magic link is undefined.')
+      const request = new Request(sendTOTPOptions.magicLink, {
+        method: 'GET',
+        headers: {
+          cookie: await sessionStorage.commitSession(session),
+        },
+      })
+      await strategy
+        .authenticate(request, sessionStorage, {
+          ...AUTH_OPTIONS,
+          successRedirect: '/account',
+        })
+        .catch((reason) => {
+          if (reason instanceof Response) {
+            expect(reason.status).toBe(302)
+            expect(reason.headers.get('location')).toBe(`/account`)
+          } else throw reason
+        })
+    })
+
     async function setupFirstAuthPhase(
       totpStrategyOptions: Partial<TOTPStrategyOptions> = {},
     ) {
@@ -405,7 +480,7 @@ describe('[ TOTP ]', () => {
       const { strategy, session, sendTOTPOptions } = await setupFirstAuthPhase()
       for (let i = 0; i < TOTP_GENERATION_DEFAULTS.maxAttempts + 1; i++) {
         const formData = new FormData()
-        formData.append(FORM_FIELDS.CODE, sendTOTPOptions.code + i)
+        formData.append(FORM_FIELDS.TOTP, sendTOTPOptions.code + i)
         const request = new Request(`${HOST_URL}/verify`, {
           method: 'POST',
           headers: {
@@ -431,7 +506,7 @@ describe('[ TOTP ]', () => {
         readTOTP,
       })
       const formData = new FormData()
-      formData.append(FORM_FIELDS.CODE, sendTOTPOptions.code)
+      formData.append(FORM_FIELDS.TOTP, sendTOTPOptions.code)
       const request = new Request(`${HOST_URL}/verify`, {
         method: 'POST',
         headers: {
@@ -454,7 +529,7 @@ describe('[ TOTP ]', () => {
         customErrors: { totpNotFound: CUSTOM_ERROR },
       })
       const formData = new FormData()
-      formData.append(FORM_FIELDS.CODE, sendTOTPOptions.code)
+      formData.append(FORM_FIELDS.TOTP, sendTOTPOptions.code)
       const request = new Request(`${HOST_URL}/verify`, {
         method: 'POST',
         headers: {
@@ -476,7 +551,7 @@ describe('[ TOTP ]', () => {
           Promise.resolve({ hash: 'SIGNED-JWT', attempts: 0, active: false }),
       })
       const formData = new FormData()
-      formData.append(FORM_FIELDS.CODE, sendTOTPOptions.code)
+      formData.append(FORM_FIELDS.TOTP, sendTOTPOptions.code)
       const request = new Request(`${HOST_URL}/verify`, {
         method: 'POST',
         headers: {
@@ -498,7 +573,7 @@ describe('[ TOTP ]', () => {
         new Date(Date.now() + 1000 * 60 * (TOTP_GENERATION_DEFAULTS.period + 1)),
       )
       const formData = new FormData()
-      formData.append(FORM_FIELDS.CODE, sendTOTPOptions.code)
+      formData.append(FORM_FIELDS.TOTP, sendTOTPOptions.code)
       const request = new Request(`${HOST_URL}/verify`, {
         method: 'POST',
         headers: {
@@ -555,7 +630,7 @@ describe('[ TOTP ]', () => {
     test('Should successfully validate TOTP.', async () => {
       const { strategy, session, sendTOTPOptions } = await setupFirstAuthPhase()
       const formData = new FormData()
-      formData.append(FORM_FIELDS.CODE, sendTOTPOptions.code)
+      formData.append(FORM_FIELDS.TOTP, sendTOTPOptions.code)
       const request = new Request(`${HOST_URL}/verify`, {
         method: 'POST',
         headers: {
@@ -579,7 +654,7 @@ describe('[ TOTP ]', () => {
     test('Should contain user property in session.', async () => {
       const { strategy, session, sendTOTPOptions, user } = await setupFirstAuthPhase()
       const formData = new FormData()
-      formData.append(FORM_FIELDS.CODE, sendTOTPOptions.code)
+      formData.append(FORM_FIELDS.TOTP, sendTOTPOptions.code)
       const request = new Request(`${HOST_URL}/verify`, {
         method: 'POST',
         headers: {
@@ -686,7 +761,7 @@ describe('[ TOTP ]', () => {
       )
       {
         const formData = new FormData()
-        formData.append(FORM_FIELDS.CODE, sendTOTPOptions.code)
+        formData.append(FORM_FIELDS.TOTP, sendTOTPOptions.code)
 
         const request = new Request(`${HOST_URL}`, {
           method: 'POST',

@@ -469,7 +469,10 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     const formDataTotp = ensureNonEmptyStringOrNull(formData.get(this.totpFieldKey))
     const sessionEmail = ensureStringOrUndefined(session.get(this.sessionEmailKey))
     const sessionTotp = ensureObjectOrUndefined(session.get(this.sessionTotpKey))
-    const email = formDataEmail ?? (!formDataTotp ? sessionEmail : null)
+    const email =
+      request.method === 'POST'
+        ? formDataEmail ?? (!formDataTotp ? sessionEmail : null)
+        : null
     console.log('authenticate:', {
       formDataEmail,
       formDataTotp,
@@ -490,7 +493,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     const code = formDataTotp ?? this._getMagicLinkCode(request)
     if (code) {
       if (!sessionEmail || !sessionTotp) throw new Error(ERRORS.EXPIRED_TOTP)
-      this._validateTOTP({ code, sessionTotp: sessionTotp as TOTPData })
+      await this._validateTOTP({ code, sessionTotp: sessionTotp as TOTPData })
 
       // Allow developer to handle user validation.
       const user = await this.verify({
@@ -498,6 +501,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
         form: formData,
         request,
       })
+      console.log('authenticate: user', user)
 
       session.set(options.sessionKey, user)
       session.unset(this.sessionEmailKey)
@@ -735,6 +739,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     formData: FormData
     options: AuthenticateOptions
   }) {
+    console.log('_generateAndSendTOTP:', { email })
     if (!options.successRedirect) throw new Error(ERRORS.REQUIRED_SUCCESS_REDIRECT_URL)
 
     await this.validateEmail(email)
@@ -807,6 +812,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     code: string
     sessionTotp: TOTPData
   }) {
+    console.log('_validateTOTP:', { code, sessionTotp })
     // Decryption and Verification.
     const { ...totp } = (await verifyJWT({
       jwt: sessionTotp.hash,
