@@ -80,6 +80,12 @@ export async function verifyJWT({ jwt, secretKey }: VerifyJWTOptions) {
 /**
  * Miscellaneous.
  */
+
+export function ensureNonEmptyStringOrNull(value: unknown) {
+  if (typeof value === 'string' && value.length > 0) return value
+  return null
+}
+
 export function ensureStringOrUndefined(value: unknown) {
   if (typeof value !== 'string' && value !== undefined) {
     throw new Error('Value must be a string or undefined.')

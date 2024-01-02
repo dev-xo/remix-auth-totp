@@ -1,4 +1,4 @@
-import type { SessionStorage } from '@remix-run/server-runtime'
+import type { Session, SessionStorage } from '@remix-run/server-runtime'
 import type { AuthenticateOptions, StrategyVerifyCallback } from 'remix-auth'
 
 import { redirect } from '@remix-run/server-runtime'
@@ -12,6 +12,7 @@ import {
   verifyJWT,
   ensureStringOrUndefined,
   ensureObjectOrUndefined,
+  ensureNonEmptyStringOrNull,
 } from './utils.js'
 import { STRATEGY_NAME, FORM_FIELDS, SESSION_KEYS, ERRORS } from './constants.js'
 
@@ -463,68 +464,42 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     const user: User | null = session.get(options.sessionKey) ?? null
     if (user) return this.success(user, request, sessionStorage, options)
 
-    if (request.method === 'GET') throw new Error('GET not implemented.')
-    //     let magicLinkTotp: string | undefined = undefined
-
-    const sessionEmail = ensureStringOrUndefined(session.get(this.sessionEmailKey))
-    const sessionTotp = ensureObjectOrUndefined(session.get(this.sessionTotpKey))
-
-    const ensureNonEmptyStringOrNull = (value: unknown) => {
-      if (typeof value === 'string' && value.length > 0) return value
-      return null;
-    }
-    const formData = await request.formData()
+    const formData = request.method === 'POST' ? await request.formData() : new FormData()
     const formDataEmail = ensureNonEmptyStringOrNull(formData.get(this.emailFieldKey))
     const formDataTotp = ensureNonEmptyStringOrNull(formData.get(this.totpFieldKey))
+    const sessionEmail = ensureStringOrUndefined(session.get(this.sessionEmailKey))
+    const sessionTotp = ensureObjectOrUndefined(session.get(this.sessionTotpKey))
     const email = formDataEmail ?? (!formDataTotp ? sessionEmail : null)
-    console.log('authenticate:', {formDataEmail, formDataTotp, sessionEmail, sessionTotp, email})
-    if (email) {
-      // Generate new TOTP.
-      await this.validateEmail(email)
-
-      const { otp: code, ...totp } = generateTOTP({
-        ...this.totpGeneration,
-        secret: generateSecret(),
-      })
-      const hash = await signJWT({
-        payload: totp,
-        expiresIn: this.totpGeneration.period ?? this._totpGenerationDefaults.period,
-        secretKey: this.secret,
-      })
-      const magicLink = generateMagicLink({
-        ...this.magicLinkGeneration,
-        code,
-        param: this.totpFieldKey,
-        request,
-      })
-      await this.sendTOTP({
+    console.log('authenticate:', {
+      formDataEmail,
+      formDataTotp,
+      sessionEmail,
+      sessionTotp,
+      email,
+    })
+    if (email)
+      await this._generateAndSendTOTP({
         email,
-        code,
-        magicLink,
-        form: formData,
+        session,
+        sessionStorage,
         request,
+        formData,
+        options,
       })
-
-      const expiresAtEpochMs = // (Milliseconds since Unix epoch).
-        Date.now() + (totp.period ?? this._totpGenerationDefaults.period) * 1000
-      const totpData: TOTPData = {
-        hash,
-        expiresAt: new Date(expiresAtEpochMs),
-        attempts: 0,
-      }
-      session.set(this.sessionEmailKey, email)
-      session.set(this.sessionTotpKey, totpData)
-      session.unset(options.sessionErrorKey)
-      throw redirect(options.successRedirect, {
-        headers: {
-          'set-cookie': await sessionStorage.commitSession(session, {
-            maxAge: this.maxAge,
-          }),
-        },
-      })
-    }
 
     throw new Error('Not implemented.')
+
+    // if (request.method === 'GET') {
+    //   if (this.magicLinkGeneration.enabled) {
+    //     const url = new URL(request.url)
+    //     if (url.pathname !== this.magicLinkGeneration.callbackPath) {
+    //       throw new Error(ERRORS.INVALID_MAGIC_LINK_PATH)
+    //     }
+    //     const code = url.searchParams.has(this.totpFieldKey)
+    //       ? decodeURIComponent(url.searchParams.get(this.totpFieldKey) ?? '')
+    //       : undefined
+    //   }
+    // }
 
     // try {
     //   if (!user) {
@@ -730,12 +705,76 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     // return this.success(user, request, sessionStorage, options)
   }
 
+  private async _generateAndSendTOTP({
+    email,
+    session,
+    sessionStorage,
+    request,
+    formData,
+    options,
+  }: {
+    email: string
+    session: Session
+    sessionStorage: SessionStorage
+    request: Request
+    formData: FormData
+    options: AuthenticateOptions
+  }) {
+    if (!options.successRedirect) throw new Error(ERRORS.REQUIRED_SUCCESS_REDIRECT_URL)
+
+    await this.validateEmail(email)
+    const { otp: code, ...totp } = generateTOTP({
+      ...this.totpGeneration,
+      secret: generateSecret(),
+    })
+    const hash = await signJWT({
+      payload: totp,
+      expiresIn: this.totpGeneration.period ?? this._totpGenerationDefaults.period,
+      secretKey: this.secret,
+    })
+    const magicLink = generateMagicLink({
+      ...this.magicLinkGeneration,
+      code,
+      param: this.totpFieldKey,
+      request,
+    })
+    await this.sendTOTP({
+      email,
+      code,
+      magicLink,
+      form: formData,
+      request,
+    })
+
+    const expiresAtEpochMs = // (Milliseconds since Unix epoch).
+      Date.now() + (totp.period ?? this._totpGenerationDefaults.period) * 1000
+    const totpData: TOTPData = {
+      hash,
+      expiresAt: new Date(expiresAtEpochMs),
+      attempts: 0,
+    }
+    session.set(this.sessionEmailKey, email)
+    session.set(this.sessionTotpKey, totpData)
+    session.unset(options.sessionErrorKey)
+    throw redirect(options.successRedirect, {
+      headers: {
+        'set-cookie': await sessionStorage.commitSession(session, {
+          maxAge: this.maxAge,
+        }),
+      },
+    })
+  }
+
   private async _validateEmailDefaults(email: string) {
     const regexEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/gm
     if (!regexEmail.test(email)) throw new Error(this.customErrors.invalidEmail)
   }
 
-  private async _validateTOTP(sessionTotp: string, otp: string, expiresAt: Date) {
+  private async _validateTOTPDeprecated(
+    sessionTotp: string,
+    otp: string,
+    expiresAt: Date,
+  ) {
     // Retrieve encrypted TOTP from database.
     const dbTOTP = await this.readTOTP(sessionTotp)
     if (!dbTOTP || !dbTOTP.hash) throw new Error(this.customErrors.totpNotFound)
