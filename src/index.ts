@@ -264,8 +264,8 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
 
   private readonly secret: string
   private readonly maxAge: number | undefined
-  private readonly totpGeneration: TOTPGenerationOptions
-  private readonly magicLinkGeneration: MagicLinkGenerationOptions
+  private readonly totpGeneration: Required<TOTPGenerationOptions>
+  private readonly magicLinkGeneration: Required<MagicLinkGenerationOptions>
   private readonly sendTOTP: SendTOTP
   private readonly validateEmail: ValidateEmail
   private readonly customErrors: Required<CustomErrorsOptions>
@@ -274,23 +274,23 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   private readonly sessionEmailKey: string
   private readonly sessionTotpKey: string
 
-  private readonly _totpGenerationDefaults = {
+  private readonly _totpGenerationDefaults: Required<TOTPGenerationOptions> = {
     secret: generateSecret(),
     algorithm: 'SHA1',
     charSet: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
     digits: 6,
     period: 60,
     maxAttempts: 3,
-  } satisfies TOTPGenerationOptions
-  private readonly _magicLinkGenerationDefaults = {
+  }
+  private readonly _magicLinkGenerationDefaults: Required<MagicLinkGenerationOptions> = {
     enabled: true,
     callbackPath: '/magic-link',
-  } satisfies MagicLinkGenerationOptions
-  private readonly _customErrorsDefaults = {
+  }
+  private readonly _customErrorsDefaults: Required<CustomErrorsOptions> = {
     invalidEmail: ERRORS.INVALID_EMAIL,
     invalidTotp: ERRORS.INVALID_TOTP,
     expiredTotp: ERRORS.EXPIRED_TOTP,
-  } satisfies CustomErrorsOptions
+  }
 
   constructor(
     options: TOTPStrategyOptions,
@@ -298,9 +298,9 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   ) {
     super(verify)
     this.secret = options.secret
-    this.maxAge = options.maxAge ?? undefined
+    this.maxAge = options.maxAge
     this.sendTOTP = options.sendTOTP
-    this.validateEmail = options.validateEmail ?? this._validateEmailDefaults
+    this.validateEmail = options.validateEmail ?? this._validateEmailDefault
     this.emailFieldKey = options.emailFieldKey ?? FORM_FIELDS.EMAIL
     this.totpFieldKey = options.totpFieldKey ?? FORM_FIELDS.TOTP
     this.sessionEmailKey = options.sessionEmailKey ?? SESSION_KEYS.EMAIL
@@ -378,7 +378,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       }
       const code = formDataTotp ?? this._getMagicLinkCode(request)
       if (code) {
-        if (!sessionEmail || !sessionTotp) throw new Error(ERRORS.EXPIRED_TOTP)
+        if (!sessionEmail || !sessionTotp) throw new Error(this.customErrors.expiredTotp)
         await this._validateTOTP({
           code,
           sessionTotp: sessionTotp as TOTPData,
@@ -450,7 +450,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     })
     const hash = await signJWT({
       payload: totp,
-      expiresIn: this.totpGeneration.period ?? this._totpGenerationDefaults.period,
+      expiresIn: this.totpGeneration.period,
       secretKey: this.secret,
     })
     const magicLink = generateMagicLink({
@@ -498,7 +498,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     return null
   }
 
-  private async _validateEmailDefaults(email: string) {
+  private async _validateEmailDefault(email: string) {
     const regexEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/gm
     if (!regexEmail.test(email)) throw new Error(this.customErrors.invalidEmail)
   }
@@ -535,9 +535,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
         session.flash(options.sessionErrorKey, { message: this.customErrors.expiredTotp })
       } else {
         sessionTotp.attempts += 1
-        const maxAttempts =
-          this.totpGeneration.maxAttempts ?? this._totpGenerationDefaults.maxAttempts
-        if (sessionTotp.attempts >= maxAttempts) {
+        if (sessionTotp.attempts >= this.totpGeneration.maxAttempts) {
           session.unset(this.sessionTotpKey)
         } else {
           session.set(this.sessionTotpKey, sessionTotp)
