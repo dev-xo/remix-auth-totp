@@ -6,6 +6,7 @@ import { ERRORS } from './constants.js'
 // @ts-expect-error - `thirty-two` is not typed.
 import * as base32 from 'thirty-two'
 import * as crypto from 'crypto'
+import { AuthenticateOptions } from 'remix-auth'
 
 /**
  * TOTP Generation.
@@ -97,4 +98,18 @@ export function ensureObjectOrUndefined(value: unknown) {
     throw new Error('Value must be a object or undefined.')
   }
   return value
+}
+
+export type RequiredAuthenticateOptions = Required<
+  Pick<AuthenticateOptions, 'failureRedirect' | 'successRedirect'>
+> &
+  Omit<AuthenticateOptions, 'failureRedirect' | 'successRedirect'>
+
+export function assertIsRequiredAuthenticateOptions(options: AuthenticateOptions): asserts options is RequiredAuthenticateOptions {
+  if (options.successRedirect === undefined) {
+    throw new Error(ERRORS.REQUIRED_SUCCESS_REDIRECT_URL)
+  }
+  if (options.failureRedirect === undefined) {
+    throw new Error(ERRORS.REQUIRED_FAILURE_REDIRECT_URL)
+  }
 }

@@ -26,5 +26,6 @@ export const ERRORS = {
   INVALID_JWT: 'Invalid JWT.',
   INVALID_MAGIC_LINK_PATH: 'Invalid magic-link expected path.',
   REQUIRED_SUCCESS_REDIRECT_URL: 'Missing required successRedirect URL.',
+  REQUIRED_FAILURE_REDIRECT_URL: 'Missing required failureRedirect URL.',
   UNKNOWN_ERROR: 'Unknown error.',
 } as const

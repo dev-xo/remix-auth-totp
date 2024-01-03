@@ -13,6 +13,8 @@ import {
   ensureStringOrUndefined,
   ensureObjectOrUndefined,
   ensureNonEmptyStringOrNull,
+  assertIsRequiredAuthenticateOptions,
+  RequiredAuthenticateOptions,
 } from './utils.js'
 import { STRATEGY_NAME, FORM_FIELDS, SESSION_KEYS, ERRORS } from './constants.js'
 
@@ -458,7 +460,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     options: AuthenticateOptions,
   ): Promise<User> {
     if (!this.secret) throw new Error(ERRORS.REQUIRED_ENV_SECRET)
-    if (!options.successRedirect) throw new Error(ERRORS.REQUIRED_SUCCESS_REDIRECT_URL)
+    assertIsRequiredAuthenticateOptions(options)
 
     const session = await sessionStorage.getSession(request.headers.get('cookie'))
     const user: User | null = session.get(options.sessionKey) ?? null
@@ -480,43 +482,63 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       sessionTotp,
       email,
     })
-    if (email) {
-      await this._generateAndSendTOTP({
-        email,
-        session,
-        sessionStorage,
-        request,
-        formData,
-        options,
-      })
+    try {
+      if (email) {
+        await this._generateAndSendTOTP({
+          email,
+          session,
+          sessionStorage,
+          request,
+          formData,
+          options,
+        })
+      }
+      const code = formDataTotp ?? this._getMagicLinkCode(request)
+      if (code) {
+        if (!sessionEmail || !sessionTotp) throw new Error(ERRORS.EXPIRED_TOTP)
+        await this._validateTOTP({
+          code,
+          sessionTotp: sessionTotp as TOTPData,
+          session,
+          sessionStorage,
+          options,
+        })
+
+        // Allow developer to handle user validation.
+        const user = await this.verify({
+          email: sessionEmail,
+          form: formData,
+          request,
+        })
+        console.log('authenticate: user', user)
+
+        session.set(options.sessionKey, user)
+        session.unset(this.sessionEmailKey)
+        session.unset(this.sessionTotpKey)
+        session.unset(options.sessionErrorKey)
+
+        throw redirect(options.successRedirect, {
+          headers: {
+            'set-cookie': await sessionStorage.commitSession(session, {
+              maxAge: this.maxAge,
+            }),
+          },
+        })
+      }
+    } catch (throwable) {
+      if (throwable instanceof Response) throw throwable
+      if (throwable instanceof Error) {
+        console.log('authenticate: error:', throwable.message)
+        return await this.failure(
+          throwable.message,
+          request,
+          sessionStorage,
+          options,
+          throwable,
+        )
+      }
+      throw throwable
     }
-    const code = formDataTotp ?? this._getMagicLinkCode(request)
-    if (code) {
-      if (!sessionEmail || !sessionTotp) throw new Error(ERRORS.EXPIRED_TOTP)
-      await this._validateTOTP({ code, sessionTotp: sessionTotp as TOTPData })
-
-      // Allow developer to handle user validation.
-      const user = await this.verify({
-        email: sessionEmail,
-        form: formData,
-        request,
-      })
-      console.log('authenticate: user', user)
-
-      session.set(options.sessionKey, user)
-      session.unset(this.sessionEmailKey)
-      session.unset(this.sessionTotpKey)
-      session.unset(options.sessionErrorKey)
-
-      throw redirect(options.successRedirect, {
-        headers: {
-          'set-cookie': await sessionStorage.commitSession(session, {
-            maxAge: this.maxAge,
-          }),
-        },
-      })
-    }
-
     throw new Error('Not implemented.')
   }
 
@@ -808,11 +830,17 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   private async _validateTOTP({
     code,
     sessionTotp,
+    session,
+    sessionStorage,
+    options,
   }: {
     code: string
     sessionTotp: TOTPData
+    session: Session
+    sessionStorage: SessionStorage
+    options: RequiredAuthenticateOptions
   }) {
-    console.log('_validateTOTP:', { code, sessionTotp })
+    // console.log('_validateTOTP:', { code, sessionTotp })
     // Decryption and Verification.
     const { ...totp } = (await verifyJWT({
       jwt: sessionTotp.hash,
@@ -822,43 +850,19 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     // Verify TOTP (@epic-web/totp).
     const isValid = verifyTOTP({ ...totp, otp: code })
     if (!isValid) {
-      // await this.updateTOTP(sessionTotp, { attempts: dbTOTP.attempts + 1 }, expiresAt)
-      throw new Error(this.customErrors.invalidTotp)
-    }
-  }
-
-  private async _validateTOTPDeprecated(
-    sessionTotp: string,
-    otp: string,
-    expiresAt: Date,
-  ) {
-    // Retrieve encrypted TOTP from database.
-    const dbTOTP = await this.readTOTP(sessionTotp)
-    if (!dbTOTP || !dbTOTP.hash) throw new Error(this.customErrors.totpNotFound)
-
-    if (dbTOTP.active !== true) {
-      throw new Error(this.customErrors.inactiveTotp)
-    }
-
-    const maxAttempts =
-      this.totpGeneration.maxAttempts ?? this._totpGenerationDefaults.maxAttempts
-
-    if (dbTOTP.attempts >= maxAttempts) {
-      await this.updateTOTP(sessionTotp, { active: false }, expiresAt)
-      throw new Error(this.customErrors.inactiveTotp)
-    }
-
-    // Decryption and Verification.
-    const { ...totp } = (await verifyJWT({
-      jwt: sessionTotp,
-      secretKey: this.secret,
-    })) as Required<TOTPGenerationOptions>
-
-    // Verify TOTP (@epic-web/totp).
-    const isValid = verifyTOTP({ ...totp, otp })
-    if (!isValid) {
-      await this.updateTOTP(sessionTotp, { attempts: dbTOTP.attempts + 1 }, expiresAt)
-      throw new Error(this.customErrors.invalidTotp)
+      sessionTotp.attempts += 1
+      const maxAttempts =
+        this.totpGeneration.maxAttempts ?? this._totpGenerationDefaults.maxAttempts
+      if (sessionTotp.attempts >= maxAttempts) {
+        session.unset(this.sessionTotpKey)
+      }
+      else {
+        session.set(this.sessionTotpKey, sessionTotp)
+      }
+      session.flash(options.sessionErrorKey, { message: this.customErrors.invalidTotp })
+      throw redirect(options.failureRedirect, {
+        headers: { 'set-cookie': await sessionStorage.commitSession(session) },
+      })
     }
   }
 }
