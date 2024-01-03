@@ -125,39 +125,6 @@ export interface MagicLinkGenerationOptions {
 }
 
 /**
- * The create TOTP CRUD method.
- *
- * @param data The TOTP data.
- * @param expiresAt The TOTP expiration date.
- */
-export interface CreateTOTP {
-  (data: TOTPDataDeprecated, expiresAt: Date): Promise<void>
-}
-
-/**
- * The read TOTP CRUD method.
- *  @param hash The hash of the TOTP.
- */
-export interface ReadTOTP {
-  (hash: string): Promise<TOTPDataDeprecated | null>
-}
-
-/**
- * The update TOTP CRUD method.
- *
- * @param hash The hash of the TOTP.
- * @param data The TOTP data to be updated.
- * @param expiresAt The TOTP expiration date. It is always the same as the expiration passed into createTOTP().
- */
-export interface UpdateTOTP {
-  (
-    hash: string,
-    data: Partial<Omit<TOTPDataDeprecated, 'hash'>>,
-    expiresAt: Date,
-  ): Promise<void>
-}
-
-/**
  * The send TOTP configuration.
  */
 export interface SendTOTPOptions {
@@ -266,21 +233,6 @@ export interface TOTPStrategyOptions {
   magicLinkGeneration?: MagicLinkGenerationOptions
 
   /**
-   * The create TOTP method.
-   */
-  createTOTP: CreateTOTP
-
-  /**
-   * The read TOTP method.
-   */
-  readTOTP: ReadTOTP
-
-  /**
-   * The update TOTP method.
-   */
-  updateTOTP: UpdateTOTP
-
-  /**
    * The send TOTP method.
    */
   sendTOTP: SendTOTP
@@ -364,9 +316,6 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   private readonly maxAge: number | undefined
   private readonly totpGeneration: TOTPGenerationOptions
   private readonly magicLinkGeneration: MagicLinkGenerationOptions
-  private readonly createTOTP: CreateTOTP
-  private readonly readTOTP: ReadTOTP
-  private readonly updateTOTP: UpdateTOTP
   private readonly sendTOTP: SendTOTP
   private readonly validateEmail: ValidateEmail
   private readonly customErrors: Required<CustomErrorsOptions>
@@ -404,9 +353,6 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     super(verify)
     this.secret = options.secret
     this.maxAge = options.maxAge ?? undefined
-    this.createTOTP = options.createTOTP
-    this.readTOTP = options.readTOTP
-    this.updateTOTP = options.updateTOTP
     this.sendTOTP = options.sendTOTP
     this.validateEmail = options.validateEmail ?? this._validateEmailDefaults
     this.emailFieldKey = options.emailFieldKey ?? FORM_FIELDS.EMAIL
@@ -666,7 +612,11 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
         session.flash(options.sessionErrorKey, { message: this.customErrors.invalidTotp })
       }
       throw redirect(options.failureRedirect, {
-        headers: { 'set-cookie': await sessionStorage.commitSession(session) },
+        headers: {
+          'set-cookie': await sessionStorage.commitSession(session, {
+            maxAge: this.maxAge,
+          }),
+        },
       })
     }
   }

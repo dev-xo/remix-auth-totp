@@ -26,17 +26,11 @@ import {
  * Mocks.
  */
 export const verify = vi.fn()
-export const createTOTP = vi.fn()
-export const readTOTP = vi.fn()
-export const updateTOTP = vi.fn()
 export const sendTOTP = vi.fn()
 export const validateEmail = vi.fn()
 
 const TOTP_STRATEGY_OPTIONS: TOTPStrategyOptions = {
   secret: SECRET_ENV,
-  createTOTP,
-  readTOTP,
-  updateTOTP,
   sendTOTP,
 }
 
@@ -58,7 +52,7 @@ describe('[ Basics ]', () => {
   test('Should throw an Error on missing required secret option.', async () => {
     const strategy = new TOTPStrategy(
       // @ts-expect-error - Error is expected since missing secret option.
-      { createTOTP, readTOTP, updateTOTP, sendTOTP },
+      { sendTOTP },
       verify,
     )
     const request = new Request(`${HOST_URL}/login`, {

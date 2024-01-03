@@ -23,7 +23,6 @@ export const ERRORS = {
   // Miscellaneous errors.
   REQUIRED_ENV_SECRET: 'Missing required .env secret.',
   USER_NOT_FOUND: 'User not found.',
-  INVALID_JWT: 'Invalid JWT.',
   INVALID_MAGIC_LINK_PATH: 'Invalid magic-link expected path.',
   REQUIRED_SUCCESS_REDIRECT_URL: 'Missing required successRedirect URL.',
   REQUIRED_FAILURE_REDIRECT_URL: 'Missing required failureRedirect URL.',
