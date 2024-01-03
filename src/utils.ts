@@ -46,21 +46,17 @@ type SignJWTOptions = {
 }
 
 export async function signJWT({ payload, expiresIn, secretKey }: SignJWTOptions) {
-  try {
-    const algorithm = 'HS256'
-    const secret = new TextEncoder().encode(secretKey)
-    const expires = new Date(Date.now() + expiresIn * 1000)
+  const algorithm = 'HS256'
+  const secret = new TextEncoder().encode(secretKey)
+  const expires = new Date(Date.now() + expiresIn * 1000)
 
-    const token = await new SignJWT(payload)
-      .setProtectedHeader({ alg: algorithm })
-      .setExpirationTime(expires)
-      .setIssuedAt()
-      .sign(secret)
+  const token = await new SignJWT(payload)
+    .setProtectedHeader({ alg: algorithm })
+    .setExpirationTime(expires)
+    .setIssuedAt()
+    .sign(secret)
 
-    return token
-  } catch (err: unknown) {
-    throw new Error(ERRORS.INVALID_JWT)
-  }
+  return token
 }
 
 type VerifyJWTOptions = {
@@ -69,13 +65,9 @@ type VerifyJWTOptions = {
 }
 
 export async function verifyJWT({ jwt, secretKey }: VerifyJWTOptions) {
-  try {
-    const secret = new TextEncoder().encode(secretKey)
-    const { payload } = await jwtVerify(jwt, secret)
-    return payload
-  } catch (err: unknown) {
-    throw new Error(ERRORS.INVALID_JWT)
-  }
+  const secret = new TextEncoder().encode(secretKey)
+  const { payload } = await jwtVerify(jwt, secret)
+  return payload
 }
 
 /**
@@ -105,7 +97,9 @@ export type RequiredAuthenticateOptions = Required<
 > &
   Omit<AuthenticateOptions, 'failureRedirect' | 'successRedirect'>
 
-export function assertIsRequiredAuthenticateOptions(options: AuthenticateOptions): asserts options is RequiredAuthenticateOptions {
+export function assertIsRequiredAuthenticateOptions(
+  options: AuthenticateOptions,
+): asserts options is RequiredAuthenticateOptions {
   if (options.successRedirect === undefined) {
     throw new Error(ERRORS.REQUIRED_SUCCESS_REDIRECT_URL)
   }

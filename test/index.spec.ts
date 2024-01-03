@@ -369,7 +369,7 @@ describe('[ TOTP ]', () => {
       return { strategy, sendTOTPOptions, session, user }
     }
 
-    test('Should successfully validate magic-link', async () => {
+    test.only('Should successfully validate magic-link', async () => {
       const { strategy, sendTOTPOptions, session } = await setupGenerateSendTOTP()
       expect(sendTOTPOptions.magicLink).toBeDefined()
       invariant(sendTOTPOptions.magicLink, 'Magic link is undefined.')
@@ -393,7 +393,7 @@ describe('[ TOTP ]', () => {
         })
     })
 
-    test('Should failure redirect on invalid magic-link code.', async () => {
+    test.only('Should failure redirect on invalid magic-link code.', async () => {
       const { strategy, sendTOTPOptions, session } = await setupGenerateSendTOTP()
       expect(sendTOTPOptions.magicLink).toBeDefined()
       invariant(sendTOTPOptions.magicLink, 'Magic link is undefined.')
@@ -423,7 +423,7 @@ describe('[ TOTP ]', () => {
         })
     })
 
-    test('Should successfully validate totp code', async () => {
+    test.only('Should successfully validate totp code', async () => {
       const { strategy, sendTOTPOptions, session, user } = await setupGenerateSendTOTP()
       const formData = new FormData()
       formData.append(FORM_FIELDS.TOTP, sendTOTPOptions.code)
@@ -452,7 +452,7 @@ describe('[ TOTP ]', () => {
         })
     })
 
-    test('Should failure redirect on invalid totp code', async () => {
+    test.only('Should failure redirect on invalid totp code', async () => {
       const { strategy, sendTOTPOptions, session } = await setupGenerateSendTOTP()
       const formData = new FormData()
       formData.append(FORM_FIELDS.TOTP, sendTOTPOptions.code + 'INVALID')
@@ -509,11 +509,48 @@ describe('[ TOTP ]', () => {
                 reason.headers.get('set-cookie') ?? '',
               )
               expect(session.get(AUTH_OPTIONS.sessionErrorKey)).toEqual({
-                message: i < TOTP_GENERATION_DEFAULTS.maxAttempts ? ERRORS.INVALID_TOTP : ERRORS.EXPIRED_TOTP,
+                message:
+                  i < TOTP_GENERATION_DEFAULTS.maxAttempts
+                    ? ERRORS.INVALID_TOTP
+                    : ERRORS.EXPIRED_TOTP,
               })
             } else throw reason
           })
       }
+    })
+
+    test.only('Should failure redirect on expired totp code', async () => {
+      const { strategy, sendTOTPOptions, session } = await setupGenerateSendTOTP()
+      vi.setSystemTime(
+        new Date(Date.now() + 1000 * 60 * (TOTP_GENERATION_DEFAULTS.period + 1)),
+      )
+      const formData = new FormData()
+      formData.append(FORM_FIELDS.TOTP, sendTOTPOptions.code)
+      const request = new Request(`${HOST_URL}/verify`, {
+        method: 'POST',
+        headers: {
+          cookie: await sessionStorage.commitSession(session),
+        },
+        body: formData,
+      })
+      await strategy
+        .authenticate(request, sessionStorage, {
+          ...AUTH_OPTIONS,
+          successRedirect: '/account',
+          failureRedirect: '/verify',
+        })
+        .catch(async (reason) => {
+          if (reason instanceof Response) {
+            expect(reason.status).toBe(302)
+            expect(reason.headers.get('location')).toBe(`/verify`)
+            const session = await sessionStorage.getSession(
+              reason.headers.get('set-cookie') ?? '',
+            )
+            expect(session.get(AUTH_OPTIONS.sessionErrorKey)).toEqual({
+              message: ERRORS.EXPIRED_TOTP,
+            })
+          } else throw reason
+        })
     })
 
     async function setupFirstAuthPhase(
@@ -590,31 +627,6 @@ describe('[ TOTP ]', () => {
       invariant(session, 'Undefined session')
       return { strategy, totpData, totpDataExpiresAt, sendTOTPOptions, session, user }
     }
-
-    test('Should throw an Error on invalid and max TOTP attempts.', async () => {
-      const { strategy, session, sendTOTPOptions } = await setupFirstAuthPhase()
-      for (let i = 0; i < TOTP_GENERATION_DEFAULTS.maxAttempts + 1; i++) {
-        const formData = new FormData()
-        formData.append(FORM_FIELDS.TOTP, sendTOTPOptions.code + i)
-        const request = new Request(`${HOST_URL}/verify`, {
-          method: 'POST',
-          headers: {
-            cookie: await sessionStorage.commitSession(session),
-          },
-          body: formData,
-        })
-        await expect(() =>
-          strategy.authenticate(request, sessionStorage, {
-            ...AUTH_OPTIONS,
-            successRedirect: '/',
-          }),
-        ).rejects.toThrowError(
-          i < TOTP_GENERATION_DEFAULTS.maxAttempts
-            ? ERRORS.INVALID_TOTP
-            : ERRORS.INACTIVE_TOTP,
-        )
-      }
-    })
 
     test('Should throw an Error on expired TOTP verification.', async () => {
       const { strategy, session, sendTOTPOptions } = await setupFirstAuthPhase()

@@ -1,5 +1,6 @@
 import type { Session, SessionStorage } from '@remix-run/server-runtime'
 import type { AuthenticateOptions, StrategyVerifyCallback } from 'remix-auth'
+import { errors } from 'jose'
 
 import { redirect } from '@remix-run/server-runtime'
 import { Strategy } from 'remix-auth'
@@ -368,7 +369,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   private readonly updateTOTP: UpdateTOTP
   private readonly sendTOTP: SendTOTP
   private readonly validateEmail: ValidateEmail
-  private readonly customErrors: CustomErrorsOptions
+  private readonly customErrors: Required<CustomErrorsOptions>
   private readonly emailFieldKey: string
   private readonly totpFieldKey: string
   private readonly sessionEmailKey: string
@@ -840,26 +841,34 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     sessionStorage: SessionStorage
     options: RequiredAuthenticateOptions
   }) {
-    // console.log('_validateTOTP:', { code, sessionTotp })
-    // Decryption and Verification.
-    const { ...totp } = (await verifyJWT({
-      jwt: sessionTotp.hash,
-      secretKey: this.secret,
-    })) as Required<TOTPGenerationOptions>
+    try {
+      console.log('_validateTOTP:', { code, sessionTotp })
+      // Decryption and Verification.
+      const { ...totp } = (await verifyJWT({
+        jwt: sessionTotp.hash,
+        secretKey: this.secret,
+      })) as Required<TOTPGenerationOptions>
+      console.log('_validateTOTP: totp:', totp)
 
-    // Verify TOTP (@epic-web/totp).
-    const isValid = verifyTOTP({ ...totp, otp: code })
-    if (!isValid) {
-      sessionTotp.attempts += 1
-      const maxAttempts =
-        this.totpGeneration.maxAttempts ?? this._totpGenerationDefaults.maxAttempts
-      if (sessionTotp.attempts >= maxAttempts) {
+      // Verify TOTP (@epic-web/totp).
+      if (!verifyTOTP({ ...totp, otp: code }))
+        throw new Error(this.customErrors.invalidTotp)
+    } catch (error) {
+      console.error('_validateTOTP: error:', error)
+      if (error instanceof errors.JWTExpired) {
         session.unset(this.sessionTotpKey)
+        session.flash(options.sessionErrorKey, { message: this.customErrors.expiredTotp })
+      } else {
+        sessionTotp.attempts += 1
+        const maxAttempts =
+          this.totpGeneration.maxAttempts ?? this._totpGenerationDefaults.maxAttempts
+        if (sessionTotp.attempts >= maxAttempts) {
+          session.unset(this.sessionTotpKey)
+        } else {
+          session.set(this.sessionTotpKey, sessionTotp)
+        }
+        session.flash(options.sessionErrorKey, { message: this.customErrors.invalidTotp })
       }
-      else {
-        session.set(this.sessionTotpKey, sessionTotp)
-      }
-      session.flash(options.sessionErrorKey, { message: this.customErrors.invalidTotp })
       throw redirect(options.failureRedirect, {
         headers: { 'set-cookie': await sessionStorage.commitSession(session) },
       })
