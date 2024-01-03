@@ -1,7 +1,6 @@
 import type { Session } from '@remix-run/server-runtime'
 import type {
   SendTOTPOptions,
-  TOTPDataDeprecated,
   TOTPStrategyOptions,
 } from '../src/index'
 

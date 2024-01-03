@@ -29,35 +29,6 @@ export interface TOTPData {
   hash: string
 
   /**
-   * The expiration date for the TOTP secret.
-   * After this date, the TOTP will no longer be valid.
-   */
-  expiresAt: Date
-
-  /**
-   * The number of attempts the user tried to verify the TOTP.
-   * @default 0
-   */
-  attempts: number
-}
-
-/**
- * The TOTP data the application stores.
- * Used in CRUD functions provided by the application.
- */
-export interface TOTPDataDeprecated {
-  /**
-   * The encrypted TOTP.
-   */
-  hash: string
-
-  /**
-   * The status of the TOTP.
-   * @default true
-   */
-  active: boolean
-
-  /**
    * The number of attempts the user tried to verify the TOTP.
    * @default 0
    */
@@ -177,11 +148,6 @@ export interface ValidateEmail {
  */
 export interface CustomErrorsOptions {
   /**
-   * The required email error message.
-   */
-  requiredEmail?: string
-
-  /**
    * The invalid email error message.
    */
   invalidEmail?: string
@@ -195,16 +161,6 @@ export interface CustomErrorsOptions {
    * The expired TOTP error message.
    */
   expiredTotp?: string
-
-  /**
-   * The inactive TOTP error message.
-   */
-  inactiveTotp?: string
-
-  /**
-   * The TOTP not found error message.
-   */
-  totpNotFound?: string
 }
 
 /**
@@ -255,7 +211,7 @@ export interface TOTPStrategyOptions {
 
   /**
    * The form input name used to get the TOTP.
-   * @default "totp"
+   * @default "code"
    */
   totpFieldKey?: string
 
@@ -270,12 +226,6 @@ export interface TOTPStrategyOptions {
    * @default "auth:totp"
    */
   sessionTotpKey?: string
-
-  /**
-   * The session key that stores the expiration of the TOTP.
-   * @default "auth:totpExpiresAt"
-   */
-  sessionTotpExpiresAtKey?: string
 }
 
 /**
@@ -323,7 +273,6 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   private readonly totpFieldKey: string
   private readonly sessionEmailKey: string
   private readonly sessionTotpKey: string
-  private readonly sessionTotpExpiresAtKey: string
 
   private readonly _totpGenerationDefaults = {
     secret: generateSecret(),
@@ -338,12 +287,9 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     callbackPath: '/magic-link',
   } satisfies MagicLinkGenerationOptions
   private readonly _customErrorsDefaults = {
-    requiredEmail: ERRORS.REQUIRED_EMAIL,
     invalidEmail: ERRORS.INVALID_EMAIL,
     invalidTotp: ERRORS.INVALID_TOTP,
     expiredTotp: ERRORS.EXPIRED_TOTP,
-    inactiveTotp: ERRORS.INACTIVE_TOTP,
-    totpNotFound: ERRORS.TOTP_NOT_FOUND,
   } satisfies CustomErrorsOptions
 
   constructor(
@@ -359,8 +305,6 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     this.totpFieldKey = options.totpFieldKey ?? FORM_FIELDS.TOTP
     this.sessionEmailKey = options.sessionEmailKey ?? SESSION_KEYS.EMAIL
     this.sessionTotpKey = options.sessionTotpKey ?? SESSION_KEYS.TOTP
-    this.sessionTotpExpiresAtKey =
-      options.sessionTotpExpiresAtKey ?? SESSION_KEYS.TOTP_EXPIRES_AT
 
     this.totpGeneration = {
       ...this._totpGenerationDefaults,
@@ -380,14 +324,6 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
    * Authenticates a user using TOTP.
    *
    * If the user is already authenticated, simply returns the user.
-   *
-   * | Method | Email | TOTP | Sess. Email | Sess. TOTP | Action/Logic                                                                                                   |
-   * |--------|-------|------|-------------|------------|----------------------------------------------------------------------------------------------------------------|
-   * | POST   | ✓     | ✗    | -           | -          | Generate new TOTP, send to user, store email and TOTP in session.                                              |
-   * | POST   | ✗     | ✓    | ✓           | ✓          | Validate TOTP against session. If valid, authenticate user.                                                    |
-   * | POST   | ✗     | ✗    | ✓           | ✓          | Invalidate previous TOTP, generate new one if session has email and TOTP.                                      |
-   * | POST   | ≠     | -    | ✓           | ✓          | Invalidate previous TOTP, generate new TOTP for new email.                                                     |
-   * | GET    | -     | -    | -           | -          | If magic-link enabled and URL has TOTP, validate it. If valid, authenticate user.                              |
    *
    * | Method | Email | TOTP | Sess. Email | Sess. TOTP | Action/Logic                             |
    * |--------|-------|------|-------------|------------|------------------------------------------|
@@ -531,11 +467,8 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       request,
     })
 
-    const expiresAtEpochMs = // (Milliseconds since Unix epoch).
-      Date.now() + (totp.period ?? this._totpGenerationDefaults.period) * 1000
     const totpData: TOTPData = {
       hash,
-      expiresAt: new Date(expiresAtEpochMs),
       attempts: 0,
     }
     session.set(this.sessionEmailKey, email)
