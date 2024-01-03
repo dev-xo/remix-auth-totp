@@ -1,4 +1,8 @@
-import type { TOTPGenerationOptions, MagicLinkGenerationOptions } from './index.js'
+import type {
+  TOTPGenerationOptions,
+  MagicLinkGenerationOptions,
+  TOTPData,
+} from './index.js'
 import { SignJWT, jwtVerify } from 'jose'
 import { generateTOTP as _generateTOTP } from '@epic-web/totp'
 import { ERRORS } from './constants.js'
@@ -11,6 +15,9 @@ import { AuthenticateOptions } from 'remix-auth'
 /**
  * TOTP Generation.
  */
+
+type TOTPPayload = Omit<ReturnType<typeof _generateTOTP>, "otp">
+
 export function generateSecret() {
   return base32.encode(crypto.randomBytes(10)).toString() as string
 }
@@ -74,22 +81,29 @@ export async function verifyJWT({ jwt, secretKey }: VerifyJWTOptions) {
  * Miscellaneous.
  */
 
-export function ensureNonEmptyStringOrNull(value: unknown) {
+export function coerceToOptionalNonEmptyString(value: unknown) {
   if (typeof value === 'string' && value.length > 0) return value
-  return null
+  return undefined
 }
 
-export function ensureStringOrUndefined(value: unknown) {
+export function coerceToOptionalString(value: unknown) {
   if (typeof value !== 'string' && value !== undefined) {
     throw new Error('Value must be a string or undefined.')
   }
   return value
 }
-export function ensureObjectOrUndefined(value: unknown) {
-  if ((typeof value !== 'object' && value !== undefined) || value === null) {
-    throw new Error('Value must be a object or undefined.')
+export function coerceToOptionalTotpData(value: unknown) {
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    'hash' in value &&
+    typeof (value as { hash: unknown }).hash === 'string' &&
+    'attempts' in value &&
+    typeof (value as { attempts: unknown }).attempts === 'number'
+  ) {
+    return value as TOTPData
   }
-  return value
+  return undefined
 }
 
 export type RequiredAuthenticateOptions = Required<

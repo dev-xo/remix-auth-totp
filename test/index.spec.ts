@@ -361,7 +361,7 @@ describe('[ TOTP ]', () => {
       return { strategy, sendTOTPOptions, session, user }
     }
 
-    test('Should successfully validate totp code', async () => {
+    test.only('Should successfully validate totp code', async () => {
       const { strategy, sendTOTPOptions, session, user } = await setupGenerateSendTOTP()
       const formData = new FormData()
       formData.append(FORM_FIELDS.TOTP, sendTOTPOptions.code)

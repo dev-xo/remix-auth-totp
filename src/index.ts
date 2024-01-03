@@ -11,9 +11,9 @@ import {
   generateMagicLink,
   signJWT,
   verifyJWT,
-  ensureStringOrUndefined,
-  ensureObjectOrUndefined,
-  ensureNonEmptyStringOrNull,
+  coerceToOptionalString,
+  coerceToOptionalTotpData,
+  coerceToOptionalNonEmptyString,
   assertIsRequiredAuthenticateOptions,
   RequiredAuthenticateOptions,
 } from './utils.js'
@@ -350,10 +350,10 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     if (user) return this.success(user, request, sessionStorage, options)
 
     const formData = request.method === 'POST' ? await request.formData() : new FormData()
-    const formDataEmail = ensureNonEmptyStringOrNull(formData.get(this.emailFieldKey))
-    const formDataTotp = ensureNonEmptyStringOrNull(formData.get(this.totpFieldKey))
-    const sessionEmail = ensureStringOrUndefined(session.get(this.sessionEmailKey))
-    const sessionTotp = ensureObjectOrUndefined(session.get(this.sessionTotpKey))
+    const formDataEmail = coerceToOptionalNonEmptyString(formData.get(this.emailFieldKey))
+    const formDataTotp = coerceToOptionalNonEmptyString(formData.get(this.totpFieldKey))
+    const sessionEmail = coerceToOptionalString(session.get(this.sessionEmailKey))
+    const sessionTotp = coerceToOptionalTotpData(session.get(this.sessionTotpKey))
     const email =
       request.method === 'POST'
         ? formDataEmail ?? (!formDataTotp ? sessionEmail : null)
@@ -381,7 +381,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
         if (!sessionEmail || !sessionTotp) throw new Error(this.customErrors.expiredTotp)
         await this._validateTOTP({
           code,
-          sessionTotp: sessionTotp as TOTPData,
+          sessionTotp: sessionTotp,
           session,
           sessionStorage,
           options,
@@ -438,11 +438,8 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     sessionStorage: SessionStorage
     request: Request
     formData: FormData
-    options: AuthenticateOptions
+    options: RequiredAuthenticateOptions
   }) {
-    console.log('_generateAndSendTOTP:', { email })
-    if (!options.successRedirect) throw new Error(ERRORS.REQUIRED_SUCCESS_REDIRECT_URL)
-
     await this.validateEmail(email)
     const { otp: code, ...totp } = generateTOTP({
       ...this.totpGeneration,
@@ -518,8 +515,9 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   }) {
     try {
       console.log('_validateTOTP:', { code, sessionTotp })
+
       // Decryption and Verification.
-      const { ...totp } = (await verifyJWT({
+      const totp = (await verifyJWT({
         jwt: sessionTotp.hash,
         secretKey: this.secret,
       })) as Required<TOTPGenerationOptions>
