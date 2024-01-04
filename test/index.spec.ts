@@ -1,8 +1,5 @@
 import type { Session } from '@remix-run/server-runtime'
-import type {
-  SendTOTPOptions,
-  TOTPStrategyOptions,
-} from '../src/index'
+import type { SendTOTPOptions, TOTPStrategyOptions } from '../src/index'
 
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest'
 import invariant from 'tiny-invariant'
@@ -646,6 +643,67 @@ describe('[ TOTP ]', () => {
           } else throw reason
         })
     })
+
+    test('Should failure redirect on stale magic-link.', async () => {
+      const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify);
+      const request = new Request('https://prodserver.com/magic-link?code=KJJERI', {
+        method: 'GET',
+      })
+      await strategy
+        .authenticate(request, sessionStorage, {
+          ...AUTH_OPTIONS,
+          successRedirect: '/account',
+          failureRedirect: '/login',
+        })
+        .catch(async (reason) => {
+          if (reason instanceof Response) {
+            expect(reason.status).toBe(302)
+            expect(reason.headers.get('location')).toBe(`/login`)
+            const session = await sessionStorage.getSession(
+              reason.headers.get('set-cookie') ?? '',
+            )
+            expect(session.get(AUTH_OPTIONS.sessionErrorKey)).toEqual({
+              message: ERRORS.EXPIRED_TOTP,
+            })
+          } else throw reason
+        })
+    })
+
+    test('Should failure redirect on magic-link invalid and max TOTP attempts.', async () => {
+      let { strategy, session, sendTOTPOptions } = await setupGenerateSendTOTP()
+      expect(sendTOTPOptions.magicLink).toBeDefined()
+      invariant(sendTOTPOptions.magicLink, 'Magic link is undefined.')
+      for (let i = 0; i <= TOTP_GENERATION_DEFAULTS.maxAttempts; i++) {
+        const request = new Request(sendTOTPOptions.magicLink + 'INVALID', {
+          method: 'GET',
+          headers: {
+            cookie: await sessionStorage.commitSession(session),
+          },
+        })
+        await strategy
+          .authenticate(request, sessionStorage, {
+            ...AUTH_OPTIONS,
+            successRedirect: '/account',
+            failureRedirect: '/verify',
+          })
+          .catch(async (reason) => {
+            if (reason instanceof Response) {
+              expect(reason.status).toBe(302)
+              expect(reason.headers.get('location')).toBe(`/verify`)
+              session = await sessionStorage.getSession(
+                reason.headers.get('set-cookie') ?? '',
+              )
+              expect(session.get(AUTH_OPTIONS.sessionErrorKey)).toEqual({
+                message:
+                  i < TOTP_GENERATION_DEFAULTS.maxAttempts
+                    ? ERRORS.INVALID_TOTP
+                    : ERRORS.EXPIRED_TOTP,
+              })
+            } else throw reason
+          })
+      }
+    })
+
   })
 })
 
