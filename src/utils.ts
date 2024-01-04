@@ -3,6 +3,7 @@ import type {
   MagicLinkGenerationOptions,
   TOTPData,
 } from './index.js'
+import { AuthenticateOptions } from 'remix-auth'
 import { SignJWT, jwtVerify } from 'jose'
 import { generateTOTP as _generateTOTP } from '@epic-web/totp'
 import { ERRORS } from './constants.js'
@@ -10,14 +11,10 @@ import { ERRORS } from './constants.js'
 // @ts-expect-error - `thirty-two` is not typed.
 import * as base32 from 'thirty-two'
 import * as crypto from 'crypto'
-import { AuthenticateOptions } from 'remix-auth'
 
 /**
  * TOTP Generation.
  */
-
-type TOTPPayload = Omit<ReturnType<typeof _generateTOTP>, "otp">
-
 export function generateSecret() {
   return base32.encode(crypto.randomBytes(10)).toString() as string
 }
@@ -46,8 +43,10 @@ export function generateMagicLink(
 /**
  * JSON Web Token (JWT).
  */
+type TOTPPayload = Omit<ReturnType<typeof _generateTOTP>, 'otp'>
+
 type SignJWTOptions = {
-  payload: { [key: string]: any }
+  payload: TOTPPayload
   expiresIn: number
   secretKey: string
 }
@@ -73,7 +72,7 @@ type VerifyJWTOptions = {
 
 export async function verifyJWT({ jwt, secretKey }: VerifyJWTOptions) {
   const secret = new TextEncoder().encode(secretKey)
-  const { payload } = await jwtVerify(jwt, secret)
+  const { payload } = await jwtVerify<TOTPPayload>(jwt, secret)
   return payload
 }
 
@@ -81,17 +80,18 @@ export async function verifyJWT({ jwt, secretKey }: VerifyJWTOptions) {
  * Miscellaneous.
  */
 
-export function coerceToOptionalNonEmptyString(value: unknown) {
-  if (typeof value === 'string' && value.length > 0) return value
-  return undefined
-}
-
 export function coerceToOptionalString(value: unknown) {
   if (typeof value !== 'string' && value !== undefined) {
     throw new Error('Value must be a string or undefined.')
   }
   return value
 }
+
+export function coerceToOptionalNonEmptyString(value: unknown) {
+  if (typeof value === 'string' && value.length > 0) return value
+  return undefined
+}
+
 export function coerceToOptionalTotpData(value: unknown) {
   if (
     typeof value === 'object' &&

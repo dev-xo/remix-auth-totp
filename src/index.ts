@@ -358,13 +358,6 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       request.method === 'POST'
         ? formDataEmail ?? (!formDataTotp ? sessionEmail : null)
         : null
-    console.log('authenticate:', {
-      formDataEmail,
-      formDataTotp,
-      sessionEmail,
-      sessionTotp,
-      email,
-    })
     try {
       if (email) {
         await this._generateAndSendTOTP({
@@ -393,7 +386,6 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
           form: formData,
           request,
         })
-        console.log('authenticate: user', user)
 
         session.set(options.sessionKey, user)
         session.unset(this.sessionEmailKey)
@@ -411,7 +403,6 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     } catch (throwable) {
       if (throwable instanceof Response) throw throwable
       if (throwable instanceof Error) {
-        console.log('authenticate: error:', throwable.message)
         return await this.failure(
           throwable.message,
           request,
@@ -441,12 +432,12 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     options: RequiredAuthenticateOptions
   }) {
     await this.validateEmail(email)
-    const { otp: code, ...totp } = generateTOTP({
+    const { otp: code, ...totpPayload } = generateTOTP({
       ...this.totpGeneration,
       secret: generateSecret(),
     })
     const hash = await signJWT({
-      payload: totp,
+      payload: totpPayload,
       expiresIn: this.totpGeneration.period,
       secretKey: this.secret,
     })
@@ -514,20 +505,17 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     options: RequiredAuthenticateOptions
   }) {
     try {
-      console.log('_validateTOTP:', { code, sessionTotp })
-
       // Decryption and Verification.
-      const totp = (await verifyJWT({
+      const totpPayload = await verifyJWT({
         jwt: sessionTotp.hash,
         secretKey: this.secret,
-      })) as Required<TOTPGenerationOptions>
-      console.log('_validateTOTP: totp:', totp)
+      })
 
       // Verify TOTP (@epic-web/totp).
-      if (!verifyTOTP({ ...totp, otp: code }))
+      if (!verifyTOTP({ ...totpPayload, otp: code })) {
         throw new Error(this.customErrors.invalidTotp)
+      }
     } catch (error) {
-      console.error('_validateTOTP: error:', error)
       if (error instanceof errors.JWTExpired) {
         session.unset(this.sessionTotpKey)
         session.flash(options.sessionErrorKey, { message: this.customErrors.expiredTotp })
