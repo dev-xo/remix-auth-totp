@@ -125,7 +125,7 @@ describe('[ TOTP ]', () => {
       const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
       const formData = new FormData()
       formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
-      formData.append(FORM_FIELDS.TOTP, '123456')
+      formData.append(FORM_FIELDS.CODE, '123456')
       const request = new Request(`${HOST_URL}/login`, {
         method: 'POST',
         body: formData,
@@ -460,7 +460,7 @@ describe('[ TOTP ]', () => {
     test('Should successfully validate totp code.', async () => {
       const { strategy, sendTOTPOptions, session, user } = await setupGenerateSendTOTP()
       const formData = new FormData()
-      formData.append(FORM_FIELDS.TOTP, sendTOTPOptions.code)
+      formData.append(FORM_FIELDS.CODE, sendTOTPOptions.code)
       const request = new Request(`${HOST_URL}/verify`, {
         method: 'POST',
         headers: {
@@ -491,7 +491,7 @@ describe('[ TOTP ]', () => {
     test('Should failure redirect on invalid totp code.', async () => {
       const { strategy, sendTOTPOptions, session } = await setupGenerateSendTOTP()
       const formData = new FormData()
-      formData.append(FORM_FIELDS.TOTP, sendTOTPOptions.code + 'INVALID')
+      formData.append(FORM_FIELDS.CODE, sendTOTPOptions.code + 'INVALID')
       const request = new Request(`${HOST_URL}/verify`, {
         method: 'POST',
         headers: {
@@ -527,7 +527,7 @@ describe('[ TOTP ]', () => {
         },
       })
       const formData = new FormData()
-      formData.append(FORM_FIELDS.TOTP, sendTOTPOptions.code + 'INVALID')
+      formData.append(FORM_FIELDS.CODE, sendTOTPOptions.code + 'INVALID')
       const request = new Request(`${HOST_URL}/verify`, {
         method: 'POST',
         headers: {
@@ -559,7 +559,7 @@ describe('[ TOTP ]', () => {
       let { strategy, session, sendTOTPOptions } = await setupGenerateSendTOTP()
       for (let i = 0; i <= TOTP_GENERATION_DEFAULTS.maxAttempts; i++) {
         const formData = new FormData()
-        formData.append(FORM_FIELDS.TOTP, sendTOTPOptions.code + 'INVALID')
+        formData.append(FORM_FIELDS.CODE, sendTOTPOptions.code + 'INVALID')
         const request = new Request(`${HOST_URL}/verify`, {
           method: 'POST',
           headers: {
@@ -597,7 +597,7 @@ describe('[ TOTP ]', () => {
         new Date(Date.now() + 1000 * 60 * (TOTP_GENERATION_DEFAULTS.period + 1)),
       )
       const formData = new FormData()
-      formData.append(FORM_FIELDS.TOTP, sendTOTPOptions.code)
+      formData.append(FORM_FIELDS.CODE, sendTOTPOptions.code)
       const request = new Request(`${HOST_URL}/verify`, {
         method: 'POST',
         headers: {
@@ -636,7 +636,7 @@ describe('[ TOTP ]', () => {
         new Date(Date.now() + 1000 * 60 * (TOTP_GENERATION_DEFAULTS.period + 1)),
       )
       const formData = new FormData()
-      formData.append(FORM_FIELDS.TOTP, sendTOTPOptions.code)
+      formData.append(FORM_FIELDS.CODE, sendTOTPOptions.code)
       const request = new Request(`${HOST_URL}/verify`, {
         method: 'POST',
         headers: {

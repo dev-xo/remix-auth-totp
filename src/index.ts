@@ -218,7 +218,7 @@ export interface TOTPStrategyOptions {
    * The form input name used to get the TOTP.
    * @default "code"
    */
-  totpFieldKey?: string
+  codeFieldKey?: string
 
   /**
    * The session key that stores the email address.
@@ -275,7 +275,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   private readonly validateEmail: ValidateEmail
   private readonly customErrors: Required<CustomErrorsOptions>
   private readonly emailFieldKey: string
-  private readonly totpFieldKey: string
+  private readonly codeFieldKey: string
   private readonly sessionEmailKey: string
   private readonly sessionTotpKey: string
 
@@ -308,7 +308,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     this.sendTOTP = options.sendTOTP
     this.validateEmail = options.validateEmail ?? this._validateEmailDefault
     this.emailFieldKey = options.emailFieldKey ?? FORM_FIELDS.EMAIL
-    this.totpFieldKey = options.totpFieldKey ?? FORM_FIELDS.TOTP
+    this.codeFieldKey = options.codeFieldKey ?? FORM_FIELDS.CODE
     this.sessionEmailKey = options.sessionEmailKey ?? SESSION_KEYS.EMAIL
     this.sessionTotpKey = options.sessionTotpKey ?? SESSION_KEYS.TOTP
 
@@ -357,7 +357,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
 
     const formData = request.method === 'POST' ? await request.formData() : new FormData()
     const formDataEmail = coerceToOptionalNonEmptyString(formData.get(this.emailFieldKey))
-    const formDataTotp = coerceToOptionalNonEmptyString(formData.get(this.totpFieldKey))
+    const formDataTotp = coerceToOptionalNonEmptyString(formData.get(this.codeFieldKey))
     const sessionEmail = coerceToOptionalString(session.get(this.sessionEmailKey))
     const sessionTotp = coerceToOptionalTotpData(session.get(this.sessionTotpKey))
     const email =
@@ -450,7 +450,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     const magicLink = generateMagicLink({
       ...this.magicLinkGeneration,
       code,
-      param: this.totpFieldKey,
+      param: this.codeFieldKey,
       request,
     })
     await this.sendTOTP({
@@ -484,8 +484,8 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
         if (url.pathname !== this.magicLinkGeneration.callbackPath) {
           throw new Error(ERRORS.INVALID_MAGIC_LINK_PATH)
         }
-        if (url.searchParams.has(this.totpFieldKey)) {
-          return decodeURIComponent(url.searchParams.get(this.totpFieldKey) ?? '')
+        if (url.searchParams.has(this.codeFieldKey)) {
+          return decodeURIComponent(url.searchParams.get(this.codeFieldKey) ?? '')
         }
       }
     }

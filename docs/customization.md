@@ -116,11 +116,10 @@ export interface CustomErrorsOptions {
    * The inactive TOTP error message.
    */
   inactiveTotp?: string
-    /**
+  /**
    * The TOTP not found error message.
    */
   totpNotFound?: string
-
 }
 
 authenticator.use(
@@ -154,9 +153,9 @@ export interface TOTPStrategyOptions<User> {
   emailFieldKey?: string
   /**
    * The form input name used to get the TOTP.
-   * @default "totp"
+   * @default "code"
    */
-  totpFieldKey?: string
+  codeFieldKey?: string
   /**
    * The session key that stores the email address.
    * @default "auth:email"
@@ -172,7 +171,6 @@ export interface TOTPStrategyOptions<User> {
    * @default "auth:totpExpiresAt"
    */
   sessionTotpExpiresAtKey?: string
-
 }
 ```
 
@@ -189,62 +187,55 @@ export default {
     globals: {
       Buffer: true,
     },
-  }
+  },
 }
 ```
 
 ### Using Cloudflare KV for session and TOTP storage
 
 ```ts
-  const sessionStorage = createWorkersKVSessionStorage({
-    kv: KV,
-    cookie: {
-      name: "_auth",
-      path: "/",
-      sameSite: "lax",
-      httpOnly: true,
-      secrets: [SESSION_SECRET],
-      secure: ENVIRONMENT === "production",
-    },
-  });
-  const authenticator = new Authenticator<SessionUser>(sessionStorage, {
-    throwOnError: true,
-  });
-  authenticator.use(
-    new TOTPStrategy(
-      {
-        secret: TOTP_SECRET,
-        magicLinkGeneration: { callbackPath: "/magic-link" },
+const sessionStorage = createWorkersKVSessionStorage({
+  kv: KV,
+  cookie: {
+    name: '_auth',
+    path: '/',
+    sameSite: 'lax',
+    httpOnly: true,
+    secrets: [SESSION_SECRET],
+    secure: ENVIRONMENT === 'production',
+  },
+})
+const authenticator = new Authenticator<SessionUser>(sessionStorage, {
+  throwOnError: true,
+})
+authenticator.use(
+  new TOTPStrategy(
+    {
+      secret: TOTP_SECRET,
+      magicLinkGeneration: { callbackPath: '/magic-link' },
 
-        createTOTP: async (data, expiresAt) => {
-          await KV.put(`totp:${data.hash}`, JSON.stringify(data), {
-            expirationTtl: Math.max(
-              (expiresAt.getTime() - Date.now()) / 1000,
-              60,
-            ), // >= 60 secs per Cloudflare KV
-          });
-        },
-        readTOTP: async (hash) => {
-          const totpJson = await KV.get(`totp:${hash}`);
-          return totpJson ? JSON.parse(totpJson) : null;
-        },
-        updateTOTP: async (hash, data, expiresAt) => {
-          const totpJson = await KV.get(`totp:${hash}`);
-          if (!totpJson) throw new Error("TOTP not found");
-          const totp = JSON.parse(totpJson);
-          await KV.put(`totp:${hash}`, JSON.stringify({ ...totp, ...data }), {
-            expirationTtl: Math.max(
-              (expiresAt.getTime() - Date.now()) / 1000,
-              60,
-            ), // >= 60 secs per Cloudflare KV
-          });
-        },
-        sendTOTP: async ({ email, code, magicLink }) => {}
+      createTOTP: async (data, expiresAt) => {
+        await KV.put(`totp:${data.hash}`, JSON.stringify(data), {
+          expirationTtl: Math.max((expiresAt.getTime() - Date.now()) / 1000, 60), // >= 60 secs per Cloudflare KV
+        })
       },
-      async ({ email }) => {}
-    ),
-  );
-
+      readTOTP: async (hash) => {
+        const totpJson = await KV.get(`totp:${hash}`)
+        return totpJson ? JSON.parse(totpJson) : null
+      },
+      updateTOTP: async (hash, data, expiresAt) => {
+        const totpJson = await KV.get(`totp:${hash}`)
+        if (!totpJson) throw new Error('TOTP not found')
+        const totp = JSON.parse(totpJson)
+        await KV.put(`totp:${hash}`, JSON.stringify({ ...totp, ...data }), {
+          expirationTtl: Math.max((expiresAt.getTime() - Date.now()) / 1000, 60), // >= 60 secs per Cloudflare KV
+        })
+      },
+      sendTOTP: async ({ email, code, magicLink }) => {},
+    },
+    async ({ email }) => {},
+  ),
+)
 ```
 
 ## Contributing

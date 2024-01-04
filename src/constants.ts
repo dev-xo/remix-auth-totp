@@ -2,7 +2,7 @@ export const STRATEGY_NAME = 'TOTP'
 
 export const FORM_FIELDS = {
   EMAIL: 'email',
-  TOTP: 'code',
+  CODE: 'code',
 } as const
 
 export const SESSION_KEYS = {
