@@ -21,9 +21,8 @@ import {
 /**
  * Mocks.
  */
-export const verify = vi.fn()
-export const sendTOTP = vi.fn()
-export const validateEmail = vi.fn()
+const verify = vi.fn()
+const sendTOTP = vi.fn()
 
 const TOTP_STRATEGY_OPTIONS: TOTPStrategyOptions = {
   secret: SECRET_ENV,
@@ -304,7 +303,7 @@ describe('[ TOTP ]', () => {
         })
     })
 
-    test('Should failure redirect on invalid email with custom error', async () => {
+    test('Should failure redirect on invalid email with custom error.', async () => {
       const CUSTOM_ERROR = 'TEST: Invalid email.'
       const strategy = new TOTPStrategy(
         {
@@ -341,7 +340,7 @@ describe('[ TOTP ]', () => {
         })
     })
 
-    test('Should failure redirect when custom validateEmail throws Error', async () => {
+    test('Should failure redirect when custom validateEmail throws Error.', async () => {
       const ERROR_MESSAGE = 'TEST: Invalid email.'
       const strategy = new TOTPStrategy(
         {
@@ -458,7 +457,7 @@ describe('[ TOTP ]', () => {
       return { strategy, sendTOTPOptions, session, user }
     }
 
-    test('Should successfully validate totp code', async () => {
+    test('Should successfully validate totp code.', async () => {
       const { strategy, sendTOTPOptions, session, user } = await setupGenerateSendTOTP()
       const formData = new FormData()
       formData.append(FORM_FIELDS.TOTP, sendTOTPOptions.code)
@@ -489,7 +488,7 @@ describe('[ TOTP ]', () => {
         })
     })
 
-    test('Should failure redirect on invalid totp code', async () => {
+    test('Should failure redirect on invalid totp code.', async () => {
       const { strategy, sendTOTPOptions, session } = await setupGenerateSendTOTP()
       const formData = new FormData()
       formData.append(FORM_FIELDS.TOTP, sendTOTPOptions.code + 'INVALID')
@@ -520,7 +519,7 @@ describe('[ TOTP ]', () => {
         })
     })
 
-    test('Should failure redirect on invalid totp code with custom error', async () => {
+    test('Should failure redirect on invalid totp code with custom error.', async () => {
       const CUSTOM_ERROR = 'TEST: invalid totp code'
       const { strategy, sendTOTPOptions, session } = await setupGenerateSendTOTP({
         customErrors: {
@@ -592,7 +591,7 @@ describe('[ TOTP ]', () => {
       }
     })
 
-    test('Should failure redirect on expired totp code', async () => {
+    test('Should failure redirect on expired totp code.', async () => {
       const { strategy, sendTOTPOptions, session } = await setupGenerateSendTOTP()
       vi.setSystemTime(
         new Date(Date.now() + 1000 * 60 * (TOTP_GENERATION_DEFAULTS.period + 1)),
@@ -626,7 +625,7 @@ describe('[ TOTP ]', () => {
         })
     })
 
-    test('Should failure redirect on expired totp code with custom error', async () => {
+    test('Should failure redirect on expired totp code with custom error.', async () => {
       const CUSTOM_ERROR = 'TEST: expired totp code'
       const { strategy, sendTOTPOptions, session } = await setupGenerateSendTOTP({
         customErrors: {
@@ -665,7 +664,7 @@ describe('[ TOTP ]', () => {
         })
     })
 
-    test('Should successfully validate magic-link', async () => {
+    test('Should successfully validate magic-link.', async () => {
       const { strategy, sendTOTPOptions, session, user } = await setupGenerateSendTOTP()
       expect(sendTOTPOptions.magicLink).toBeDefined()
       invariant(sendTOTPOptions.magicLink, 'Magic link is undefined.')
@@ -726,7 +725,7 @@ describe('[ TOTP ]', () => {
         })
     })
 
-    test('Should failure redirect on expired magic-link', async () => {
+    test('Should failure redirect on expired magic-link.', async () => {
       const { strategy, sendTOTPOptions, session } = await setupGenerateSendTOTP()
       expect(sendTOTPOptions.magicLink).toBeDefined()
       invariant(sendTOTPOptions.magicLink, 'Magic link is undefined.')
