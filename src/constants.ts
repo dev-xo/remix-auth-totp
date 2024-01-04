@@ -12,6 +12,7 @@ export const SESSION_KEYS = {
 
 export const ERRORS = {
   // Customizable errors.
+  REQUIRED_EMAIL: 'Email is required.',
   INVALID_EMAIL: 'Email is not valid.',
   INVALID_TOTP: 'Code is not valid.',
   EXPIRED_TOTP: 'Code has expired.',

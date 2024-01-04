@@ -148,6 +148,11 @@ export interface ValidateEmail {
  */
 export interface CustomErrorsOptions {
   /**
+   * The required email error message.
+   */
+  requiredEmail?: string
+
+  /**
    * The invalid email error message.
    */
   invalidEmail?: string
@@ -287,6 +292,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     callbackPath: '/magic-link',
   }
   private readonly _customErrorsDefaults: Required<CustomErrorsOptions> = {
+    requiredEmail: ERRORS.REQUIRED_EMAIL,
     invalidEmail: ERRORS.INVALID_EMAIL,
     invalidTotp: ERRORS.INVALID_TOTP,
     expiredTotp: ERRORS.EXPIRED_TOTP,
@@ -400,6 +406,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
           },
         })
       }
+      throw new Error(this.customErrors.requiredEmail)
     } catch (throwable) {
       if (throwable instanceof Response) throw throwable
       if (throwable instanceof Error) {
@@ -413,7 +420,6 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       }
       throw throwable
     }
-    throw new Error('Not implemented.')
   }
 
   private async _generateAndSendTOTP({

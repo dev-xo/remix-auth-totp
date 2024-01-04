@@ -306,6 +306,32 @@ describe('[ TOTP ]', () => {
           } else throw reason
         })
     })
+
+    test('Should failure redirect on missing email.', async () => {
+      const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
+      const request = new Request(`${HOST_URL}/login`, {
+        method: 'POST',
+        body: new FormData(),
+      })
+      await strategy
+        .authenticate(request, sessionStorage, {
+          ...AUTH_OPTIONS,
+          successRedirect: '/verify',
+          failureRedirect: '/login',
+        })
+        .catch(async (reason) => {
+          if (reason instanceof Response) {
+            expect(reason.status).toBe(302)
+            expect(reason.headers.get('location')).toBe('/login')
+            const session = await sessionStorage.getSession(
+              reason.headers.get('set-cookie') ?? '',
+            )
+            expect(session.get(AUTH_OPTIONS.sessionErrorKey)).toEqual({
+              message: ERRORS.REQUIRED_EMAIL,
+            })
+          } else throw reason
+        })
+    })
   })
 
   describe('Validate TOTP', () => {
