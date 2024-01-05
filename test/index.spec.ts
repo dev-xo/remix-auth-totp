@@ -341,14 +341,15 @@ describe('[ TOTP ]', () => {
         })
     })
 
-    test('Should failure redirect when custom validateEmail throws Error.', async () => {
+    test('Should failure redirect when custom validateEmail returns false.', async () => {
       const ERROR_MESSAGE = 'TEST: Invalid email.'
       const strategy = new TOTPStrategy(
         {
           ...TOTP_STRATEGY_OPTIONS,
-          validateEmail: () => {
-            throw new Error(ERROR_MESSAGE)
+          customErrors: {
+            invalidEmail: ERROR_MESSAGE,
           },
+          validateEmail: async () => false,
         },
         verify,
       )

@@ -123,7 +123,7 @@ export interface SendTOTP {
  * @param email The email address to validate.
  */
 export interface ValidateEmail {
-  (email: string): Promise<void>
+  (email: string): Promise<boolean>
 }
 
 /**
@@ -414,7 +414,9 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     formData: FormData
     options: RequiredAuthenticateOptions
   }) {
-    await this.validateEmail(email)
+    if (!(await this.validateEmail(email))) {
+      throw new Error(this.customErrors.invalidEmail)
+    }
     const { otp: code, ...totpPayload } = generateTOTP({
       ...this.totpGeneration,
       secret: generateSecret(),
@@ -469,7 +471,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
 
   private async _validateEmailDefault(email: string) {
     const regexEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/gm
-    if (!regexEmail.test(email)) throw new Error(this.customErrors.invalidEmail)
+    return regexEmail.test(email)
   }
 
   private async _validateTOTP({
