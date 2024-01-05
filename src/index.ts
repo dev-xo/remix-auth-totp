@@ -382,7 +382,8 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     formData: FormData
     options: RequiredAuthenticateOptions
   }) {
-    if (!(await this.validateEmail(email))) {
+    const isValidEmail =  await this.validateEmail(email)
+    if (!isValidEmail) {
       throw new Error(this.customErrors.invalidEmail)
     }
     const { otp: code, ...totpPayload } = generateTOTP({
