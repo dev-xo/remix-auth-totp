@@ -1,8 +1,4 @@
-import type {
-  TOTPGenerationOptions,
-  MagicLinkGenerationOptions,
-  TOTPData,
-} from './index.js'
+import type { TOTPGenerationOptions, TOTPData } from './index.js'
 import { AuthenticateOptions } from 'remix-auth'
 import { SignJWT, jwtVerify } from 'jose'
 import { generateTOTP as _generateTOTP } from '@epic-web/totp'
@@ -23,18 +19,13 @@ export function generateTOTP(options: TOTPGenerationOptions) {
   return _generateTOTP(options)
 }
 
-export function generateMagicLink(
-  options: MagicLinkGenerationOptions & {
-    code: string
-    param: string
-    request: Request
-  },
-) {
-  if (!options.enabled) {
-    return undefined
-  }
-
-  const url = new URL(options.callbackPath ?? '/', new URL(options.request.url).origin)
+export function generateMagicLink(options: {
+  code: string
+  magicLinkPath: string
+  param: string
+  request: Request
+}) {
+  const url = new URL(options.magicLinkPath ?? '/', new URL(options.request.url).origin)
   url.searchParams.set(options.param, options.code)
 
   return url.toString()

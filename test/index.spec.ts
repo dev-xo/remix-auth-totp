@@ -13,9 +13,9 @@ import {
   HOST_URL,
   AUTH_OPTIONS,
   TOTP_GENERATION_DEFAULTS,
-  MAGIC_LINK_GENERATION_DEFAULTS,
   DEFAULT_EMAIL,
   sessionStorage,
+  MAGIC_LINK_PATH,
 } from './utils'
 
 /**
@@ -27,6 +27,7 @@ const sendTOTP = vi.fn()
 const TOTP_STRATEGY_OPTIONS: TOTPStrategyOptions = {
   secret: SECRET_ENV,
   sendTOTP,
+  magicLinkPath: MAGIC_LINK_PATH,
 }
 
 beforeEach(() => {
@@ -416,7 +417,9 @@ describe('[ TOTP ]', () => {
         sendTOTPOptions = options
         expect(options.email).toBe(DEFAULT_EMAIL)
         expect(options.code).to.not.equal('')
-        expect(options.magicLink).toBe(`${HOST_URL}/magic-link?code=${options.code}`)
+        expect(options.magicLink).toBe(
+          `${HOST_URL}${MAGIC_LINK_PATH}?code=${options.code}`,
+        )
       })
 
       const strategy = new TOTPStrategy<typeof user>(
@@ -762,9 +765,9 @@ describe('[ TOTP ]', () => {
       const { strategy, sendTOTPOptions, session } = await setupGenerateSendTOTP()
       expect(sendTOTPOptions.magicLink).toBeDefined()
       invariant(sendTOTPOptions.magicLink, 'Magic link is undefined.')
-      expect(sendTOTPOptions.magicLink).toMatch(/\/magic-link/)
+      expect(sendTOTPOptions.magicLink).toMatch(MAGIC_LINK_PATH)
       const request = new Request(
-        sendTOTPOptions.magicLink.replace(/\/magic-link/, '/invalid-magic-link'),
+        sendTOTPOptions.magicLink.replace(MAGIC_LINK_PATH, '/invalid-magic-link'),
         {
           method: 'GET',
           headers: {
@@ -870,7 +873,7 @@ describe('[ Utils ]', () => {
       const request = new Request(requestUrl)
       expect(
         generateMagicLink({
-          ...MAGIC_LINK_GENERATION_DEFAULTS,
+          magicLinkPath: '/magic-link',
           param: 'code',
           code: 'U2N2EY',
           request,

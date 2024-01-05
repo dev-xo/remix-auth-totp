@@ -79,23 +79,6 @@ export interface TOTPGenerationOptions {
 }
 
 /**
- * The magic-link configuration.
- */
-export interface MagicLinkGenerationOptions {
-  /**
-   * Whether to enable the Magic Link generation.
-   * @default true
-   */
-  enabled?: boolean
-
-  /**
-   * The callback URL path for the Magic Link.
-   * @default '/magic-link'
-   */
-  callbackPath?: string
-}
-
-/**
  * The send TOTP configuration.
  */
 export interface SendTOTPOptions {
@@ -189,11 +172,6 @@ export interface TOTPStrategyOptions {
   totpGeneration?: TOTPGenerationOptions
 
   /**
-   * The Magic Link configuration.
-   */
-  magicLinkGeneration?: MagicLinkGenerationOptions
-
-  /**
    * The send TOTP method.
    */
   sendTOTP: SendTOTP
@@ -231,6 +209,12 @@ export interface TOTPStrategyOptions {
    * @default "auth:totp"
    */
   sessionTotpKey?: string
+
+  /**
+   * The URL path for the Magic Link.
+   * @default '/magic-link'
+   */
+  magicLinkPath?: string
 }
 
 /**
@@ -270,7 +254,6 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   private readonly secret: string
   private readonly maxAge: number | undefined
   private readonly totpGeneration: Required<TOTPGenerationOptions>
-  private readonly magicLinkGeneration: Required<MagicLinkGenerationOptions>
   private readonly sendTOTP: SendTOTP
   private readonly validateEmail: ValidateEmail
   private readonly customErrors: Required<CustomErrorsOptions>
@@ -278,6 +261,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   private readonly codeFieldKey: string
   private readonly sessionEmailKey: string
   private readonly sessionTotpKey: string
+  private readonly magicLinkPath: string
 
   private readonly _totpGenerationDefaults: Required<TOTPGenerationOptions> = {
     secret: generateSecret(),
@@ -286,10 +270,6 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     digits: 6,
     period: 60,
     maxAttempts: 3,
-  }
-  private readonly _magicLinkGenerationDefaults: Required<MagicLinkGenerationOptions> = {
-    enabled: true,
-    callbackPath: '/magic-link',
   }
   private readonly _customErrorsDefaults: Required<CustomErrorsOptions> = {
     requiredEmail: ERRORS.REQUIRED_EMAIL,
@@ -311,14 +291,11 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     this.codeFieldKey = options.codeFieldKey ?? FORM_FIELDS.CODE
     this.sessionEmailKey = options.sessionEmailKey ?? SESSION_KEYS.EMAIL
     this.sessionTotpKey = options.sessionTotpKey ?? SESSION_KEYS.TOTP
+    this.magicLinkPath = options.magicLinkPath ?? '/magic-link'
 
     this.totpGeneration = {
       ...this._totpGenerationDefaults,
       ...options.totpGeneration,
-    }
-    this.magicLinkGeneration = {
-      ...this._magicLinkGenerationDefaults,
-      ...options.magicLinkGeneration,
     }
     this.customErrors = {
       ...this._customErrorsDefaults,
@@ -448,8 +425,8 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       secretKey: this.secret,
     })
     const magicLink = generateMagicLink({
-      ...this.magicLinkGeneration,
       code,
+      magicLinkPath: this.magicLinkPath,
       param: this.codeFieldKey,
       request,
     })
@@ -479,17 +456,15 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
 
   private _getMagicLinkCode(request: Request) {
     if (request.method === 'GET') {
-      if (this.magicLinkGeneration.enabled) {
-        const url = new URL(request.url)
-        if (url.pathname !== this.magicLinkGeneration.callbackPath) {
-          throw new Error(ERRORS.INVALID_MAGIC_LINK_PATH)
-        }
-        if (url.searchParams.has(this.codeFieldKey)) {
-          return decodeURIComponent(url.searchParams.get(this.codeFieldKey) ?? '')
-        }
+      const url = new URL(request.url)
+      if (url.pathname !== this.magicLinkPath) {
+        throw new Error(ERRORS.INVALID_MAGIC_LINK_PATH)
+      }
+      if (url.searchParams.has(this.codeFieldKey)) {
+        return decodeURIComponent(url.searchParams.get(this.codeFieldKey) ?? '')
       }
     }
-    return null
+    return undefined
   }
 
   private async _validateEmailDefault(email: string) {
