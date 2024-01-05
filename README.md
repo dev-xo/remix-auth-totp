@@ -140,9 +140,9 @@ authenticator.use(
   new TOTPStrategy(
     {
       secret: process.env.ENCRYPTION_SECRET || 'NOT_A_STRONG_SECRET',
-      sendTOTP: async ({ email, code, magicLink, user, form, request }) => {},
+      sendTOTP: async ({ email, code, magicLink }) => {},
     },
-    async ({ email, code, form, magicLink, request }) => {},
+    async ({ email }) => {},
   ),
 )
 ```
@@ -165,7 +165,7 @@ authenticator.use(
         await sendEmail({ email, code, magicLink })
       },
     },
-    async ({ email, code, magicLink, form, request }) => {},
+    async ({ email }) => {},
   ),
 )
 ```
@@ -184,7 +184,7 @@ authenticator.use(
       // createTOTP: async (data) => {},
       // ...
     },
-    async ({ email, code, magicLink, form, request }) => {
+    async ({ email }) => {
       // You can determine whether the user is authenticating
       // via OTP code submission or Magic-Link URL and run your own logic.
       if (form) console.log('Optional form submission logic.')
