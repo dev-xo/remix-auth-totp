@@ -313,17 +313,32 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
         : null
     try {
       if (email) {
-        await this._generateAndSendTOTP({
+        // Generate and send TOTP.
+        const { code, hash, magicLink } = await this._generateTOTP({ email, request })
+        await this.sendTOTP({
           email,
-          session,
-          sessionStorage,
-          request,
-          formData,
-          options,
+          code,
+          magicLink,
+        })
+
+        const totpData: TOTPData = {
+          hash,
+          attempts: 0,
+        }
+        session.set(this.sessionEmailKey, email)
+        session.set(this.sessionTotpKey, totpData)
+        session.unset(options.sessionErrorKey)
+        throw redirect(options.successRedirect, {
+          headers: {
+            'set-cookie': await sessionStorage.commitSession(session, {
+              maxAge: this.maxAge,
+            }),
+          },
         })
       }
       const code = formDataTotp ?? this._getMagicLinkCode(request)
       if (code) {
+        // Validate TOTP.
         if (!sessionEmail || !sessionTotp) throw new Error(this.customErrors.expiredTotp)
         await this._validateTOTP({
           code,
@@ -333,7 +348,6 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
           options,
         })
 
-        // Allow developer to handle user validation.
         const user = await this.verify({
           email: sessionEmail,
         })
@@ -367,22 +381,8 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     }
   }
 
-  private async _generateAndSendTOTP({
-    email,
-    session,
-    sessionStorage,
-    request,
-    formData,
-    options,
-  }: {
-    email: string
-    session: Session
-    sessionStorage: SessionStorage
-    request: Request
-    formData: FormData
-    options: RequiredAuthenticateOptions
-  }) {
-    const isValidEmail =  await this.validateEmail(email)
+  private async _generateTOTP({ email, request }: { email: string; request: Request }) {
+    const isValidEmail = await this.validateEmail(email)
     if (!isValidEmail) {
       throw new Error(this.customErrors.invalidEmail)
     }
@@ -401,26 +401,8 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       param: this.codeFieldKey,
       request,
     })
-    await this.sendTOTP({
-      email,
-      code,
-      magicLink,
-    })
 
-    const totpData: TOTPData = {
-      hash,
-      attempts: 0,
-    }
-    session.set(this.sessionEmailKey, email)
-    session.set(this.sessionTotpKey, totpData)
-    session.unset(options.sessionErrorKey)
-    throw redirect(options.successRedirect, {
-      headers: {
-        'set-cookie': await sessionStorage.commitSession(session, {
-          maxAge: this.maxAge,
-        }),
-      },
-    })
+    return { code, hash, magicLink }
   }
 
   private _getMagicLinkCode(request: Request) {
