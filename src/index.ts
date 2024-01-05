@@ -209,33 +209,13 @@ export interface TOTPStrategyOptions {
 
 /**
  * The verify method callback.
- * Returns required data to verify the user and handle additional logic.
+ * Returns the user for the email to be stored in the session.
  */
 export interface TOTPVerifyParams {
   /**
    * The email address provided by the user.
    */
   email: string
-
-  /**
-   * The TOTP code.
-   */
-  code?: string
-
-  /**
-   * The Magic Link URL.
-   */
-  magicLink?: string
-
-  /**
-   * The formData object from the Request.
-   */
-  form?: FormData
-
-  /**
-   * The Request object.
-   */
-  request: Request
 }
 
 export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
@@ -298,11 +278,11 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
    *
    * If the user is already authenticated, simply returns the user.
    *
-   * | Method | Email | TOTP | Sess. Email | Sess. TOTP | Action/Logic                             |
+   * | Method | Email | Code | Sess. Email | Sess. TOTP | Action/Logic                             |
    * |--------|-------|------|-------------|------------|------------------------------------------|
    * | POST   | ✓     | -    | -           | -          | Generate/send TOTP using form email.     |
-   * | POST   | ✗     | ✗    | ✓           | -          | Generate/send TOTP for session email.    |
-   * | POST   | ✗     | ✓    | ✓           | ✓          | Validate form TOTP.                      |
+   * | POST   | ✗     | ✗    | ✓           | -          | Generate/send TOTP using session email.  |
+   * | POST   | ✗     | ✓    | ✓           | ✓          | Validate form TOTP code.                 |
    * | GET    | -     | -    | ✓           | ✓          | Validate magic link TOTP.                |
    *
    * @param {Request} request - The request object.
@@ -356,8 +336,6 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
         // Allow developer to handle user validation.
         const user = await this.verify({
           email: sessionEmail,
-          form: formData,
-          request,
         })
 
         session.set(options.sessionKey, user)
