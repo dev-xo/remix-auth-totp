@@ -113,13 +113,9 @@ export interface CustomErrorsOptions {
    */
   invalidTotp?: string
   /**
-   * The inactive TOTP error message.
+   * The expired TOTP error message.
    */
-  inactiveTotp?: string
-  /**
-   * The TOTP not found error message.
-   */
-  totpNotFound?: string
+  expiredTotp?: string
 }
 
 authenticator.use(
@@ -162,15 +158,10 @@ export interface TOTPStrategyOptions<User> {
    */
   sessionEmailKey?: string
   /**
-   * The session key that stores the encrypted TOTP.
+   * The session key that stores the TOTP data.
    * @default "auth:totp"
    */
   sessionTotpKey?: string
-  /**
-   * The session key that stores the expiration of the TOTP.
-   * @default "auth:totpExpiresAt"
-   */
-  sessionTotpExpiresAtKey?: string
 }
 ```
 
@@ -191,7 +182,7 @@ export default {
 }
 ```
 
-### Using Cloudflare KV for session and TOTP storage
+### Using Cloudflare KV for session storage
 
 ```ts
 const sessionStorage = createWorkersKVSessionStorage({
@@ -205,32 +196,11 @@ const sessionStorage = createWorkersKVSessionStorage({
     secure: ENVIRONMENT === 'production',
   },
 })
-const authenticator = new Authenticator<SessionUser>(sessionStorage, {
-  throwOnError: true,
-})
+const authenticator = new Authenticator<SessionUser>(sessionStorage)
 authenticator.use(
   new TOTPStrategy(
     {
       secret: TOTP_SECRET,
-      magicLinkGeneration: { callbackPath: '/magic-link' },
-
-      createTOTP: async (data, expiresAt) => {
-        await KV.put(`totp:${data.hash}`, JSON.stringify(data), {
-          expirationTtl: Math.max((expiresAt.getTime() - Date.now()) / 1000, 60), // >= 60 secs per Cloudflare KV
-        })
-      },
-      readTOTP: async (hash) => {
-        const totpJson = await KV.get(`totp:${hash}`)
-        return totpJson ? JSON.parse(totpJson) : null
-      },
-      updateTOTP: async (hash, data, expiresAt) => {
-        const totpJson = await KV.get(`totp:${hash}`)
-        if (!totpJson) throw new Error('TOTP not found')
-        const totp = JSON.parse(totpJson)
-        await KV.put(`totp:${hash}`, JSON.stringify({ ...totp, ...data }), {
-          expirationTtl: Math.max((expiresAt.getTime() - Date.now()) / 1000, 60), // >= 60 secs per Cloudflare KV
-        })
-      },
       sendTOTP: async ({ email, code, magicLink }) => {},
     },
     async ({ email }) => {},
