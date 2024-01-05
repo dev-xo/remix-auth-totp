@@ -95,17 +95,7 @@ export interface SendTOTPOptions {
   /**
    * The Magic Link URL.
    */
-  magicLink?: string
-
-  /**
-   * The formData object.
-   */
-  form?: FormData
-
-  /**
-   * The Request object.
-   */
-  request: Request
+  magicLink: string
 }
 
 /**
@@ -436,8 +426,6 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       email,
       code,
       magicLink,
-      form: formData,
-      request,
     })
 
     const totpData: TOTPData = {
