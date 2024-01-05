@@ -70,30 +70,6 @@ authenticator.use(
 )
 ```
 
-### Magic Link Generation
-
-The Magic Link is optional and enabled by default. You can decide to opt-out by setting the `enabled` option to `false`.
-
-Furthermore, the Magic Link can be customized via the `magicLinkGeneration` object in the TOTPStrategy Instance.
-The URL link generated will be in the format of `{request url origin}{callbackPath}?{codeField}=<magic-link-code>`.
-
-```ts
-export interface MagicLinkGenerationOptions {
-  /**
-   * Whether to enable the Magic Link generation.
-   * @default true
-   */
-  enabled?: boolean
-  /**
-   * The callback path for the Magic Link.
-   * @default '/magic-link'
-   */
-  callbackPath?: string
-}
-```
-
-> **Note:** Enabling the Magic Link feature will require to create a [magic-link.tsx](#magic-linktsx) route.
-
 ### Custom Error Messages
 
 The Strategy includes a few default error messages that can be customized by passing an object called `customErrors` to the TOTPStrategy Instance.
@@ -162,6 +138,11 @@ export interface TOTPStrategyOptions<User> {
    * @default "auth:totp"
    */
   sessionTotpKey?: string
+  /**
+   * The URL path for the Magic Link.
+   * @default '/magic-link'
+   */
+  magicLinkPath?: string
 }
 ```
 

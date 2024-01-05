@@ -9,6 +9,7 @@ Remove `Totp` model from database if one exists.
 ### Implement `remix-auth-totp` API
 
 - Remove `createTOTP`, `readTOTP` and `updateTOTP` from `TOTPStrategy` options.
+- Remove unneeded parameters from `sendTOTP` and `verify` functions
 
 ```ts
 authenticator.use(
@@ -18,11 +19,11 @@ authenticator.use(
 
       // ❗`createTOTP`, `readTOTP` and `updateTOTP` are no longer needed (removed).
 
-      // Unchanged.
+      // Only email, code, and magicLink. Remove any other parameters.
       sendTOTP: async ({ email, code, magicLink }) => {},
     },
-    // Unchanged.
-    async ({ email, code, magicLink, form, request }) => {},
+    // Only email. Remove any other parameters.
+    async ({ email }) => {},
   ),
 )
 ```
