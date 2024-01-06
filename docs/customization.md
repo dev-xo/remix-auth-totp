@@ -22,7 +22,7 @@ authenticator.use(
 
 ### TOTP Generation
 
-The TOTP generation can customized by passing an object called `codeGeneration` to the TOTPStrategy Instance.
+The TOTP generation can customized by passing an object called `totpGeneration` to the TOTPStrategy Instance.
 
 ```ts
 export interface TOTPGenerationOptions {
@@ -61,7 +61,7 @@ export interface TOTPGenerationOptions {
 
 authenticator.use(
   new TOTPStrategy({
-    codeGeneration: {
+    totpGeneration: {
       digits: 6,
       period: 60,
       // ...
