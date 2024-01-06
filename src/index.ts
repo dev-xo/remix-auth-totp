@@ -1,10 +1,10 @@
 import type { Session, SessionStorage } from '@remix-run/server-runtime'
 import type { AuthenticateOptions, StrategyVerifyCallback } from 'remix-auth'
-import { errors } from 'jose'
 
 import { redirect } from '@remix-run/server-runtime'
 import { Strategy } from 'remix-auth'
 import { verifyTOTP } from '@epic-web/totp'
+import { errors as JoseErrors } from 'jose'
 import {
   generateSecret,
   generateTOTP,
@@ -162,14 +162,10 @@ export interface TOTPStrategyOptions {
   totpGeneration?: TOTPGenerationOptions
 
   /**
-   * The send TOTP method.
+   * The URL path for the Magic Link.
+   * @default '/magic-link'
    */
-  sendTOTP: SendTOTP
-
-  /**
-   * The validate email method.
-   */
-  validateEmail?: ValidateEmail
+  magicLinkPath?: string
 
   /**
    * The custom errors configuration.
@@ -201,10 +197,14 @@ export interface TOTPStrategyOptions {
   sessionTotpKey?: string
 
   /**
-   * The URL path for the Magic Link.
-   * @default '/magic-link'
+   * The send TOTP method.
    */
-  magicLinkPath?: string
+  sendTOTP: SendTOTP
+
+  /**
+   * The validate email method.
+   */
+  validateEmail?: ValidateEmail
 }
 
 /**
@@ -224,14 +224,14 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   private readonly secret: string
   private readonly maxAge: number | undefined
   private readonly totpGeneration: Required<TOTPGenerationOptions>
-  private readonly sendTOTP: SendTOTP
-  private readonly validateEmail: ValidateEmail
+  private readonly magicLinkPath: string
   private readonly customErrors: Required<CustomErrorsOptions>
   private readonly emailFieldKey: string
   private readonly codeFieldKey: string
   private readonly sessionEmailKey: string
   private readonly sessionTotpKey: string
-  private readonly magicLinkPath: string
+  private readonly sendTOTP: SendTOTP
+  private readonly validateEmail: ValidateEmail
 
   private readonly _totpGenerationDefaults: Required<TOTPGenerationOptions> = {
     secret: generateSecret(),
@@ -255,13 +255,13 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     super(verify)
     this.secret = options.secret
     this.maxAge = options.maxAge
-    this.sendTOTP = options.sendTOTP
-    this.validateEmail = options.validateEmail ?? this._validateEmailDefault
+    this.magicLinkPath = options.magicLinkPath ?? '/magic-link'
     this.emailFieldKey = options.emailFieldKey ?? FORM_FIELDS.EMAIL
     this.codeFieldKey = options.codeFieldKey ?? FORM_FIELDS.CODE
     this.sessionEmailKey = options.sessionEmailKey ?? SESSION_KEYS.EMAIL
     this.sessionTotpKey = options.sessionTotpKey ?? SESSION_KEYS.TOTP
-    this.magicLinkPath = options.magicLinkPath ?? '/magic-link'
+    this.sendTOTP = options.sendTOTP
+    this.validateEmail = options.validateEmail ?? this._validateEmailDefault
 
     this.totpGeneration = {
       ...this._totpGenerationDefaults,
@@ -304,30 +304,25 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
 
     const formData = request.method === 'POST' ? await request.formData() : new FormData()
     const formDataEmail = coerceToOptionalNonEmptyString(formData.get(this.emailFieldKey))
-    const formDataTotp = coerceToOptionalNonEmptyString(formData.get(this.codeFieldKey))
+    const formDataCode = coerceToOptionalNonEmptyString(formData.get(this.codeFieldKey))
     const sessionEmail = coerceToOptionalString(session.get(this.sessionEmailKey))
     const sessionTotp = coerceToOptionalTotpData(session.get(this.sessionTotpKey))
     const email =
       request.method === 'POST'
-        ? formDataEmail ?? (!formDataTotp ? sessionEmail : null)
+        ? formDataEmail ?? (!formDataCode ? sessionEmail : null)
         : null
+
     try {
       if (email) {
-        // Generate and send TOTP.
+        // Generate and Send TOTP.
         const { code, hash, magicLink } = await this._generateTOTP({ email, request })
-        await this.sendTOTP({
-          email,
-          code,
-          magicLink,
-        })
+        await this.sendTOTP({ email, code, magicLink })
 
-        const totpData: TOTPData = {
-          hash,
-          attempts: 0,
-        }
+        const totpData: TOTPData = { hash, attempts: 0 }
         session.set(this.sessionEmailKey, email)
         session.set(this.sessionTotpKey, totpData)
         session.unset(options.sessionErrorKey)
+
         throw redirect(options.successRedirect, {
           headers: {
             'set-cookie': await sessionStorage.commitSession(session, {
@@ -336,17 +331,12 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
           },
         })
       }
-      const code = formDataTotp ?? this._getMagicLinkCode(request)
+
+      const code = formDataCode ?? this._getMagicLinkCode(request)
       if (code) {
         // Validate TOTP.
         if (!sessionEmail || !sessionTotp) throw new Error(this.customErrors.expiredTotp)
-        await this._validateTOTP({
-          code,
-          sessionTotp: sessionTotp,
-          session,
-          sessionStorage,
-          options,
-        })
+        await this._validateTOTP({ code, sessionTotp, session, sessionStorage, options })
 
         const user = await this.verify({
           email: sessionEmail,
@@ -383,9 +373,8 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
 
   private async _generateTOTP({ email, request }: { email: string; request: Request }) {
     const isValidEmail = await this.validateEmail(email)
-    if (!isValidEmail) {
-      throw new Error(this.customErrors.invalidEmail)
-    }
+    if (!isValidEmail) throw new Error(this.customErrors.invalidEmail)
+
     const { otp: code, ...totpPayload } = generateTOTP({
       ...this.totpGeneration,
       secret: generateSecret(),
@@ -448,7 +437,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
         throw new Error(this.customErrors.invalidTotp)
       }
     } catch (error) {
-      if (error instanceof errors.JWTExpired) {
+      if (error instanceof JoseErrors.JWTExpired) {
         session.unset(this.sessionTotpKey)
         session.flash(options.sessionErrorKey, { message: this.customErrors.expiredTotp })
       } else {
