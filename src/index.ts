@@ -4,7 +4,7 @@ import type { AuthenticateOptions, StrategyVerifyCallback } from 'remix-auth'
 import { redirect } from '@remix-run/server-runtime'
 import { Strategy } from 'remix-auth'
 import { verifyTOTP } from '@epic-web/totp'
-import { errors as JoseErrors } from 'jose'
+import { errors } from 'jose'
 import {
   generateSecret,
   generateTOTP,
@@ -437,7 +437,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
         throw new Error(this.customErrors.invalidTotp)
       }
     } catch (error) {
-      if (error instanceof JoseErrors.JWTExpired) {
+      if (error instanceof errors.JWTExpired) {
         session.unset(this.sessionTotpKey)
         session.flash(options.sessionErrorKey, { message: this.customErrors.expiredTotp })
       } else {
