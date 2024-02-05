@@ -1,8 +1,6 @@
 # Package Managers.
 package-lock.json
 yarn.lock
-pnpm-lock.yaml
-pnpm-lock.yml
 node_modules
 
 # Editor Configs.

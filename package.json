@@ -38,7 +38,7 @@
     "/public/dist"
   ],
   "dependencies": {
-    "@epic-web/totp": "github:mw10013/totp#types",
+    "@epic-web/totp": "^1.1.2",
     "jose": "^5.2.0",
     "thirty-two": "^1.0.2"
   },
