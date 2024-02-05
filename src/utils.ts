@@ -5,14 +5,14 @@ import { generateTOTP as _generateTOTP } from '@epic-web/totp'
 import { ERRORS } from './constants.js'
 
 // @ts-expect-error - `thirty-two` is not typed.
-import * as base32 from 'thirty-two'
-import * as crypto from 'crypto'
+import { encode } from 'thirty-two'
+import { randomBytes } from 'node:crypto'
 
 /**
  * TOTP Generation.
  */
 export function generateSecret() {
-  return base32.encode(crypto.randomBytes(10)).toString() as string
+  return encode(randomBytes(10)).toString() as string
 }
 
 export function generateTOTP(options: TOTPGenerationOptions) {
