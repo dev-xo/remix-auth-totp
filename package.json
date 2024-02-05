@@ -24,7 +24,7 @@
     "test": "vitest --reporter verbose",
     "test:cov": "vitest run --coverage",
     "validate": "npm run lint && npm run typecheck && npx vitest --watch=false",
-    "prepare": "husky install",
+    "prepare": "husky install && npm run build",
     "prepublishOnly": "npm run validate && npm run build"
   },
   "files": [
