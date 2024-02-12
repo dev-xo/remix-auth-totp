@@ -148,6 +148,8 @@ export interface TOTPStrategyOptions<User> {
 
 ## Cloudflare
 
+### Remix v2 Compiler
+
 To use on the Cloudflare runtime, you'll need to add the following to your `remix.config.js` file to specify the polyfills for a couple of node builtin modules. See the remix docs on [supportNodeBuiltinsPolyfill](https://remix.run/docs/en/main/file-conventions/remix-config#servernodebuiltinspolyfill).
 
 ### `remix.config.js`
@@ -160,6 +162,26 @@ export default {
       Buffer: true,
     },
   },
+}
+```
+
+### Vite
+
+Enable [nodejs compatiblity](https://developers.cloudflare.com/workers/runtime-apis/nodejs/) for Cloudflare in [wrangler.toml](https://developers.cloudflare.com/workers/runtime-apis/nodejs/#enable-nodejs-with-workers), [Cloudflare dashboard](https://developers.cloudflare.com/workers/runtime-apis/nodejs/#enable-nodejs-from-the-cloudflare-dashboard), and in the start script inside package.json
+
+```json
+"scripts": {
+  "start": "wrangler pages dev ./build/client --compatibility-flags=nodejs_compat"
+}
+```
+
+Ensure the `Buffer` global is set up before using `remix-auth-totp`.
+
+```ts
+import { Buffer } from "node:buffer";
+
+function setUpGlobals() {
+  globalThis.Buffer = Buffer
 }
 ```
 
@@ -187,7 +209,7 @@ authenticator.use(
     async ({ email }) => {},
   ),
 )
-```
+````
 
 ## Contributing
 

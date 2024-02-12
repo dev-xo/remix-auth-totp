@@ -185,11 +185,6 @@ authenticator.use(
       // ...
     },
     async ({ email }) => {
-      // You can determine whether the user is authenticating
-      // via OTP code submission or Magic-Link URL and run your own logic.
-      if (form) console.log('Optional form submission logic.')
-      if (magicLink) console.log('Optional magic-link submission logic.')
-
       // Get user from database.
       let user = await db.user.findFirst({
         where: { email },
