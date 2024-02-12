@@ -89,6 +89,8 @@ describe('[ TOTP ]', () => {
       sendTOTP.mockImplementation(async (options: SendTOTPOptions) => {
         expect(options.email).toBe(DEFAULT_EMAIL)
         expect(options.code).to.not.equal('')
+        expect(options.request).toBeInstanceOf(Request)
+        expect(options.formData).toBeInstanceOf(FormData)
       })
       const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
       const formData = new FormData()
@@ -118,10 +120,51 @@ describe('[ TOTP ]', () => {
       expect(sendTOTP).toHaveBeenCalledTimes(1)
     })
 
+    test('Should generate/send TOTP for form email with application form data.', async () => {
+      const APP_FORM_FIELD = 'via'
+      const APP_FORM_VALUE = 'whatsapp'
+      sendTOTP.mockImplementation(async (options: SendTOTPOptions) => {
+        expect(options.email).toBe(DEFAULT_EMAIL)
+        expect(options.code).to.not.equal('')
+        expect(options.request).toBeInstanceOf(Request)
+        expect(options.formData).toBeInstanceOf(FormData)
+        expect(options.formData.get(APP_FORM_FIELD)).toBe(APP_FORM_VALUE)
+      })
+      const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
+      const formData = new FormData()
+      formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
+      formData.append(APP_FORM_FIELD, APP_FORM_VALUE)
+      const request = new Request(`${HOST_URL}/login`, {
+        method: 'POST',
+        body: formData,
+      })
+      await strategy
+        .authenticate(request, sessionStorage, {
+          ...AUTH_OPTIONS,
+          successRedirect: '/verify',
+          failureRedirect: '/login',
+        })
+        .catch(async (reason) => {
+          if (reason instanceof Response) {
+            expect(reason.status).toBe(302)
+            expect(reason.headers.get('location')).toBe('/verify')
+            const session = await sessionStorage.getSession(
+              reason.headers.get('set-cookie') ?? '',
+            )
+            expect(session.get(SESSION_KEYS.EMAIL)).toBe(DEFAULT_EMAIL)
+            expect(session.get(SESSION_KEYS.TOTP)).toBeDefined()
+          } else throw reason
+        })
+
+      expect(sendTOTP).toHaveBeenCalledTimes(1)
+    })
+
     test('Should generate/send TOTP for form email ignoring form totp code.', async () => {
       sendTOTP.mockImplementation(async (options: SendTOTPOptions) => {
         expect(options.email).toBe(DEFAULT_EMAIL)
         expect(options.code).to.not.equal('')
+        expect(options.request).toBeInstanceOf(Request)
+        expect(options.formData).toBeInstanceOf(FormData)
       })
       const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
       const formData = new FormData()
@@ -219,6 +262,8 @@ describe('[ TOTP ]', () => {
       sendTOTP.mockImplementation(async (options: SendTOTPOptions) => {
         expect(options.email).toBe(DEFAULT_EMAIL)
         expect(options.code).to.not.equal('')
+        expect(options.request).toBeInstanceOf(Request)
+        expect(options.formData).toBeInstanceOf(FormData)
       })
       let session: Session | undefined
       let sessionTotp: unknown
@@ -257,6 +302,75 @@ describe('[ TOTP ]', () => {
       })
       await strategy
         .authenticate(emptyFormRequest, sessionStorage, {
+          ...AUTH_OPTIONS,
+          successRedirect: '/verify',
+          failureRedirect: '/login',
+        })
+        .catch(async (reason) => {
+          if (reason instanceof Response) {
+            expect(reason.status).toBe(302)
+            expect(reason.headers.get('location')).toBe('/verify')
+            const session = await sessionStorage.getSession(
+              reason.headers.get('set-cookie') ?? '',
+            )
+            expect(session.get(SESSION_KEYS.EMAIL)).toBe(DEFAULT_EMAIL)
+            expect(session.get(SESSION_KEYS.TOTP)).toBeDefined()
+            expect(session.get(SESSION_KEYS.TOTP)).not.toEqual(sessionTotp)
+          } else throw reason
+        })
+      expect(sendTOTP).toHaveBeenCalledTimes(2)
+    })
+
+    test('Should generate/send TOTP for application form data with session email.', async () => {
+      const APP_FORM_FIELD = 'via'
+      const APP_FORM_VALUE = 'whatsapp'
+      sendTOTP.mockImplementation(async (options: SendTOTPOptions) => {
+        expect(options.email).toBe(DEFAULT_EMAIL)
+        expect(options.code).to.not.equal('')
+        expect(options.request).toBeInstanceOf(Request)
+        expect(options.formData).toBeInstanceOf(FormData)
+        expect(options.formData.get(APP_FORM_FIELD)).toBe(APP_FORM_VALUE)
+      })
+      let session: Session | undefined
+      let sessionTotp: unknown
+      const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
+      const formData = new FormData()
+      formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
+      formData.append(APP_FORM_FIELD, APP_FORM_VALUE)
+      const requestToPopulateSessionEmail = new Request(`${HOST_URL}/login`, {
+        method: 'POST',
+        body: formData,
+      })
+      await strategy
+        .authenticate(requestToPopulateSessionEmail, sessionStorage, {
+          ...AUTH_OPTIONS,
+          successRedirect: '/verify',
+          failureRedirect: '/login',
+        })
+        .catch(async (reason) => {
+          if (reason instanceof Response) {
+            expect(reason.status).toBe(302)
+            expect(reason.headers.get('location')).toBe('/verify')
+            session = await sessionStorage.getSession(
+              reason.headers.get('set-cookie') ?? '',
+            )
+            expect(session.get(SESSION_KEYS.EMAIL)).toBe(DEFAULT_EMAIL)
+            expect(session.get(SESSION_KEYS.TOTP)).toBeDefined()
+            sessionTotp = session.get(SESSION_KEYS.TOTP)
+          } else throw reason
+        })
+      if (!session) throw new Error('Undefined session.')
+      const appFormData = new FormData()
+      appFormData.append(APP_FORM_FIELD, APP_FORM_VALUE)
+      const appFormRequest = new Request(`${HOST_URL}/login`, {
+        method: 'POST',
+        headers: {
+          cookie: await sessionStorage.commitSession(session),
+        },
+        body: appFormData,
+      })
+      await strategy
+        .authenticate(appFormRequest, sessionStorage, {
           ...AUTH_OPTIONS,
           successRedirect: '/verify',
           failureRedirect: '/login',

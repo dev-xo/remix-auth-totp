@@ -96,6 +96,16 @@ export interface SendTOTPOptions {
    * The Magic Link URL.
    */
   magicLink: string
+
+  /**
+   * The request to generate the TOTP.
+   */
+  request: Request
+
+  /**
+   * The form data of the request.
+   */
+  formData: FormData
 }
 
 /**
@@ -316,7 +326,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       if (email) {
         // Generate and Send TOTP.
         const { code, hash, magicLink } = await this._generateTOTP({ email, request })
-        await this.sendTOTP({ email, code, magicLink })
+        await this.sendTOTP({ email, code, magicLink, request, formData })
 
         const totpData: TOTPData = { hash, attempts: 0 }
         session.set(this.sessionEmailKey, email)
