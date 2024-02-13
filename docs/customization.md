@@ -178,7 +178,7 @@ Enable [nodejs compatiblity](https://developers.cloudflare.com/workers/runtime-a
 Ensure the `Buffer` global is set up before using `remix-auth-totp`.
 
 ```ts
-import { Buffer } from "node:buffer";
+import { Buffer } from 'node:buffer'
 
 function setUpGlobals() {
   globalThis.Buffer = Buffer
@@ -209,7 +209,7 @@ authenticator.use(
     async ({ email }) => {},
   ),
 )
-````
+```
 
 ## Contributing
 
