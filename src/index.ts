@@ -226,6 +226,16 @@ export interface TOTPVerifyParams {
    * The email address provided by the user.
    */
   email: string
+
+  /**
+   * The formData object from the Request.
+   */
+  formData?: FormData
+
+  /**
+   * The Request object.
+   */
+  request: Request
 }
 
 export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
@@ -326,7 +336,13 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       if (email) {
         // Generate and Send TOTP.
         const { code, hash, magicLink } = await this._generateTOTP({ email, request })
-        await this.sendTOTP({ email, code, magicLink, request, formData })
+        await this.sendTOTP({
+          email,
+          code,
+          magicLink,
+          formData,
+          request,
+        })
 
         const totpData: TOTPData = { hash, attempts: 0 }
         session.set(this.sessionEmailKey, email)
@@ -350,6 +366,8 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
 
         const user = await this.verify({
           email: sessionEmail,
+          formData: request.method === 'POST' ? formData : undefined,
+          request,
         })
 
         session.set(options.sessionKey, user)

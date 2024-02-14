@@ -539,7 +539,14 @@ describe('[ TOTP ]', () => {
 
       const strategy = new TOTPStrategy<typeof user>(
         { ...TOTP_STRATEGY_OPTIONS, ...totpStrategyOptions },
-        async () => {
+        async ({ email, formData, request }) => {
+          expect(email).toBe(DEFAULT_EMAIL)
+          expect(request).toBeInstanceOf(Request)
+          if (request.method === 'POST') {
+            expect(formData).toBeInstanceOf(FormData)
+          } else {
+            expect(formData).not.toBeDefined()
+          }
           return Promise.resolve(user)
         },
       )
