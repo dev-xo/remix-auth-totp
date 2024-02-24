@@ -70,30 +70,6 @@ authenticator.use(
 )
 ```
 
-### Magic Link Generation
-
-The Magic Link is optional and enabled by default. You can decide to opt-out by setting the `enabled` option to `false`.
-
-Furthermore, the Magic Link can be customized via the `magicLinkGeneration` object in the TOTPStrategy Instance.
-The URL link generated will be in the format of `{request url origin}{callbackPath}?{codeField}=<magic-link-code>`.
-
-```ts
-export interface MagicLinkGenerationOptions {
-  /**
-   * Whether to enable the Magic Link generation.
-   * @default true
-   */
-  enabled?: boolean
-  /**
-   * The callback path for the Magic Link.
-   * @default '/magic-link'
-   */
-  callbackPath?: string
-}
-```
-
-> **Note:** Enabling the Magic Link feature will require to create a [magic-link.tsx](#magic-linktsx) route.
-
 ### Custom Error Messages
 
 The Strategy includes a few default error messages that can be customized by passing an object called `customErrors` to the TOTPStrategy Instance.
@@ -113,14 +89,9 @@ export interface CustomErrorsOptions {
    */
   invalidTotp?: string
   /**
-   * The inactive TOTP error message.
+   * The expired TOTP error message.
    */
-  inactiveTotp?: string
-    /**
-   * The TOTP not found error message.
-   */
-  totpNotFound?: string
-
+  expiredTotp?: string
 }
 
 authenticator.use(
@@ -154,29 +125,30 @@ export interface TOTPStrategyOptions<User> {
   emailFieldKey?: string
   /**
    * The form input name used to get the TOTP.
-   * @default "totp"
+   * @default "code"
    */
-  totpFieldKey?: string
+  codeFieldKey?: string
   /**
    * The session key that stores the email address.
    * @default "auth:email"
    */
   sessionEmailKey?: string
   /**
-   * The session key that stores the encrypted TOTP.
+   * The session key that stores the TOTP data.
    * @default "auth:totp"
    */
   sessionTotpKey?: string
   /**
-   * The session key that stores the expiration of the TOTP.
-   * @default "auth:totpExpiresAt"
+   * The URL path for the Magic Link.
+   * @default '/magic-link'
    */
-  sessionTotpExpiresAtKey?: string
-
+  magicLinkPath?: string
 }
 ```
 
 ## Cloudflare
+
+### Remix v2 Compiler
 
 To use on the Cloudflare runtime, you'll need to add the following to your `remix.config.js` file to specify the polyfills for a couple of node builtin modules. See the remix docs on [supportNodeBuiltinsPolyfill](https://remix.run/docs/en/main/file-conventions/remix-config#servernodebuiltinspolyfill).
 
@@ -189,62 +161,54 @@ export default {
     globals: {
       Buffer: true,
     },
-  }
+  },
 }
 ```
 
-### Using Cloudflare KV for session and TOTP storage
+### Vite
+
+Enable [nodejs compatiblity](https://developers.cloudflare.com/workers/runtime-apis/nodejs/) for Cloudflare in [wrangler.toml](https://developers.cloudflare.com/workers/runtime-apis/nodejs/#enable-nodejs-with-workers), [Cloudflare dashboard](https://developers.cloudflare.com/workers/runtime-apis/nodejs/#enable-nodejs-from-the-cloudflare-dashboard), and in the start script inside package.json
+
+```json
+"scripts": {
+  "start": "wrangler pages dev ./build/client --compatibility-flags=nodejs_compat"
+}
+```
+
+Ensure the `Buffer` global is set up before using `remix-auth-totp`.
 
 ```ts
-  const sessionStorage = createWorkersKVSessionStorage({
-    kv: KV,
-    cookie: {
-      name: "_auth",
-      path: "/",
-      sameSite: "lax",
-      httpOnly: true,
-      secrets: [SESSION_SECRET],
-      secure: ENVIRONMENT === "production",
+import { Buffer } from 'node:buffer'
+
+function setUpGlobals() {
+  globalThis.Buffer = Buffer
+}
+```
+
+### Using Cloudflare KV for session storage
+
+```ts
+const sessionStorage = createWorkersKVSessionStorage({
+  kv: KV,
+  cookie: {
+    name: '_auth',
+    path: '/',
+    sameSite: 'lax',
+    httpOnly: true,
+    secrets: [SESSION_SECRET],
+    secure: ENVIRONMENT === 'production',
+  },
+})
+const authenticator = new Authenticator<SessionUser>(sessionStorage)
+authenticator.use(
+  new TOTPStrategy(
+    {
+      secret: TOTP_SECRET,
+      sendTOTP: async ({ email, code, magicLink }) => {},
     },
-  });
-  const authenticator = new Authenticator<SessionUser>(sessionStorage, {
-    throwOnError: true,
-  });
-  authenticator.use(
-    new TOTPStrategy(
-      {
-        secret: TOTP_SECRET,
-        magicLinkGeneration: { callbackPath: "/magic-link" },
-
-        createTOTP: async (data, expiresAt) => {
-          await KV.put(`totp:${data.hash}`, JSON.stringify(data), {
-            expirationTtl: Math.max(
-              (expiresAt.getTime() - Date.now()) / 1000,
-              60,
-            ), // >= 60 secs per Cloudflare KV
-          });
-        },
-        readTOTP: async (hash) => {
-          const totpJson = await KV.get(`totp:${hash}`);
-          return totpJson ? JSON.parse(totpJson) : null;
-        },
-        updateTOTP: async (hash, data, expiresAt) => {
-          const totpJson = await KV.get(`totp:${hash}`);
-          if (!totpJson) throw new Error("TOTP not found");
-          const totp = JSON.parse(totpJson);
-          await KV.put(`totp:${hash}`, JSON.stringify({ ...totp, ...data }), {
-            expirationTtl: Math.max(
-              (expiresAt.getTime() - Date.now()) / 1000,
-              60,
-            ), // >= 60 secs per Cloudflare KV
-          });
-        },
-        sendTOTP: async ({ email, code, magicLink }) => {}
-      },
-      async ({ email }) => {}
-    ),
-  );
-
+    async ({ email }) => {},
+  ),
+)
 ```
 
 ## Contributing

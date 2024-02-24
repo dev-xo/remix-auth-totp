@@ -1,5 +1,5 @@
 import type { Session } from '@remix-run/server-runtime'
-import type { SendTOTPOptions, TOTPData, TOTPStrategyOptions } from '../src/index'
+import type { SendTOTPOptions, TOTPStrategyOptions } from '../src/index'
 
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest'
 import invariant from 'tiny-invariant'
@@ -13,27 +13,21 @@ import {
   HOST_URL,
   AUTH_OPTIONS,
   TOTP_GENERATION_DEFAULTS,
-  MAGIC_LINK_GENERATION_DEFAULTS,
   DEFAULT_EMAIL,
   sessionStorage,
+  MAGIC_LINK_PATH,
 } from './utils'
 
 /**
  * Mocks.
  */
-export const verify = vi.fn()
-export const createTOTP = vi.fn()
-export const readTOTP = vi.fn()
-export const updateTOTP = vi.fn()
-export const sendTOTP = vi.fn()
-export const validateEmail = vi.fn()
+const verify = vi.fn()
+const sendTOTP = vi.fn()
 
 const TOTP_STRATEGY_OPTIONS: TOTPStrategyOptions = {
   secret: SECRET_ENV,
-  createTOTP,
-  readTOTP,
-  updateTOTP,
   sendTOTP,
+  magicLinkPath: MAGIC_LINK_PATH,
 }
 
 beforeEach(() => {
@@ -54,10 +48,10 @@ describe('[ Basics ]', () => {
   test('Should throw an Error on missing required secret option.', async () => {
     const strategy = new TOTPStrategy(
       // @ts-expect-error - Error is expected since missing secret option.
-      { createTOTP, readTOTP, updateTOTP, sendTOTP },
+      { sendTOTP },
       verify,
     )
-    const request = new Request(`${HOST_URL}`, {
+    const request = new Request(`${HOST_URL}/login`, {
       method: 'POST',
     })
     await expect(() =>
@@ -67,7 +61,7 @@ describe('[ Basics ]', () => {
 
   test('Should throw an Error on missing required successRedirect option.', async () => {
     const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
-    const request = new Request(`${HOST_URL}`, {
+    const request = new Request(`${HOST_URL}/login`, {
       method: 'POST',
     })
     await expect(() =>
@@ -75,141 +69,33 @@ describe('[ Basics ]', () => {
     ).rejects.toThrow(ERRORS.REQUIRED_SUCCESS_REDIRECT_URL)
   })
 
-  test('Should throw a custom Error message.', async () => {
-    const CUSTOM_ERROR = 'Custom error message.'
-    const strategy = new TOTPStrategy(
-      {
-        ...TOTP_STRATEGY_OPTIONS,
-        customErrors: {
-          requiredEmail: CUSTOM_ERROR,
-        },
-      },
-      verify,
-    )
-    const formData = new FormData()
-    formData.append(FORM_FIELDS.EMAIL, '')
-    const request = new Request(`${HOST_URL}`, {
+  test('Should throw an Error on missing required failureRedirect option.', async () => {
+    const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
+    const request = new Request(`${HOST_URL}/login`, {
       method: 'POST',
-      body: formData,
     })
     await expect(() =>
       strategy.authenticate(request, sessionStorage, {
         ...AUTH_OPTIONS,
-        successRedirect: '/',
+        successRedirect: '/verify',
       }),
-    ).rejects.toThrow(CUSTOM_ERROR)
+    ).rejects.toThrow(ERRORS.REQUIRED_FAILURE_REDIRECT_URL)
   })
 })
 
 describe('[ TOTP ]', () => {
-  describe('1st Authentication Phase', () => {
-    test('Should throw an Error on missing formData email.', async () => {
-      const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
-      const formData = new FormData()
-      formData.append(FORM_FIELDS.EMAIL, '')
-      const request = new Request(`${HOST_URL}`, {
-        method: 'POST',
-        body: formData,
+  describe('Generate/Send TOTP', () => {
+    test('Should generate/send TOTP for form email.', async () => {
+      sendTOTP.mockImplementation(async (options: SendTOTPOptions) => {
+        expect(options.email).toBe(DEFAULT_EMAIL)
+        expect(options.code).to.not.equal('')
+        expect(options.request).toBeInstanceOf(Request)
+        expect(options.formData).toBeInstanceOf(FormData)
       })
-      await expect(() =>
-        strategy.authenticate(request, sessionStorage, {
-          ...AUTH_OPTIONS,
-          successRedirect: '/',
-        }),
-      ).rejects.toThrow(ERRORS.REQUIRED_EMAIL)
-    })
-
-    test('Should throw an Error on invalid form email.', async () => {
-      const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
-      const formData = new FormData()
-      formData.append(FORM_FIELDS.EMAIL, '@invalid-email')
-      const request = new Request(`${HOST_URL}`, {
-        method: 'POST',
-        body: formData,
-      })
-      await expect(() =>
-        strategy.authenticate(request, sessionStorage, {
-          ...AUTH_OPTIONS,
-          successRedirect: '/',
-        }),
-      ).rejects.toThrow(ERRORS.INVALID_EMAIL)
-    })
-
-    test('Should call createTOTP function.', async () => {
       const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
       const formData = new FormData()
       formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
-      const request = new Request(`${HOST_URL}`, {
-        method: 'POST',
-        body: formData,
-      })
-      await strategy
-        .authenticate(request, sessionStorage, {
-          ...AUTH_OPTIONS,
-          successRedirect: '/',
-        })
-        .catch((reason) => {
-          if (reason instanceof Response) {
-            expect(reason.status).toBe(302)
-          } else throw reason
-        })
-
-      expect(createTOTP).toHaveBeenCalledTimes(1)
-    })
-
-    test('Should call sendTOTP function.', async () => {
-      const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
-      const formData = new FormData()
-      formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
-      const request = new Request(`${HOST_URL}`, {
-        method: 'POST',
-        body: formData,
-      })
-      await strategy
-        .authenticate(request, sessionStorage, {
-          ...AUTH_OPTIONS,
-          successRedirect: '/',
-        })
-        .catch((reason) => {
-          if (reason instanceof Response) {
-            expect(reason.status).toBe(302)
-          } else throw reason
-        })
-
-      expect(sendTOTP).toHaveBeenCalledTimes(1)
-    })
-
-    test('Should contain auth:email, auth:totp, and auth:totpExpiresAt properties in session.', async () => {
-      const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
-      const formData = new FormData()
-      formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
-      const request = new Request(`${HOST_URL}`, {
-        method: 'POST',
-        body: formData,
-      })
-      await strategy
-        .authenticate(request, sessionStorage, {
-          ...AUTH_OPTIONS,
-          successRedirect: '/',
-        })
-        .catch(async (reason) => {
-          if (reason instanceof Response) {
-            expect(reason.status).toBe(302)
-            const session = await sessionStorage.getSession(
-              reason.headers.get('set-cookie') ?? '',
-            )
-            expect(session.data).toHaveProperty(SESSION_KEYS.EMAIL)
-            expect(session.data).toHaveProperty(SESSION_KEYS.TOTP)
-            expect(session.data).toHaveProperty(SESSION_KEYS.TOTP_EXPIRES_AT)
-          } else throw reason
-        })
-    })
-
-    test('Should contain Location header pointing to provided successRedirect url.', async () => {
-      const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
-      const formData = new FormData()
-      formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
-      const request = new Request(`${HOST_URL}`, {
+      const request = new Request(`${HOST_URL}/login`, {
         method: 'POST',
         body: formData,
       })
@@ -217,89 +103,450 @@ describe('[ TOTP ]', () => {
         .authenticate(request, sessionStorage, {
           ...AUTH_OPTIONS,
           successRedirect: '/verify',
+          failureRedirect: '/login',
         })
-        .catch((reason) => {
+        .catch(async (reason) => {
           if (reason instanceof Response) {
             expect(reason.status).toBe(302)
-            expect(reason.headers.get('location')).toMatch('/verify')
+            expect(reason.headers.get('location')).toBe('/verify')
+            const session = await sessionStorage.getSession(
+              reason.headers.get('set-cookie') ?? '',
+            )
+            expect(session.get(SESSION_KEYS.EMAIL)).toBe(DEFAULT_EMAIL)
+            expect(session.get(SESSION_KEYS.TOTP)).toBeDefined()
           } else throw reason
         })
+
+      expect(sendTOTP).toHaveBeenCalledTimes(1)
     })
 
-    test('Re-send TOTP - Should invalidate previous TOTP.', async () => {
-      updateTOTP.mockImplementation(async (_, { active }) => {
-        expect(active).toBe(false)
+    test('Should generate/send TOTP for form email with application form data.', async () => {
+      const APP_FORM_FIELD = 'via'
+      const APP_FORM_VALUE = 'whatsapp'
+      sendTOTP.mockImplementation(async (options: SendTOTPOptions) => {
+        expect(options.email).toBe(DEFAULT_EMAIL)
+        expect(options.code).to.not.equal('')
+        expect(options.request).toBeInstanceOf(Request)
+        expect(options.formData).toBeInstanceOf(FormData)
+        expect(options.formData.get(APP_FORM_FIELD)).toBe(APP_FORM_VALUE)
       })
-
       const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
-      const session = await sessionStorage.getSession()
-      session.set(SESSION_KEYS.EMAIL, DEFAULT_EMAIL)
-      session.set(SESSION_KEYS.TOTP, 'JWT-SIGNED')
-      session.set(
-        SESSION_KEYS.TOTP_EXPIRES_AT,
-        new Date(Date.now() + TOTP_GENERATION_DEFAULTS.period * 1000).toISOString(),
-      )
-      const request = new Request(`${HOST_URL}`, {
+      const formData = new FormData()
+      formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
+      formData.append(APP_FORM_FIELD, APP_FORM_VALUE)
+      const request = new Request(`${HOST_URL}/login`, {
         method: 'POST',
-        headers: {
-          cookie: await sessionStorage.commitSession(session),
-        },
-        body: new FormData(), // Empty form data indicates re-send new TOTP.
+        body: formData,
       })
       await strategy
         .authenticate(request, sessionStorage, {
           ...AUTH_OPTIONS,
-          successRedirect: '/',
+          successRedirect: '/verify',
+          failureRedirect: '/login',
         })
-        .catch((reason) => {
+        .catch(async (reason) => {
           if (reason instanceof Response) {
             expect(reason.status).toBe(302)
+            expect(reason.headers.get('location')).toBe('/verify')
+            const session = await sessionStorage.getSession(
+              reason.headers.get('set-cookie') ?? '',
+            )
+            expect(session.get(SESSION_KEYS.EMAIL)).toBe(DEFAULT_EMAIL)
+            expect(session.get(SESSION_KEYS.TOTP)).toBeDefined()
           } else throw reason
         })
-      expect(updateTOTP).toHaveBeenCalledTimes(1)
+
+      expect(sendTOTP).toHaveBeenCalledTimes(1)
+    })
+
+    test('Should generate/send TOTP for form email ignoring form totp code.', async () => {
+      sendTOTP.mockImplementation(async (options: SendTOTPOptions) => {
+        expect(options.email).toBe(DEFAULT_EMAIL)
+        expect(options.code).to.not.equal('')
+        expect(options.request).toBeInstanceOf(Request)
+        expect(options.formData).toBeInstanceOf(FormData)
+      })
+      const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
+      const formData = new FormData()
+      formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
+      formData.append(FORM_FIELDS.CODE, '123456')
+      const request = new Request(`${HOST_URL}/login`, {
+        method: 'POST',
+        body: formData,
+      })
+      await strategy
+        .authenticate(request, sessionStorage, {
+          ...AUTH_OPTIONS,
+          successRedirect: '/verify',
+          failureRedirect: '/login',
+        })
+        .catch(async (reason) => {
+          if (reason instanceof Response) {
+            expect(reason.status).toBe(302)
+            expect(reason.headers.get('location')).toMatch('/verify')
+            const session = await sessionStorage.getSession(
+              reason.headers.get('set-cookie') ?? '',
+            )
+            expect(session.get(SESSION_KEYS.EMAIL)).toBe(DEFAULT_EMAIL)
+            expect(session.get(SESSION_KEYS.TOTP)).toBeDefined()
+          } else throw reason
+        })
+
+      expect(sendTOTP).toHaveBeenCalledTimes(1)
+    })
+
+    test('Should generate/send TOTP for form email ignoring session email.', async () => {
+      let session: Session | undefined
+      let sessionTotp: unknown
+      const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
+      const formDataToPopulateSessionEmail = new FormData()
+      formDataToPopulateSessionEmail.append(FORM_FIELDS.EMAIL, 'email@session.com')
+      const requestToPopulateSessionEmail = new Request(`${HOST_URL}/login`, {
+        method: 'POST',
+        body: formDataToPopulateSessionEmail,
+      })
+      await strategy
+        .authenticate(requestToPopulateSessionEmail, sessionStorage, {
+          ...AUTH_OPTIONS,
+          successRedirect: '/verify',
+          failureRedirect: '/login',
+        })
+        .catch(async (reason) => {
+          if (reason instanceof Response) {
+            expect(reason.status).toBe(302)
+            expect(reason.headers.get('location')).toBe('/verify')
+            session = await sessionStorage.getSession(
+              reason.headers.get('set-cookie') ?? '',
+            )
+            expect(session.get(SESSION_KEYS.EMAIL)).toBe('email@session.com')
+            expect(session.get(SESSION_KEYS.TOTP)).toBeDefined()
+            sessionTotp = session.get(SESSION_KEYS.TOTP)
+          } else throw reason
+        })
+      sendTOTP.mockImplementation(async (options: SendTOTPOptions) => {
+        expect(options.email).toBe(DEFAULT_EMAIL)
+        expect(options.code).to.not.equal('')
+      })
+      if (!session) throw new Error('Undefined session.')
+      const formData = new FormData()
+      formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
+      const request = new Request(`${HOST_URL}/login`, {
+        method: 'POST',
+        headers: {
+          cookie: await sessionStorage.commitSession(session),
+        },
+        body: formData,
+      })
+      await strategy
+        .authenticate(request, sessionStorage, {
+          ...AUTH_OPTIONS,
+          successRedirect: '/verify',
+          failureRedirect: '/login',
+        })
+        .catch(async (reason) => {
+          if (reason instanceof Response) {
+            expect(reason.status).toBe(302)
+            expect(reason.headers.get('location')).toBe('/verify')
+            const session = await sessionStorage.getSession(
+              reason.headers.get('set-cookie') ?? '',
+            )
+            expect(session.get(SESSION_KEYS.EMAIL)).toBe(DEFAULT_EMAIL)
+            expect(session.get(SESSION_KEYS.TOTP)).toBeDefined()
+            expect(session.get(SESSION_KEYS.TOTP)).not.toEqual(sessionTotp)
+          } else throw reason
+        })
+      expect(sendTOTP).toHaveBeenCalledTimes(2)
+    })
+
+    test('Should generate/send TOTP for empty form data with session email.', async () => {
+      sendTOTP.mockImplementation(async (options: SendTOTPOptions) => {
+        expect(options.email).toBe(DEFAULT_EMAIL)
+        expect(options.code).to.not.equal('')
+        expect(options.request).toBeInstanceOf(Request)
+        expect(options.formData).toBeInstanceOf(FormData)
+      })
+      let session: Session | undefined
+      let sessionTotp: unknown
+      const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
+      const formData = new FormData()
+      formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
+      const requestToPopulateSessionEmail = new Request(`${HOST_URL}/login`, {
+        method: 'POST',
+        body: formData,
+      })
+      await strategy
+        .authenticate(requestToPopulateSessionEmail, sessionStorage, {
+          ...AUTH_OPTIONS,
+          successRedirect: '/verify',
+          failureRedirect: '/login',
+        })
+        .catch(async (reason) => {
+          if (reason instanceof Response) {
+            expect(reason.status).toBe(302)
+            expect(reason.headers.get('location')).toBe('/verify')
+            session = await sessionStorage.getSession(
+              reason.headers.get('set-cookie') ?? '',
+            )
+            expect(session.get(SESSION_KEYS.EMAIL)).toBe(DEFAULT_EMAIL)
+            expect(session.get(SESSION_KEYS.TOTP)).toBeDefined()
+            sessionTotp = session.get(SESSION_KEYS.TOTP)
+          } else throw reason
+        })
+      if (!session) throw new Error('Undefined session.')
+      const emptyFormRequest = new Request(`${HOST_URL}/login`, {
+        method: 'POST',
+        headers: {
+          cookie: await sessionStorage.commitSession(session),
+        },
+        body: new FormData(),
+      })
+      await strategy
+        .authenticate(emptyFormRequest, sessionStorage, {
+          ...AUTH_OPTIONS,
+          successRedirect: '/verify',
+          failureRedirect: '/login',
+        })
+        .catch(async (reason) => {
+          if (reason instanceof Response) {
+            expect(reason.status).toBe(302)
+            expect(reason.headers.get('location')).toBe('/verify')
+            const session = await sessionStorage.getSession(
+              reason.headers.get('set-cookie') ?? '',
+            )
+            expect(session.get(SESSION_KEYS.EMAIL)).toBe(DEFAULT_EMAIL)
+            expect(session.get(SESSION_KEYS.TOTP)).toBeDefined()
+            expect(session.get(SESSION_KEYS.TOTP)).not.toEqual(sessionTotp)
+          } else throw reason
+        })
+      expect(sendTOTP).toHaveBeenCalledTimes(2)
+    })
+
+    test('Should generate/send TOTP for application form data with session email.', async () => {
+      const APP_FORM_FIELD = 'via'
+      const APP_FORM_VALUE = 'whatsapp'
+      sendTOTP.mockImplementation(async (options: SendTOTPOptions) => {
+        expect(options.email).toBe(DEFAULT_EMAIL)
+        expect(options.code).to.not.equal('')
+        expect(options.request).toBeInstanceOf(Request)
+        expect(options.formData).toBeInstanceOf(FormData)
+        expect(options.formData.get(APP_FORM_FIELD)).toBe(APP_FORM_VALUE)
+      })
+      let session: Session | undefined
+      let sessionTotp: unknown
+      const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
+      const formData = new FormData()
+      formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
+      formData.append(APP_FORM_FIELD, APP_FORM_VALUE)
+      const requestToPopulateSessionEmail = new Request(`${HOST_URL}/login`, {
+        method: 'POST',
+        body: formData,
+      })
+      await strategy
+        .authenticate(requestToPopulateSessionEmail, sessionStorage, {
+          ...AUTH_OPTIONS,
+          successRedirect: '/verify',
+          failureRedirect: '/login',
+        })
+        .catch(async (reason) => {
+          if (reason instanceof Response) {
+            expect(reason.status).toBe(302)
+            expect(reason.headers.get('location')).toBe('/verify')
+            session = await sessionStorage.getSession(
+              reason.headers.get('set-cookie') ?? '',
+            )
+            expect(session.get(SESSION_KEYS.EMAIL)).toBe(DEFAULT_EMAIL)
+            expect(session.get(SESSION_KEYS.TOTP)).toBeDefined()
+            sessionTotp = session.get(SESSION_KEYS.TOTP)
+          } else throw reason
+        })
+      if (!session) throw new Error('Undefined session.')
+      const appFormData = new FormData()
+      appFormData.append(APP_FORM_FIELD, APP_FORM_VALUE)
+      const appFormRequest = new Request(`${HOST_URL}/login`, {
+        method: 'POST',
+        headers: {
+          cookie: await sessionStorage.commitSession(session),
+        },
+        body: appFormData,
+      })
+      await strategy
+        .authenticate(appFormRequest, sessionStorage, {
+          ...AUTH_OPTIONS,
+          successRedirect: '/verify',
+          failureRedirect: '/login',
+        })
+        .catch(async (reason) => {
+          if (reason instanceof Response) {
+            expect(reason.status).toBe(302)
+            expect(reason.headers.get('location')).toBe('/verify')
+            const session = await sessionStorage.getSession(
+              reason.headers.get('set-cookie') ?? '',
+            )
+            expect(session.get(SESSION_KEYS.EMAIL)).toBe(DEFAULT_EMAIL)
+            expect(session.get(SESSION_KEYS.TOTP)).toBeDefined()
+            expect(session.get(SESSION_KEYS.TOTP)).not.toEqual(sessionTotp)
+          } else throw reason
+        })
+      expect(sendTOTP).toHaveBeenCalledTimes(2)
+    })
+
+    test('Should failure redirect on invalid email.', async () => {
+      const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
+      const formData = new FormData()
+      formData.append(FORM_FIELDS.EMAIL, '@invalid-email')
+      const request = new Request(`${HOST_URL}/login`, {
+        method: 'POST',
+        body: formData,
+      })
+      await strategy
+        .authenticate(request, sessionStorage, {
+          ...AUTH_OPTIONS,
+          successRedirect: '/verify',
+          failureRedirect: '/login',
+        })
+        .catch(async (reason) => {
+          if (reason instanceof Response) {
+            expect(reason.status).toBe(302)
+            expect(reason.headers.get('location')).toBe('/login')
+            const session = await sessionStorage.getSession(
+              reason.headers.get('set-cookie') ?? '',
+            )
+            expect(session.get(AUTH_OPTIONS.sessionErrorKey)).toEqual({
+              message: ERRORS.INVALID_EMAIL,
+            })
+          } else throw reason
+        })
+    })
+
+    test('Should failure redirect on invalid email with custom error.', async () => {
+      const CUSTOM_ERROR = 'TEST: Invalid email.'
+      const strategy = new TOTPStrategy(
+        {
+          ...TOTP_STRATEGY_OPTIONS,
+          customErrors: {
+            invalidEmail: CUSTOM_ERROR,
+          },
+        },
+        verify,
+      )
+      const formData = new FormData()
+      formData.append(FORM_FIELDS.EMAIL, '@invalid-email')
+      const request = new Request(`${HOST_URL}/login`, {
+        method: 'POST',
+        body: formData,
+      })
+      await strategy
+        .authenticate(request, sessionStorage, {
+          ...AUTH_OPTIONS,
+          successRedirect: '/verify',
+          failureRedirect: '/login',
+        })
+        .catch(async (reason) => {
+          if (reason instanceof Response) {
+            expect(reason.status).toBe(302)
+            expect(reason.headers.get('location')).toBe('/login')
+            const session = await sessionStorage.getSession(
+              reason.headers.get('set-cookie') ?? '',
+            )
+            expect(session.get(AUTH_OPTIONS.sessionErrorKey)).toEqual({
+              message: CUSTOM_ERROR,
+            })
+          } else throw reason
+        })
+    })
+
+    test('Should failure redirect when custom validateEmail returns false.', async () => {
+      const ERROR_MESSAGE = 'TEST: Invalid email.'
+      const strategy = new TOTPStrategy(
+        {
+          ...TOTP_STRATEGY_OPTIONS,
+          customErrors: {
+            invalidEmail: ERROR_MESSAGE,
+          },
+          validateEmail: async () => false,
+        },
+        verify,
+      )
+      const formData = new FormData()
+      formData.append(FORM_FIELDS.EMAIL, '@invalid-email')
+      const request = new Request(`${HOST_URL}/login`, {
+        method: 'POST',
+        body: formData,
+      })
+      await strategy
+        .authenticate(request, sessionStorage, {
+          ...AUTH_OPTIONS,
+          successRedirect: '/verify',
+          failureRedirect: '/login',
+        })
+        .catch(async (reason) => {
+          if (reason instanceof Response) {
+            expect(reason.status).toBe(302)
+            expect(reason.headers.get('location')).toBe('/login')
+            const session = await sessionStorage.getSession(
+              reason.headers.get('set-cookie') ?? '',
+            )
+            expect(session.get(AUTH_OPTIONS.sessionErrorKey)).toEqual({
+              message: ERROR_MESSAGE,
+            })
+          } else throw reason
+        })
+    })
+
+    test('Should failure redirect on missing email.', async () => {
+      const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
+      const request = new Request(`${HOST_URL}/login`, {
+        method: 'POST',
+        body: new FormData(),
+      })
+      await strategy
+        .authenticate(request, sessionStorage, {
+          ...AUTH_OPTIONS,
+          successRedirect: '/verify',
+          failureRedirect: '/login',
+        })
+        .catch(async (reason) => {
+          if (reason instanceof Response) {
+            expect(reason.status).toBe(302)
+            expect(reason.headers.get('location')).toBe('/login')
+            const session = await sessionStorage.getSession(
+              reason.headers.get('set-cookie') ?? '',
+            )
+            expect(session.get(AUTH_OPTIONS.sessionErrorKey)).toEqual({
+              message: ERRORS.REQUIRED_EMAIL,
+            })
+          } else throw reason
+        })
     })
   })
 
-  describe('2nd Authentication Phase', () => {
-    async function setupFirstAuthPhase(
+  describe('Validate TOTP', () => {
+    async function setupGenerateSendTOTP(
       totpStrategyOptions: Partial<TOTPStrategyOptions> = {},
     ) {
       const user = { name: 'Joe Schmoe' }
-      let totpData: TOTPData | undefined
-      let totpDataExpiresAt: Date | undefined
       let sendTOTPOptions: SendTOTPOptions | undefined
       let session: Session | undefined
+
+      sendTOTP.mockImplementation(async (options: SendTOTPOptions) => {
+        sendTOTPOptions = options
+        expect(options.email).toBe(DEFAULT_EMAIL)
+        expect(options.code).to.not.equal('')
+        expect(options.magicLink).toBe(
+          `${HOST_URL}${MAGIC_LINK_PATH}?code=${options.code}`,
+        )
+      })
+
       const strategy = new TOTPStrategy<typeof user>(
-        {
-          secret: SECRET_ENV,
-          createTOTP: async (data, expiresAt) => {
-            expect(totpData).not.toBeDefined()
-            expect(data.active).toBeTruthy()
-            expect(data.attempts).toBe(0)
-            totpData = data
-            totpDataExpiresAt = expiresAt
-          },
-          readTOTP: async (hash) => {
-            expect(totpData).toBeDefined()
-            invariant(totpData, 'Undefined totpData')
-            expect(totpData.hash).toBe(hash)
-            return totpData
-          },
-          updateTOTP: async (hash, data, expiresAt) => {
-            expect(totpData).toBeDefined()
-            invariant(totpData, 'Undefined totpData')
-            expect(totpData.hash).toBe(hash)
-            expect(totpDataExpiresAt).toEqual(expiresAt)
-            totpData = { ...totpData, ...data }
-          },
-          sendTOTP: async (options) => {
-            sendTOTPOptions = options
-            expect(options.email).toBe(DEFAULT_EMAIL)
-            expect(options.magicLink).toBe(`${HOST_URL}/magic-link?code=${options.code}`)
-          },
-          ...totpStrategyOptions,
-        },
-        () => {
+        { ...TOTP_STRATEGY_OPTIONS, ...totpStrategyOptions },
+        async ({ email, formData, request }) => {
+          expect(email).toBe(DEFAULT_EMAIL)
+          expect(request).toBeInstanceOf(Request)
+          if (request.method === 'POST') {
+            expect(formData).toBeInstanceOf(FormData)
+          } else {
+            expect(formData).not.toBeDefined()
+          }
           return Promise.resolve(user)
         },
       )
@@ -313,6 +560,7 @@ describe('[ TOTP ]', () => {
         .authenticate(request, sessionStorage, {
           ...AUTH_OPTIONS,
           successRedirect: '/verify',
+          failureRedirect: '/login',
         })
         .catch(async (reason) => {
           if (reason instanceof Response) {
@@ -321,26 +569,122 @@ describe('[ TOTP ]', () => {
             session = await sessionStorage.getSession(
               reason.headers.get('set-cookie') ?? '',
             )
+            expect(session.get(SESSION_KEYS.EMAIL)).toBe(DEFAULT_EMAIL)
+            expect(session.get(SESSION_KEYS.TOTP)).toBeDefined()
           } else throw reason
         })
 
-      expect(totpData).toBeDefined()
-      invariant(totpData, 'Undefined totpData')
-      expect(totpData.active).toBeTruthy()
-      expect(totpDataExpiresAt).toBeDefined()
-      invariant(totpDataExpiresAt, 'Undefined totpDataExpiresAt')
+      expect(sendTOTP).toHaveBeenCalledTimes(1)
       expect(sendTOTPOptions).toBeDefined()
       invariant(sendTOTPOptions, 'Undefined sendTOTPOptions')
       expect(session).toBeDefined()
       invariant(session, 'Undefined session')
-      return { strategy, totpData, totpDataExpiresAt, sendTOTPOptions, session, user }
+      return { strategy, sendTOTPOptions, session, user }
     }
 
-    test('Should throw an Error on invalid and max TOTP attempts.', async () => {
-      const { strategy, session, sendTOTPOptions } = await setupFirstAuthPhase()
-      for (let i = 0; i < TOTP_GENERATION_DEFAULTS.maxAttempts + 1; i++) {
+    test('Should successfully validate totp code.', async () => {
+      const { strategy, sendTOTPOptions, session, user } = await setupGenerateSendTOTP()
+      const formData = new FormData()
+      formData.append(FORM_FIELDS.CODE, sendTOTPOptions.code)
+      const request = new Request(`${HOST_URL}/verify`, {
+        method: 'POST',
+        headers: {
+          cookie: await sessionStorage.commitSession(session),
+        },
+        body: formData,
+      })
+      await strategy
+        .authenticate(request, sessionStorage, {
+          ...AUTH_OPTIONS,
+          successRedirect: '/account',
+          failureRedirect: '/login',
+        })
+        .catch(async (reason) => {
+          if (reason instanceof Response) {
+            expect(reason.status).toBe(302)
+            expect(reason.headers.get('location')).toBe(`/account`)
+            const session = await sessionStorage.getSession(
+              reason.headers.get('set-cookie') ?? '',
+            )
+            expect(session.get('user')).toEqual(user)
+            expect(session.get(SESSION_KEYS.EMAIL)).not.toBeDefined()
+            expect(session.get(SESSION_KEYS.TOTP)).not.toBeDefined()
+          } else throw reason
+        })
+    })
+
+    test('Should failure redirect on invalid totp code.', async () => {
+      const { strategy, sendTOTPOptions, session } = await setupGenerateSendTOTP()
+      const formData = new FormData()
+      formData.append(FORM_FIELDS.CODE, sendTOTPOptions.code + 'INVALID')
+      const request = new Request(`${HOST_URL}/verify`, {
+        method: 'POST',
+        headers: {
+          cookie: await sessionStorage.commitSession(session),
+        },
+        body: formData,
+      })
+      await strategy
+        .authenticate(request, sessionStorage, {
+          ...AUTH_OPTIONS,
+          successRedirect: '/account',
+          failureRedirect: '/verify',
+        })
+        .catch(async (reason) => {
+          if (reason instanceof Response) {
+            expect(reason.status).toBe(302)
+            expect(reason.headers.get('location')).toBe(`/verify`)
+            const session = await sessionStorage.getSession(
+              reason.headers.get('set-cookie') ?? '',
+            )
+            expect(session.get(AUTH_OPTIONS.sessionErrorKey)).toEqual({
+              message: ERRORS.INVALID_TOTP,
+            })
+          } else throw reason
+        })
+    })
+
+    test('Should failure redirect on invalid totp code with custom error.', async () => {
+      const CUSTOM_ERROR = 'TEST: invalid totp code'
+      const { strategy, sendTOTPOptions, session } = await setupGenerateSendTOTP({
+        customErrors: {
+          invalidTotp: CUSTOM_ERROR,
+        },
+      })
+      const formData = new FormData()
+      formData.append(FORM_FIELDS.CODE, sendTOTPOptions.code + 'INVALID')
+      const request = new Request(`${HOST_URL}/verify`, {
+        method: 'POST',
+        headers: {
+          cookie: await sessionStorage.commitSession(session),
+        },
+        body: formData,
+      })
+      await strategy
+        .authenticate(request, sessionStorage, {
+          ...AUTH_OPTIONS,
+          successRedirect: '/account',
+          failureRedirect: '/verify',
+        })
+        .catch(async (reason) => {
+          if (reason instanceof Response) {
+            expect(reason.status).toBe(302)
+            expect(reason.headers.get('location')).toBe(`/verify`)
+            const session = await sessionStorage.getSession(
+              reason.headers.get('set-cookie') ?? '',
+            )
+            expect(session.get(AUTH_OPTIONS.sessionErrorKey)).toEqual({
+              message: CUSTOM_ERROR,
+            })
+          } else throw reason
+        })
+    })
+
+    test('Should failure redirect on invalid and max TOTP attempts.', async () => {
+      let { strategy, session, sendTOTPOptions } = await setupGenerateSendTOTP()
+      for (let i = 0; i <= TOTP_GENERATION_DEFAULTS.maxAttempts; i++) {
         const formData = new FormData()
-        formData.append(FORM_FIELDS.TOTP, sendTOTPOptions.code + i)
+        formData.append(FORM_FIELDS.CODE, sendTOTPOptions.code + 'INVALID')
         const request = new Request(`${HOST_URL}/verify`, {
           method: 'POST',
           headers: {
@@ -348,92 +692,37 @@ describe('[ TOTP ]', () => {
           },
           body: formData,
         })
-        await expect(() =>
-          strategy.authenticate(request, sessionStorage, {
+        await strategy
+          .authenticate(request, sessionStorage, {
             ...AUTH_OPTIONS,
-            successRedirect: '/',
-          }),
-        ).rejects.toThrowError(
-          i < TOTP_GENERATION_DEFAULTS.maxAttempts
-            ? ERRORS.INVALID_TOTP
-            : ERRORS.INACTIVE_TOTP,
-        )
+            successRedirect: '/account',
+            failureRedirect: '/verify',
+          })
+          .catch(async (reason) => {
+            if (reason instanceof Response) {
+              expect(reason.status).toBe(302)
+              expect(reason.headers.get('location')).toBe(`/verify`)
+              session = await sessionStorage.getSession(
+                reason.headers.get('set-cookie') ?? '',
+              )
+              expect(session.get(AUTH_OPTIONS.sessionErrorKey)).toEqual({
+                message:
+                  i < TOTP_GENERATION_DEFAULTS.maxAttempts
+                    ? ERRORS.INVALID_TOTP
+                    : ERRORS.EXPIRED_TOTP,
+              })
+            } else throw reason
+          })
       }
     })
 
-    test('Should throw an Error on missing TOTP from database.', async () => {
-      const { strategy, session, sendTOTPOptions } = await setupFirstAuthPhase({
-        readTOTP,
-      })
-      const formData = new FormData()
-      formData.append(FORM_FIELDS.TOTP, sendTOTPOptions.code)
-      const request = new Request(`${HOST_URL}/verify`, {
-        method: 'POST',
-        headers: {
-          cookie: await sessionStorage.commitSession(session),
-        },
-        body: formData,
-      })
-      await expect(() =>
-        strategy.authenticate(request, sessionStorage, {
-          ...AUTH_OPTIONS,
-          successRedirect: '/account',
-        }),
-      ).rejects.toThrowError(ERRORS.TOTP_NOT_FOUND)
-    })
-
-    test('Should throw a custom Error message on missing TOTP from database.', async () => {
-      const CUSTOM_ERROR = 'Custom error message.'
-      const { strategy, session, sendTOTPOptions } = await setupFirstAuthPhase({
-        readTOTP,
-        customErrors: { totpNotFound: CUSTOM_ERROR },
-      })
-      const formData = new FormData()
-      formData.append(FORM_FIELDS.TOTP, sendTOTPOptions.code)
-      const request = new Request(`${HOST_URL}/verify`, {
-        method: 'POST',
-        headers: {
-          cookie: await sessionStorage.commitSession(session),
-        },
-        body: formData,
-      })
-      await expect(() =>
-        strategy.authenticate(request, sessionStorage, {
-          ...AUTH_OPTIONS,
-          successRedirect: '/account',
-        }),
-      ).rejects.toThrowError(CUSTOM_ERROR)
-    })
-
-    test('Should throw an Error on inactive TOTP.', async () => {
-      const { strategy, session, sendTOTPOptions } = await setupFirstAuthPhase({
-        readTOTP: () =>
-          Promise.resolve({ hash: 'SIGNED-JWT', attempts: 0, active: false }),
-      })
-      const formData = new FormData()
-      formData.append(FORM_FIELDS.TOTP, sendTOTPOptions.code)
-      const request = new Request(`${HOST_URL}/verify`, {
-        method: 'POST',
-        headers: {
-          cookie: await sessionStorage.commitSession(session),
-        },
-        body: formData,
-      })
-      await expect(() =>
-        strategy.authenticate(request, sessionStorage, {
-          ...AUTH_OPTIONS,
-          successRedirect: '/account',
-        }),
-      ).rejects.toThrowError(ERRORS.INACTIVE_TOTP)
-    })
-
-    test('Should throw an Error on expired TOTP verification.', async () => {
-      const { strategy, session, sendTOTPOptions } = await setupFirstAuthPhase()
+    test('Should failure redirect on expired totp code.', async () => {
+      const { strategy, sendTOTPOptions, session } = await setupGenerateSendTOTP()
       vi.setSystemTime(
         new Date(Date.now() + 1000 * 60 * (TOTP_GENERATION_DEFAULTS.period + 1)),
       )
       const formData = new FormData()
-      formData.append(FORM_FIELDS.TOTP, sendTOTPOptions.code)
+      formData.append(FORM_FIELDS.CODE, sendTOTPOptions.code)
       const request = new Request(`${HOST_URL}/verify`, {
         method: 'POST',
         headers: {
@@ -441,16 +730,128 @@ describe('[ TOTP ]', () => {
         },
         body: formData,
       })
-      await expect(() =>
-        strategy.authenticate(request, sessionStorage, {
+      await strategy
+        .authenticate(request, sessionStorage, {
           ...AUTH_OPTIONS,
-          successRedirect: '/',
-        }),
-      ).rejects.toThrow(ERRORS.INACTIVE_TOTP)
+          successRedirect: '/account',
+          failureRedirect: '/verify',
+        })
+        .catch(async (reason) => {
+          if (reason instanceof Response) {
+            expect(reason.status).toBe(302)
+            expect(reason.headers.get('location')).toBe(`/verify`)
+            const session = await sessionStorage.getSession(
+              reason.headers.get('set-cookie') ?? '',
+            )
+            expect(session.get(AUTH_OPTIONS.sessionErrorKey)).toEqual({
+              message: ERRORS.EXPIRED_TOTP,
+            })
+          } else throw reason
+        })
     })
 
-    test('Should throw an Error on expired magic-link TOTP verification.', async () => {
-      const { strategy, session, sendTOTPOptions } = await setupFirstAuthPhase()
+    test('Should failure redirect on expired totp code with custom error.', async () => {
+      const CUSTOM_ERROR = 'TEST: expired totp code'
+      const { strategy, sendTOTPOptions, session } = await setupGenerateSendTOTP({
+        customErrors: {
+          expiredTotp: CUSTOM_ERROR,
+        },
+      })
+      vi.setSystemTime(
+        new Date(Date.now() + 1000 * 60 * (TOTP_GENERATION_DEFAULTS.period + 1)),
+      )
+      const formData = new FormData()
+      formData.append(FORM_FIELDS.CODE, sendTOTPOptions.code)
+      const request = new Request(`${HOST_URL}/verify`, {
+        method: 'POST',
+        headers: {
+          cookie: await sessionStorage.commitSession(session),
+        },
+        body: formData,
+      })
+      await strategy
+        .authenticate(request, sessionStorage, {
+          ...AUTH_OPTIONS,
+          successRedirect: '/account',
+          failureRedirect: '/verify',
+        })
+        .catch(async (reason) => {
+          if (reason instanceof Response) {
+            expect(reason.status).toBe(302)
+            expect(reason.headers.get('location')).toBe(`/verify`)
+            const session = await sessionStorage.getSession(
+              reason.headers.get('set-cookie') ?? '',
+            )
+            expect(session.get(AUTH_OPTIONS.sessionErrorKey)).toEqual({
+              message: CUSTOM_ERROR,
+            })
+          } else throw reason
+        })
+    })
+
+    test('Should successfully validate magic-link.', async () => {
+      const { strategy, sendTOTPOptions, session, user } = await setupGenerateSendTOTP()
+      expect(sendTOTPOptions.magicLink).toBeDefined()
+      invariant(sendTOTPOptions.magicLink, 'Magic link is undefined.')
+      const request = new Request(sendTOTPOptions.magicLink, {
+        method: 'GET',
+        headers: {
+          cookie: await sessionStorage.commitSession(session),
+        },
+      })
+      await strategy
+        .authenticate(request, sessionStorage, {
+          ...AUTH_OPTIONS,
+          successRedirect: '/account',
+          failureRedirect: '/login',
+        })
+        .catch(async (reason) => {
+          if (reason instanceof Response) {
+            expect(reason.status).toBe(302)
+            expect(reason.headers.get('location')).toBe(`/account`)
+            const session = await sessionStorage.getSession(
+              reason.headers.get('set-cookie') ?? '',
+            )
+            expect(session.get('user')).toEqual(user)
+            expect(session.get('user')).toEqual(user)
+            expect(session.get(SESSION_KEYS.EMAIL)).not.toBeDefined()
+            expect(session.get(SESSION_KEYS.TOTP)).not.toBeDefined()
+          } else throw reason
+        })
+    })
+
+    test('Should failure redirect on invalid magic-link code.', async () => {
+      const { strategy, sendTOTPOptions, session } = await setupGenerateSendTOTP()
+      expect(sendTOTPOptions.magicLink).toBeDefined()
+      invariant(sendTOTPOptions.magicLink, 'Magic link is undefined.')
+      const request = new Request(sendTOTPOptions.magicLink + 'INVALID', {
+        method: 'GET',
+        headers: {
+          cookie: await sessionStorage.commitSession(session),
+        },
+      })
+      await strategy
+        .authenticate(request, sessionStorage, {
+          ...AUTH_OPTIONS,
+          successRedirect: '/account',
+          failureRedirect: '/login',
+        })
+        .catch(async (reason) => {
+          if (reason instanceof Response) {
+            expect(reason.status).toBe(302)
+            expect(reason.headers.get('location')).toBe(`/login`)
+            const session = await sessionStorage.getSession(
+              reason.headers.get('set-cookie') ?? '',
+            )
+            expect(session.get(AUTH_OPTIONS.sessionErrorKey)).toEqual({
+              message: ERRORS.INVALID_TOTP,
+            })
+          } else throw reason
+        })
+    })
+
+    test('Should failure redirect on expired magic-link.', async () => {
+      const { strategy, sendTOTPOptions, session } = await setupGenerateSendTOTP()
       expect(sendTOTPOptions.magicLink).toBeDefined()
       invariant(sendTOTPOptions.magicLink, 'Magic link is undefined.')
       vi.setSystemTime(
@@ -462,196 +863,118 @@ describe('[ TOTP ]', () => {
           cookie: await sessionStorage.commitSession(session),
         },
       })
-      await expect(() =>
-        strategy.authenticate(request, sessionStorage, {
-          ...AUTH_OPTIONS,
-          successRedirect: '/account',
-        }),
-      ).rejects.toThrow(ERRORS.INACTIVE_TOTP)
-    })
-
-    test('Should throw an Error on invalid magic-link path.', async () => {
-      const { strategy, sendTOTPOptions } = await setupFirstAuthPhase()
-      expect(sendTOTPOptions.magicLink).toBeDefined()
-      invariant(sendTOTPOptions.magicLink, 'Magic link is undefined.')
-      expect(sendTOTPOptions.magicLink).toMatch(/\/magic-link/)
-      const request = new Request(
-        sendTOTPOptions.magicLink.replace(/\/magic-link/, '/invalid-magic-link'),
-        { method: 'GET' },
-      )
-      await expect(() =>
-        strategy.authenticate(request, sessionStorage, {
-          ...AUTH_OPTIONS,
-          successRedirect: '/account',
-        }),
-      ).rejects.toThrow(ERRORS.INVALID_MAGIC_LINK_PATH)
-    })
-
-    test('Should successfully validate TOTP.', async () => {
-      const { strategy, session, sendTOTPOptions } = await setupFirstAuthPhase()
-      const formData = new FormData()
-      formData.append(FORM_FIELDS.TOTP, sendTOTPOptions.code)
-      const request = new Request(`${HOST_URL}/verify`, {
-        method: 'POST',
-        headers: {
-          cookie: await sessionStorage.commitSession(session),
-        },
-        body: formData,
-      })
       await strategy
         .authenticate(request, sessionStorage, {
           ...AUTH_OPTIONS,
           successRedirect: '/account',
-        })
-        .catch((reason) => {
-          if (reason instanceof Response) {
-            expect(reason.status).toBe(302)
-            expect(reason.headers.get('location')).toBe(`/account`)
-          } else throw reason
-        })
-    })
-
-    test('Should contain user property in session.', async () => {
-      const { strategy, session, sendTOTPOptions, user } = await setupFirstAuthPhase()
-      const formData = new FormData()
-      formData.append(FORM_FIELDS.TOTP, sendTOTPOptions.code)
-      const request = new Request(`${HOST_URL}/verify`, {
-        method: 'POST',
-        headers: {
-          cookie: await sessionStorage.commitSession(session),
-        },
-        body: formData,
-      })
-      await strategy
-        .authenticate(request, sessionStorage, {
-          ...AUTH_OPTIONS,
-          successRedirect: '/account',
+          failureRedirect: '/login',
         })
         .catch(async (reason) => {
           if (reason instanceof Response) {
             expect(reason.status).toBe(302)
+            expect(reason.headers.get('location')).toBe(`/login`)
             const session = await sessionStorage.getSession(
               reason.headers.get('set-cookie') ?? '',
             )
-            expect(session.has('user')).toBeTruthy()
-            expect(session.get('user')).toEqual(user)
+            expect(session.get(AUTH_OPTIONS.sessionErrorKey)).toEqual({
+              message: ERRORS.EXPIRED_TOTP,
+            })
           } else throw reason
         })
     })
-  })
 
-  describe('End to End', () => {
-    test('Should authenticate user with valid TOTP.', async () => {
-      const user = { name: 'Joe Schmoe' }
-      let totpData: TOTPData | undefined
-      let totpDataExpiresAt: Date | undefined
-      let sendTOTPOptions: SendTOTPOptions | undefined
-      let session: Session | undefined
-      const strategy = new TOTPStrategy(
+    test('Should failure redirect on invalid magic-link path.', async () => {
+      const { strategy, sendTOTPOptions, session } = await setupGenerateSendTOTP()
+      expect(sendTOTPOptions.magicLink).toBeDefined()
+      invariant(sendTOTPOptions.magicLink, 'Magic link is undefined.')
+      expect(sendTOTPOptions.magicLink).toMatch(MAGIC_LINK_PATH)
+      const request = new Request(
+        sendTOTPOptions.magicLink.replace(MAGIC_LINK_PATH, '/invalid-magic-link'),
         {
-          secret: SECRET_ENV,
-          createTOTP: async (data, expiresAt) => {
-            expect(totpData).not.toBeDefined()
-            expect(data.active).toBeTruthy()
-            expect(data.attempts).toBe(0)
-            totpData = data
-            totpDataExpiresAt = expiresAt
-          },
-          readTOTP: async (hash) => {
-            expect(totpData).toBeDefined()
-            invariant(totpData, 'TOTP data is undefined.')
-            expect(totpData.hash).toBe(hash)
-            return totpData
-          },
-          updateTOTP: async (hash, data, expiresAt) => {
-            expect(totpData).toBeDefined()
-            invariant(totpData, 'TOTP data is undefined.')
-            expect(totpData.hash).toBe(hash)
-            expect(totpDataExpiresAt).toEqual(expiresAt)
-            totpData = { ...totpData, ...data }
-          },
-          sendTOTP: async (options) => {
-            sendTOTPOptions = options
-            expect(options.email).toBe(DEFAULT_EMAIL)
-            expect(options.magicLink).toBe(`${HOST_URL}/magic-link?code=${options.code}`)
-          },
-        },
-        () => {
-          return Promise.resolve(user)
-        },
-      )
-      {
-        const formData = new FormData()
-        formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
-
-        const request = new Request(`${HOST_URL}`, {
-          method: 'POST',
-          body: formData,
-        })
-
-        await strategy
-          .authenticate(request, sessionStorage, {
-            ...AUTH_OPTIONS,
-            successRedirect: '/verify',
-          })
-          .catch(async (reason) => {
-            if (reason instanceof Response) {
-              expect(reason.status).toBe(302)
-              expect(reason.headers.get('location')).toBe('/verify')
-              session = await sessionStorage.getSession(
-                reason.headers.get('set-cookie') ?? '',
-              )
-            } else throw reason
-          })
-      }
-      expect(totpData).toBeDefined()
-      invariant(totpData, 'Undefined totpData')
-      expect(totpData.active).toBeTruthy()
-      expect(totpData.attempts).toBe(0)
-      expect(totpDataExpiresAt).toBeDefined()
-      invariant(totpDataExpiresAt, 'Undefined totpDataExpiresAt')
-      expect(sendTOTPOptions).toBeDefined()
-      invariant(sendTOTPOptions, 'Undefined sendTOTPOptions')
-      expect(session).toBeDefined()
-      invariant(session, 'Undefined session')
-      expect(session.get(SESSION_KEYS.EMAIL)).toBe(DEFAULT_EMAIL)
-      expect(session.get(SESSION_KEYS.TOTP)).toBe(totpData?.hash)
-      expect(session.get(SESSION_KEYS.TOTP_EXPIRES_AT)).toBe(
-        totpDataExpiresAt?.toISOString(),
-      )
-      {
-        const formData = new FormData()
-        formData.append(FORM_FIELDS.TOTP, sendTOTPOptions.code)
-
-        const request = new Request(`${HOST_URL}`, {
-          method: 'POST',
+          method: 'GET',
           headers: {
             cookie: await sessionStorage.commitSession(session),
           },
-          body: formData,
+        },
+      )
+      await strategy
+        .authenticate(request, sessionStorage, {
+          ...AUTH_OPTIONS,
+          successRedirect: '/account',
+          failureRedirect: '/login',
         })
+        .catch(async (reason) => {
+          if (reason instanceof Response) {
+            expect(reason.status).toBe(302)
+            expect(reason.headers.get('location')).toBe(`/login`)
+            const session = await sessionStorage.getSession(
+              reason.headers.get('set-cookie') ?? '',
+            )
+            expect(session.get(AUTH_OPTIONS.sessionErrorKey)).toEqual({
+              message: ERRORS.INVALID_MAGIC_LINK_PATH,
+            })
+          } else throw reason
+        })
+    })
 
+    test('Should failure redirect on stale magic-link.', async () => {
+      const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
+      const request = new Request('https://prodserver.com/magic-link?code=KJJERI', {
+        method: 'GET',
+      })
+      await strategy
+        .authenticate(request, sessionStorage, {
+          ...AUTH_OPTIONS,
+          successRedirect: '/account',
+          failureRedirect: '/login',
+        })
+        .catch(async (reason) => {
+          if (reason instanceof Response) {
+            expect(reason.status).toBe(302)
+            expect(reason.headers.get('location')).toBe(`/login`)
+            const session = await sessionStorage.getSession(
+              reason.headers.get('set-cookie') ?? '',
+            )
+            expect(session.get(AUTH_OPTIONS.sessionErrorKey)).toEqual({
+              message: ERRORS.EXPIRED_TOTP,
+            })
+          } else throw reason
+        })
+    })
+
+    test('Should failure redirect on magic-link invalid and max TOTP attempts.', async () => {
+      let { strategy, session, sendTOTPOptions } = await setupGenerateSendTOTP()
+      expect(sendTOTPOptions.magicLink).toBeDefined()
+      invariant(sendTOTPOptions.magicLink, 'Magic link is undefined.')
+      for (let i = 0; i <= TOTP_GENERATION_DEFAULTS.maxAttempts; i++) {
+        const request = new Request(sendTOTPOptions.magicLink + 'INVALID', {
+          method: 'GET',
+          headers: {
+            cookie: await sessionStorage.commitSession(session),
+          },
+        })
         await strategy
           .authenticate(request, sessionStorage, {
             ...AUTH_OPTIONS,
             successRedirect: '/account',
+            failureRedirect: '/verify',
           })
           .catch(async (reason) => {
             if (reason instanceof Response) {
               expect(reason.status).toBe(302)
-              expect(reason.headers.get('location')).toBe('/account')
+              expect(reason.headers.get('location')).toBe(`/verify`)
               session = await sessionStorage.getSession(
                 reason.headers.get('set-cookie') ?? '',
               )
+              expect(session.get(AUTH_OPTIONS.sessionErrorKey)).toEqual({
+                message:
+                  i < TOTP_GENERATION_DEFAULTS.maxAttempts
+                    ? ERRORS.INVALID_TOTP
+                    : ERRORS.EXPIRED_TOTP,
+              })
             } else throw reason
           })
       }
-      expect(totpData).toBeDefined()
-      expect(totpData.active).toBeFalsy()
-      expect(totpData.attempts).toBe(0)
-      expect(session).toBeDefined()
-      invariant(session, 'Undefined session')
-      expect(session.get('user')).toEqual(user)
     })
   })
 })
@@ -672,7 +995,7 @@ describe('[ Utils ]', () => {
       const request = new Request(requestUrl)
       expect(
         generateMagicLink({
-          ...MAGIC_LINK_GENERATION_DEFAULTS,
+          magicLinkPath: '/magic-link',
           param: 'code',
           code: 'U2N2EY',
           request,

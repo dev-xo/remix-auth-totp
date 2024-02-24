@@ -1,12 +1,12 @@
-import type { TOTPGenerationOptions, MagicLinkGenerationOptions } from './index.js'
+import type { TOTPGenerationOptions, TOTPData } from './index.js'
+import { AuthenticateOptions } from 'remix-auth'
 import { SignJWT, jwtVerify } from 'jose'
 import { generateTOTP as _generateTOTP } from '@epic-web/totp'
 import { ERRORS } from './constants.js'
 
 // @ts-expect-error - `thirty-two` is not typed.
 import * as base32 from 'thirty-two'
-import * as crypto from 'crypto'
-
+import * as crypto from 'node:crypto'
 /**
  * TOTP Generation.
  */
@@ -18,18 +18,13 @@ export function generateTOTP(options: TOTPGenerationOptions) {
   return _generateTOTP(options)
 }
 
-export function generateMagicLink(
-  options: MagicLinkGenerationOptions & {
-    code: string
-    param: string
-    request: Request
-  },
-) {
-  if (!options.enabled) {
-    return undefined
-  }
-
-  const url = new URL(options.callbackPath ?? '/', new URL(options.request.url).origin)
+export function generateMagicLink(options: {
+  code: string
+  magicLinkPath: string
+  param: string
+  request: Request
+}) {
+  const url = new URL(options.magicLinkPath ?? '/', new URL(options.request.url).origin)
   url.searchParams.set(options.param, options.code)
 
   return url.toString()
@@ -38,28 +33,26 @@ export function generateMagicLink(
 /**
  * JSON Web Token (JWT).
  */
+type TOTPPayload = Omit<ReturnType<typeof _generateTOTP>, 'otp'>
+
 type SignJWTOptions = {
-  payload: { [key: string]: any }
+  payload: TOTPPayload
   expiresIn: number
   secretKey: string
 }
 
 export async function signJWT({ payload, expiresIn, secretKey }: SignJWTOptions) {
-  try {
-    const algorithm = 'HS256'
-    const secret = new TextEncoder().encode(secretKey)
-    const expires = new Date(Date.now() + expiresIn * 1000)
+  const algorithm = 'HS256'
+  const secret = new TextEncoder().encode(secretKey)
+  const expires = new Date(Date.now() + expiresIn * 1000)
 
-    const token = await new SignJWT(payload)
-      .setProtectedHeader({ alg: algorithm })
-      .setExpirationTime(expires)
-      .setIssuedAt()
-      .sign(secret)
+  const token = await new SignJWT(payload)
+    .setProtectedHeader({ alg: algorithm })
+    .setExpirationTime(expires)
+    .setIssuedAt()
+    .sign(secret)
 
-    return token
-  } catch (err: unknown) {
-    throw new Error(ERRORS.INVALID_JWT)
-  }
+  return token
 }
 
 type VerifyJWTOptions = {
@@ -68,21 +61,53 @@ type VerifyJWTOptions = {
 }
 
 export async function verifyJWT({ jwt, secretKey }: VerifyJWTOptions) {
-  try {
-    const secret = new TextEncoder().encode(secretKey)
-    const { payload } = await jwtVerify(jwt, secret)
-    return payload
-  } catch (err: unknown) {
-    throw new Error(ERRORS.INVALID_JWT)
-  }
+  const secret = new TextEncoder().encode(secretKey)
+  const { payload } = await jwtVerify<TOTPPayload>(jwt, secret)
+  return payload
 }
 
 /**
  * Miscellaneous.
  */
-export function ensureStringOrUndefined(value: unknown) {
+
+export function coerceToOptionalString(value: unknown) {
   if (typeof value !== 'string' && value !== undefined) {
     throw new Error('Value must be a string or undefined.')
   }
   return value
+}
+
+export function coerceToOptionalNonEmptyString(value: unknown) {
+  if (typeof value === 'string' && value.length > 0) return value
+  return undefined
+}
+
+export function coerceToOptionalTotpData(value: unknown) {
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    'hash' in value &&
+    typeof (value as { hash: unknown }).hash === 'string' &&
+    'attempts' in value &&
+    typeof (value as { attempts: unknown }).attempts === 'number'
+  ) {
+    return value as TOTPData
+  }
+  return undefined
+}
+
+export type RequiredAuthenticateOptions = Required<
+  Pick<AuthenticateOptions, 'failureRedirect' | 'successRedirect'>
+> &
+  Omit<AuthenticateOptions, 'failureRedirect' | 'successRedirect'>
+
+export function assertIsRequiredAuthenticateOptions(
+  options: AuthenticateOptions,
+): asserts options is RequiredAuthenticateOptions {
+  if (options.successRedirect === undefined) {
+    throw new Error(ERRORS.REQUIRED_SUCCESS_REDIRECT_URL)
+  }
+  if (options.failureRedirect === undefined) {
+    throw new Error(ERRORS.REQUIRED_FAILURE_REDIRECT_URL)
+  }
 }

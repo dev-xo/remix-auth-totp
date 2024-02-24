@@ -43,11 +43,8 @@ npm install remix-auth-totp
 
 ## Usage
 
-Remix Auth TOTP exports four required methods:
+Remix Auth TOTP exports one required method:
 
-- `createTOTP` - Create the TOTP data in the database.
-- `readTOTP` - Read the TOTP data from the database.
-- `updateTOTP` - Update the TOTP data in the database.
 - `sendTOTP` - Sends the TOTP code to the user via email or any other method.
 
 Here's a basic overview of the authentication process.
@@ -62,41 +59,6 @@ Here's a basic overview of the authentication process.
 > Remix Auth TOTP is only Remix v2.0+ compatible.
 
 Let's see how we can implement the Strategy into our Remix App.
-
-## Database
-
-We'll require a database to store our TOTP data.
-
-For this example we'll use Prisma ORM with a SQLite database. As long as your database supports the following fields, you can use any database of choice.
-
-```ts
-/**
- * Fields:
- * - `hash`: String
- * - `active`: Boolean
- * - `attempts`: Int (Number)
- * - `expiresAt`: DateTime (Date)
- */
-model Totp {
-  // The encrypted data used to generate the OTP.
-  hash String @unique
-
-  // The status of the TOTP.
-  // Used internally / programmatically to invalidate TOTPs.
-  active Boolean
-
-  // The input attempts of the TOTP.
-  // Used internally to invalidate TOTPs after a certain amount of attempts.
-  attempts Int
-
-  // The expiration date of the TOTP.
-  // Used programmatically to invalidate unused TOTPs.
-  expiresAt DateTime
-
-  // Index for expiresAt
-  @@index([expiresAt])
-}
-```
 
 ## Email Service
 
@@ -172,20 +134,15 @@ type User = {
   email: string
 }
 
-export let authenticator = new Authenticator<User>(sessionStorage, {
-  throwOnError: true,
-})
+export let authenticator = new Authenticator<User>(sessionStorage)
 
 authenticator.use(
   new TOTPStrategy(
     {
       secret: process.env.ENCRYPTION_SECRET || 'NOT_A_STRONG_SECRET',
-      createTOTP: async (data, expiresAt) => {},
-      readTOTP: async (hash) => {},
-      updateTOTP: async (hash, data, expiresAt) => {},
-      sendTOTP: async ({ email, code, magicLink, user, form, request }) => {},
+      sendTOTP: async ({ email, code, magicLink }) => {},
     },
-    async ({ email, code, form, magicLink, request }) => {},
+    async ({ email }) => {},
   ),
 )
 ```
@@ -195,7 +152,7 @@ authenticator.use(
 
 ### 2: Implementing the Strategy Logic.
 
-The Strategy Instance requires the following four methods: `createTOTP`, `readTOTP`, `updateTOTP`, `sendTOTP`.
+The Strategy Instance requires the following method: `sendTOTP`.
 
 ```ts
 authenticator.use(
@@ -203,37 +160,15 @@ authenticator.use(
     {
       secret: process.env.ENCRYPTION_SECRET,
 
-      createTOTP: async (data, expiresAt) => {
-        await prisma.totp.create({ data: { ...data, expiresAt } })
-
-        try {
-          // Optional - Delete expired TOTP records.
-          // Feel free to handle this on a scheduled task.
-          await prisma.totp.deleteMany({ where: { expiresAt: { lt: new Date() } } })
-        } catch (error) {
-          console.warn('Error deleting expired TOTP records', error)
-        }
-      },
-      readTOTP: async (hash) => {
-        // Get the TOTP data from the database.
-        return await db.totp.findUnique({ where: { hash } })
-      },
-      updateTOTP: async (hash, data, expiresAt) => {
-        // Update the TOTP data in the database.
-        // No need to update expiresAt since it does not change after createTOTP().
-        await db.totp.update({ where: { hash }, data })
-      },
       sendTOTP: async ({ email, code, magicLink }) => {
         // Send the TOTP code to the user.
         await sendEmail({ email, code, magicLink })
       },
     },
-    async ({ email, code, magicLink, form, request }) => {},
+    async ({ email }) => {},
   ),
 )
 ```
-
-All these CRUD methods should be replaced and adapted with the ones provided by our database.
 
 ### 3. Creating and Storing the User.
 
@@ -249,12 +184,7 @@ authenticator.use(
       // createTOTP: async (data) => {},
       // ...
     },
-    async ({ email, code, magicLink, form, request }) => {
-      // You can determine whether the user is authenticating
-      // via OTP code submission or Magic-Link URL and run your own logic.
-      if (form) console.log('Optional form submission logic.')
-      if (magicLink) console.log('Optional magic-link submission logic.')
-
+    async ({ email }) => {
       // Get user from database.
       let user = await db.user.findFirst({
         where: { email },
@@ -294,13 +224,12 @@ export async function loader({ request }: DataFunctionArgs) {
     successRedirect: '/account',
   })
 
-  const cookie = await getSession(request.headers.get('Cookie'))
-  const authEmail = cookie.get('auth:email')
-  const authError = cookie.get(authenticator.sessionErrorKey)
+  const session = await getSession(request.headers.get('Cookie'))
+  const authError = session.get(authenticator.sessionErrorKey)
 
   // Commit session to clear any `flash` error message.
   return json(
-    { authEmail, authError },
+    { authError },
     {
       headers: {
         'set-cookie': await commitSession(session),
@@ -312,56 +241,94 @@ export async function loader({ request }: DataFunctionArgs) {
 export async function action({ request }: DataFunctionArgs) {
   await authenticator.authenticate('TOTP', request, {
     // The `successRedirect` route it's required.
-    // ...
     // User is not authenticated yet.
     // We want to redirect to our verify code form. (/verify-code or any other route).
     successRedirect: '/verify',
 
     // The `failureRedirect` route it's required.
-    // ...
     // We want to display any possible error message.
-    // If not provided, ErrorBoundary will be rendered instead.
     failureRedirect: '/login',
   })
 }
 
 export default function Login() {
-  let { authEmail, authError } = useLoaderData<typeof loader>()
+  let { authError } = useLoaderData<typeof loader>()
 
   return (
     <div style={{ display: 'flex' flexDirection: 'column' }}>
-      {/* Email Form. */}
-      {!authEmail && (
+      {/* Login Form. */}
         <Form method="POST">
           <label htmlFor="email">Email</label>
           <input type="email" name="email" placeholder="Insert email .." required />
           <button type="submit">Send Code</button>
         </Form>
-      )}
 
-      {/* Code Verification Form. */}
-      {authEmail && (
-        <div style={{ display: 'flex' flexDirection: 'column' }}>
-          {/* Renders the form that verifies the code. */}
-          <Form method="POST">
-            <label htmlFor="code">Code</label>
-            <input type="text" name="code" placeholder="Insert code .." required />
+      {/* Login Errors Handling. */}
+      <span>{authError?.message}</span>
+    </div>
+  )
+}
+```
 
-            <button type="submit">Continue</button>
-          </Form>
+### `verify.tsx`
 
-          {/* Renders the form that requests a new code. */}
-          {/* Email input is not required, it's already stored in Session. */}
-          <Form method="POST">
-            <button type="submit">Request new Code</button>
-          </Form>
-        </div>
-      )}
+```tsx
+// app/routes/verify.tsx
+import type { DataFunctionArgs } from '@remix-run/node'
+import { json, redirect } from '@remix-run/node'
+import { Form, useLoaderData } from '@remix-run/react'
 
-      {/* Email Errors Handling. */}
-      {!authEmail && (<span>{authError?.message || email?.error}</span>)}
+import { authenticator } from '~/modules/auth/auth.server.ts'
+import { getSession, commitSession } from '~/modules/auth/auth-session.server.ts'
+
+export async function loader({ request }: DataFunctionArgs) {
+  await authenticator.isAuthenticated(request, {
+    successRedirect: '/account',
+  })
+
+  const session = await getSession(request.headers.get('cookie'))
+  const authEmail = session.get('auth:email')
+  const authError = session.get(authenticator.sessionErrorKey)
+  if (!authEmail) return redirect('/login')
+
+  // Commit session to clear any `flash` error message.
+  return json({ authError }, {
+    headers: {
+      'set-cookie': await commitSession(session),
+    },
+  })
+}
+
+export async function action({ request }: DataFunctionArgs) {
+  const url = new URL(request.url)
+  const currentPath = url.pathname
+
+  await authenticator.authenticate('TOTP', request, {
+    successRedirect: currentPath,
+    failureRedirect: currentPath,
+  })
+}
+
+export default function Verify() {
+  const { authError } = useLoaderData<typeof loader>()
+
+  return (
+    <div style={{ display: 'flex' flexDirection: 'column' }}>
+      {/* Code Verification Form */}
+      <Form method="POST">
+        <label htmlFor="code">Code</label>
+        <input type="text" name="code" placeholder="Insert code .." required />
+        <button type="submit">Continue</button>
+      </Form>
+
+      {/* Renders the form that requests a new code. */}
+      {/* Email input is not required, it's already stored in Session. */}
+      <Form method="POST">
+        <button type="submit">Request new Code</button>
+      </Form>
+
       {/* Code Errors Handling. */}
-      {authEmail && (<span>{authError?.message || code?.error}</span>)}
+      <span>{authError?.message}</span>
     </div>
   )
 }
@@ -372,7 +339,6 @@ export default function Login() {
 ```tsx
 // app/routes/account.tsx
 import type { DataFunctionArgs } from '@remix-run/node'
-
 import { json } from '@remix-run/node'
 import { Form, useLoaderData } from '@remix-run/react'
 import { authenticator } from '~/modules/auth/auth.server'

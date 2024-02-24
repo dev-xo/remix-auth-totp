@@ -1,34 +1,32 @@
-import type { SessionStorage } from '@remix-run/server-runtime'
+import type { Session, SessionStorage } from '@remix-run/server-runtime'
 import type { AuthenticateOptions, StrategyVerifyCallback } from 'remix-auth'
 
 import { redirect } from '@remix-run/server-runtime'
 import { Strategy } from 'remix-auth'
 import { verifyTOTP } from '@epic-web/totp'
+import { errors } from 'jose'
 import {
   generateSecret,
   generateTOTP,
   generateMagicLink,
   signJWT,
   verifyJWT,
-  ensureStringOrUndefined,
+  coerceToOptionalString,
+  coerceToOptionalTotpData,
+  coerceToOptionalNonEmptyString,
+  assertIsRequiredAuthenticateOptions,
+  RequiredAuthenticateOptions,
 } from './utils.js'
 import { STRATEGY_NAME, FORM_FIELDS, SESSION_KEYS, ERRORS } from './constants.js'
 
 /**
- * The TOTP data the application stores.
- * Used in CRUD functions provided by the application.
+ * The TOTP data stored in the session.
  */
 export interface TOTPData {
   /**
    * The encrypted TOTP.
    */
   hash: string
-
-  /**
-   * The status of the TOTP.
-   * @default true
-   */
-  active: boolean
 
   /**
    * The number of attempts the user tried to verify the TOTP.
@@ -81,52 +79,6 @@ export interface TOTPGenerationOptions {
 }
 
 /**
- * The magic-link configuration.
- */
-export interface MagicLinkGenerationOptions {
-  /**
-   * Whether to enable the Magic Link generation.
-   * @default true
-   */
-  enabled?: boolean
-
-  /**
-   * The callback URL path for the Magic Link.
-   * @default '/magic-link'
-   */
-  callbackPath?: string
-}
-
-/**
- * The create TOTP CRUD method.
- *
- * @param data The TOTP data.
- * @param expiresAt The TOTP expiration date.
- */
-export interface CreateTOTP {
-  (data: TOTPData, expiresAt: Date): Promise<void>
-}
-
-/**
- * The read TOTP CRUD method.
- *  @param hash The hash of the TOTP.
- */
-export interface ReadTOTP {
-  (hash: string): Promise<TOTPData | null>
-}
-
-/**
- * The update TOTP CRUD method.
- *
- * @param hash The hash of the TOTP.
- * @param data The TOTP data to be updated.
- * @param expiresAt The TOTP expiration date. It is always the same as the expiration passed into createTOTP().
- */
-export interface UpdateTOTP {
-  (hash: string, data: Partial<Omit<TOTPData, 'hash'>>, expiresAt: Date): Promise<void>
-}
-
-/**
  * The send TOTP configuration.
  */
 export interface SendTOTPOptions {
@@ -143,17 +95,17 @@ export interface SendTOTPOptions {
   /**
    * The Magic Link URL.
    */
-  magicLink?: string
+  magicLink: string
 
   /**
-   * The formData object.
-   */
-  form?: FormData
-
-  /**
-   * The Request object.
+   * The request to generate the TOTP.
    */
   request: Request
+
+  /**
+   * The form data of the request.
+   */
+  formData: FormData
 }
 
 /**
@@ -171,7 +123,7 @@ export interface SendTOTP {
  * @param email The email address to validate.
  */
 export interface ValidateEmail {
-  (email: string): Promise<void>
+  (email: string): Promise<boolean>
 }
 
 /**
@@ -194,14 +146,9 @@ export interface CustomErrorsOptions {
   invalidTotp?: string
 
   /**
-   * The inactive TOTP error message.
+   * The expired TOTP error message.
    */
-  inactiveTotp?: string
-
-  /**
-   * The TOTP not found error message.
-   */
-  totpNotFound?: string
+  expiredTotp?: string
 }
 
 /**
@@ -225,34 +172,10 @@ export interface TOTPStrategyOptions {
   totpGeneration?: TOTPGenerationOptions
 
   /**
-   * The Magic Link configuration.
+   * The URL path for the Magic Link.
+   * @default '/magic-link'
    */
-  magicLinkGeneration?: MagicLinkGenerationOptions
-
-  /**
-   * The create TOTP method.
-   */
-  createTOTP: CreateTOTP
-
-  /**
-   * The read TOTP method.
-   */
-  readTOTP: ReadTOTP
-
-  /**
-   * The update TOTP method.
-   */
-  updateTOTP: UpdateTOTP
-
-  /**
-   * The send TOTP method.
-   */
-  sendTOTP: SendTOTP
-
-  /**
-   * The validate email method.
-   */
-  validateEmail?: ValidateEmail
+  magicLinkPath?: string
 
   /**
    * The custom errors configuration.
@@ -267,9 +190,9 @@ export interface TOTPStrategyOptions {
 
   /**
    * The form input name used to get the TOTP.
-   * @default "totp"
+   * @default "code"
    */
-  totpFieldKey?: string
+  codeFieldKey?: string
 
   /**
    * The session key that stores the email address.
@@ -284,15 +207,19 @@ export interface TOTPStrategyOptions {
   sessionTotpKey?: string
 
   /**
-   * The session key that stores the expiration of the TOTP.
-   * @default "auth:totpExpiresAt"
+   * The send TOTP method.
    */
-  sessionTotpExpiresAtKey?: string
+  sendTOTP: SendTOTP
+
+  /**
+   * The validate email method.
+   */
+  validateEmail?: ValidateEmail
 }
 
 /**
  * The verify method callback.
- * Returns required data to verify the user and handle additional logic.
+ * Returns the user for the email to be stored in the session.
  */
 export interface TOTPVerifyParams {
   /**
@@ -301,19 +228,9 @@ export interface TOTPVerifyParams {
   email: string
 
   /**
-   * The TOTP code.
-   */
-  code?: string
-
-  /**
-   * The Magic Link URL.
-   */
-  magicLink?: string
-
-  /**
    * The formData object from the Request.
    */
-  form?: FormData
+  formData?: FormData
 
   /**
    * The Request object.
@@ -326,39 +243,30 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
 
   private readonly secret: string
   private readonly maxAge: number | undefined
-  private readonly totpGeneration: TOTPGenerationOptions
-  private readonly magicLinkGeneration: MagicLinkGenerationOptions
-  private readonly createTOTP: CreateTOTP
-  private readonly readTOTP: ReadTOTP
-  private readonly updateTOTP: UpdateTOTP
-  private readonly sendTOTP: SendTOTP
-  private readonly validateEmail: ValidateEmail
-  private readonly customErrors: CustomErrorsOptions
+  private readonly totpGeneration: Required<TOTPGenerationOptions>
+  private readonly magicLinkPath: string
+  private readonly customErrors: Required<CustomErrorsOptions>
   private readonly emailFieldKey: string
-  private readonly totpFieldKey: string
+  private readonly codeFieldKey: string
   private readonly sessionEmailKey: string
   private readonly sessionTotpKey: string
-  private readonly sessionTotpExpiresAtKey: string
+  private readonly sendTOTP: SendTOTP
+  private readonly validateEmail: ValidateEmail
 
-  private readonly _totpGenerationDefaults = {
+  private readonly _totpGenerationDefaults: Required<TOTPGenerationOptions> = {
     secret: generateSecret(),
     algorithm: 'SHA1',
     charSet: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
     digits: 6,
     period: 60,
     maxAttempts: 3,
-  } satisfies TOTPGenerationOptions
-  private readonly _magicLinkGenerationDefaults = {
-    enabled: true,
-    callbackPath: '/magic-link',
-  } satisfies MagicLinkGenerationOptions
-  private readonly _customErrorsDefaults = {
+  }
+  private readonly _customErrorsDefaults: Required<CustomErrorsOptions> = {
     requiredEmail: ERRORS.REQUIRED_EMAIL,
     invalidEmail: ERRORS.INVALID_EMAIL,
     invalidTotp: ERRORS.INVALID_TOTP,
-    inactiveTotp: ERRORS.INACTIVE_TOTP,
-    totpNotFound: ERRORS.TOTP_NOT_FOUND,
-  } satisfies CustomErrorsOptions
+    expiredTotp: ERRORS.EXPIRED_TOTP,
+  }
 
   constructor(
     options: TOTPStrategyOptions,
@@ -366,26 +274,18 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   ) {
     super(verify)
     this.secret = options.secret
-    this.maxAge = options.maxAge ?? undefined
-    this.createTOTP = options.createTOTP
-    this.readTOTP = options.readTOTP
-    this.updateTOTP = options.updateTOTP
-    this.sendTOTP = options.sendTOTP
-    this.validateEmail = options.validateEmail ?? this._validateEmailDefaults
+    this.maxAge = options.maxAge
+    this.magicLinkPath = options.magicLinkPath ?? '/magic-link'
     this.emailFieldKey = options.emailFieldKey ?? FORM_FIELDS.EMAIL
-    this.totpFieldKey = options.totpFieldKey ?? FORM_FIELDS.TOTP
+    this.codeFieldKey = options.codeFieldKey ?? FORM_FIELDS.CODE
     this.sessionEmailKey = options.sessionEmailKey ?? SESSION_KEYS.EMAIL
     this.sessionTotpKey = options.sessionTotpKey ?? SESSION_KEYS.TOTP
-    this.sessionTotpExpiresAtKey =
-      options.sessionTotpExpiresAtKey ?? SESSION_KEYS.TOTP_EXPIRES_AT
+    this.sendTOTP = options.sendTOTP
+    this.validateEmail = options.validateEmail ?? this._validateEmailDefault
 
     this.totpGeneration = {
       ...this._totpGenerationDefaults,
       ...options.totpGeneration,
-    }
-    this.magicLinkGeneration = {
-      ...this._magicLinkGenerationDefaults,
-      ...options.magicLinkGeneration,
     }
     this.customErrors = {
       ...this._customErrorsDefaults,
@@ -393,268 +293,197 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     }
   }
 
+  /**
+   * Authenticates a user using TOTP.
+   *
+   * If the user is already authenticated, simply returns the user.
+   *
+   * | Method | Email | Code | Sess. Email | Sess. TOTP | Action/Logic                             |
+   * |--------|-------|------|-------------|------------|------------------------------------------|
+   * | POST   | ✓     | -    | -           | -          | Generate/send TOTP using form email.     |
+   * | POST   | ✗     | ✗    | ✓           | -          | Generate/send TOTP using session email.  |
+   * | POST   | ✗     | ✓    | ✓           | ✓          | Validate form TOTP code.                 |
+   * | GET    | -     | -    | ✓           | ✓          | Validate magic link TOTP.                |
+   *
+   * @param {Request} request - The request object.
+   * @param {SessionStorage} sessionStorage - The session storage instance.
+   * @param {AuthenticateOptions} options - The authentication options. successRedirect is required.
+   * @returns {Promise<User>} The authenticated user.
+   */
   async authenticate(
     request: Request,
     sessionStorage: SessionStorage,
     options: AuthenticateOptions,
   ): Promise<User> {
     if (!this.secret) throw new Error(ERRORS.REQUIRED_ENV_SECRET)
-    if (!options.successRedirect) throw new Error(ERRORS.REQUIRED_SUCCESS_REDIRECT_URL)
-
-    const isPOST = request.method === 'POST'
-    const isGET = request.method === 'GET'
+    assertIsRequiredAuthenticateOptions(options)
 
     const session = await sessionStorage.getSession(request.headers.get('cookie'))
-    const sessionEmail = ensureStringOrUndefined(session.get(this.sessionEmailKey))
-    const sessionTotp = ensureStringOrUndefined(session.get(this.sessionTotpKey))
-    const sessionTotpExpiresAt = ensureStringOrUndefined(
-      session.get(this.sessionTotpExpiresAtKey),
-    )
+    const user: User | null = session.get(options.sessionKey) ?? null
+    if (user) return this.success(user, request, sessionStorage, options)
 
-    let user: User | null = session.get(options.sessionKey) ?? null
-
-    let formData: FormData | undefined = undefined
-    let formDataEmail: string | undefined = undefined
-    let formDataTotp: string | undefined = undefined
-    let magicLinkTotp: string | undefined = undefined
+    const formData = request.method === 'POST' ? await request.formData() : new FormData()
+    const formDataEmail = coerceToOptionalNonEmptyString(formData.get(this.emailFieldKey))
+    const formDataCode = coerceToOptionalNonEmptyString(formData.get(this.codeFieldKey))
+    const sessionEmail = coerceToOptionalString(session.get(this.sessionEmailKey))
+    const sessionTotp = coerceToOptionalTotpData(session.get(this.sessionTotpKey))
+    const email =
+      request.method === 'POST'
+        ? formDataEmail ?? (!formDataCode ? sessionEmail : null)
+        : null
 
     try {
-      if (!user) {
-        /**
-         * 1st Authentication Phase.
-         */
-        if (isPOST) {
-          formData = await request.formData()
-          const form = Object.fromEntries(formData)
+      if (email) {
+        // Generate and Send TOTP.
+        const { code, hash, magicLink } = await this._generateTOTP({ email, request })
+        await this.sendTOTP({
+          email,
+          code,
+          magicLink,
+          formData,
+          request,
+        })
 
-          formDataEmail = form[this.emailFieldKey] && String(form[this.emailFieldKey])
-          formDataTotp = form[this.totpFieldKey] && String(form[this.totpFieldKey])
+        const totpData: TOTPData = { hash, attempts: 0 }
+        session.set(this.sessionEmailKey, email)
+        session.set(this.sessionTotpKey, totpData)
+        session.unset(options.sessionErrorKey)
 
-          /**
-           * Re-send TOTP - User has requested a new TOTP.
-           * This will invalidate previous TOTP and assign session email to form email.
-           */
-          if (
-            !formDataEmail &&
-            !formDataTotp &&
-            sessionEmail &&
-            sessionTotp &&
-            sessionTotpExpiresAt
-          ) {
-            const expiresAt = new Date(sessionTotpExpiresAt)
-            await this.updateTOTP(sessionTotp, { active: false }, expiresAt)
-            formDataEmail = sessionEmail
-          }
-
-          /**
-           * Invalidate previous TOTP - User has submitted a new email address.
-           */
-          if (
-            formDataEmail &&
-            sessionEmail &&
-            formDataEmail !== sessionEmail &&
-            sessionTotp &&
-            sessionTotpExpiresAt
-          ) {
-            const expiresAt = new Date(sessionTotpExpiresAt)
-            await this.updateTOTP(sessionTotp, { active: false }, expiresAt)
-          }
-
-          /**
-           * First TOTP request.
-           */
-          if (!formDataTotp) {
-            if (!formDataEmail) throw new Error(this.customErrors.requiredEmail)
-            await this.validateEmail(formDataEmail)
-
-            // Generate, Sign and create Magic Link.
-            const { otp: _otp, ...totp } = generateTOTP({
-              ...this.totpGeneration,
-              secret: generateSecret(),
-            })
-            const signedTotp = await signJWT({
-              payload: totp,
-              expiresIn:
-                this.totpGeneration.period ?? this._totpGenerationDefaults.period,
-              secretKey: this.secret,
-            })
-            const magicLink = generateMagicLink({
-              ...this.magicLinkGeneration,
-              param: this.totpFieldKey,
-              code: _otp,
-              request,
-            })
-
-            // Create TOTP in application storage. (Milliseconds since Unix epoch).
-            const expiresAtEpochMs =
-              Date.now() + (totp.period ?? this._totpGenerationDefaults.period) * 1000
-            const expiresAt = new Date(expiresAtEpochMs)
-
-            await this.createTOTP(
-              { hash: signedTotp, active: true, attempts: 0 },
-              expiresAt,
-            )
-
-            // Send TOTP.
-            await this.sendTOTP({
-              email: formDataEmail,
-              code: _otp,
-              magicLink,
-              form: formData,
-              request,
-            })
-
-            session.set(this.sessionEmailKey, formDataEmail)
-            session.set(this.sessionTotpKey, signedTotp)
-            session.set(this.sessionTotpExpiresAtKey, expiresAt.toISOString())
-            session.unset(options.sessionErrorKey)
-
-            throw redirect(options.successRedirect, {
-              headers: {
-                'set-cookie': await sessionStorage.commitSession(session, {
-                  maxAge: this.maxAge,
-                }),
-              },
-            })
-          }
-        }
-
-        /**
-         * 2nd Authentication Phase.
-         * Either via form submission or magic-link URL.
-         */
-        if (isGET && this.magicLinkGeneration.enabled) {
-          const url = new URL(request.url)
-
-          if (url.pathname !== this.magicLinkGeneration.callbackPath) {
-            throw new Error(ERRORS.INVALID_MAGIC_LINK_PATH)
-          }
-
-          magicLinkTotp = url.searchParams.has(this.totpFieldKey)
-            ? decodeURIComponent(url.searchParams.get(this.totpFieldKey) ?? '')
-            : undefined
-        }
-
-        if ((isPOST && formDataTotp) || (isGET && magicLinkTotp)) {
-          // Validation.
-          if (!sessionEmail || !sessionTotp || !sessionTotpExpiresAt) {
-            throw new Error(this.customErrors.inactiveTotp)
-          }
-
-          const expiresAt = new Date(sessionTotpExpiresAt)
-
-          if (isPOST && formDataTotp) {
-            await this._validateTOTP(sessionTotp, formDataTotp, expiresAt)
-          }
-          if (isGET && magicLinkTotp) {
-            await this._validateTOTP(sessionTotp, magicLinkTotp, expiresAt)
-          }
-
-          // Invalidation.
-          await this.updateTOTP(sessionTotp, { active: false }, expiresAt)
-
-          // Allow developer to handle user validation.
-          user = await this.verify({
-            email: sessionEmail,
-            form: formData,
-            magicLink: magicLinkTotp,
-            request,
-          })
-
-          session.set(options.sessionKey, user)
-          session.unset(this.sessionEmailKey)
-          session.unset(this.sessionTotpKey)
-          session.unset(this.sessionTotpExpiresAtKey)
-          session.unset(options.sessionErrorKey)
-
-          throw redirect(options.successRedirect, {
-            headers: {
-              'set-cookie': await sessionStorage.commitSession(session, {
-                maxAge: this.maxAge,
-              }),
-            },
-          })
-        }
+        throw redirect(options.successRedirect, {
+          headers: {
+            'set-cookie': await sessionStorage.commitSession(session, {
+              maxAge: this.maxAge,
+            }),
+          },
+        })
       }
-    } catch (error) {
-      // Allow Response to pass-through.
-      if (error instanceof Response && error.status === 302) throw error
-      if (error instanceof Error) {
-        if (error.message === ERRORS.INVALID_JWT) {
-          if (sessionTotp && sessionTotpExpiresAt) {
-            const dbTOTP = await this.readTOTP(sessionTotp)
-            if (!dbTOTP || !dbTOTP.hash) throw new Error(this.customErrors.totpNotFound)
 
-            const expiresAt = new Date(sessionTotpExpiresAt)
-            await this.updateTOTP(sessionTotp, { active: false }, expiresAt)
-          }
-          return await this.failure(
-            this.customErrors.inactiveTotp || ERRORS.INACTIVE_TOTP,
-            request,
-            sessionStorage,
-            options,
-            error,
-          )
-        }
+      const code = formDataCode ?? this._getMagicLinkCode(request)
+      if (code) {
+        // Validate TOTP.
+        if (!sessionEmail || !sessionTotp) throw new Error(this.customErrors.expiredTotp)
+        await this._validateTOTP({ code, sessionTotp, session, sessionStorage, options })
 
-        return await this.failure(error.message, request, sessionStorage, options, error)
+        const user = await this.verify({
+          email: sessionEmail,
+          formData: request.method === 'POST' ? formData : undefined,
+          request,
+        })
+
+        session.set(options.sessionKey, user)
+        session.unset(this.sessionEmailKey)
+        session.unset(this.sessionTotpKey)
+        session.unset(options.sessionErrorKey)
+
+        throw redirect(options.successRedirect, {
+          headers: {
+            'set-cookie': await sessionStorage.commitSession(session, {
+              maxAge: this.maxAge,
+            }),
+          },
+        })
       }
-      if (typeof error === 'string') {
+      throw new Error(this.customErrors.requiredEmail)
+    } catch (throwable) {
+      if (throwable instanceof Response) throw throwable
+      if (throwable instanceof Error) {
         return await this.failure(
-          error,
+          throwable.message,
           request,
           sessionStorage,
           options,
-          new Error(error),
+          throwable,
         )
       }
-      return await this.failure(
-        ERRORS.UNKNOWN_ERROR,
-        request,
-        sessionStorage,
-        options,
-        new Error(JSON.stringify(error, null, 2)),
-      )
+      throw throwable
     }
-
-    if (!user) throw new Error(ERRORS.USER_NOT_FOUND)
-
-    return this.success(user, request, sessionStorage, options)
   }
 
-  private async _validateEmailDefaults(email: string) {
-    const regexEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/gm
-    if (!regexEmail.test(email)) throw new Error(this.customErrors.invalidEmail)
-  }
+  private async _generateTOTP({ email, request }: { email: string; request: Request }) {
+    const isValidEmail = await this.validateEmail(email)
+    if (!isValidEmail) throw new Error(this.customErrors.invalidEmail)
 
-  private async _validateTOTP(sessionTotp: string, otp: string, expiresAt: Date) {
-    // Retrieve encrypted TOTP from database.
-    const dbTOTP = await this.readTOTP(sessionTotp)
-    if (!dbTOTP || !dbTOTP.hash) throw new Error(this.customErrors.totpNotFound)
-
-    if (dbTOTP.active !== true) {
-      throw new Error(this.customErrors.inactiveTotp)
-    }
-
-    const maxAttempts =
-      this.totpGeneration.maxAttempts ?? this._totpGenerationDefaults.maxAttempts
-
-    if (dbTOTP.attempts >= maxAttempts) {
-      await this.updateTOTP(sessionTotp, { active: false }, expiresAt)
-      throw new Error(this.customErrors.inactiveTotp)
-    }
-
-    // Decryption and Verification.
-    const { ...totp } = (await verifyJWT({
-      jwt: sessionTotp,
+    const { otp: code, ...totpPayload } = generateTOTP({
+      ...this.totpGeneration,
+      secret: generateSecret(),
+    })
+    const hash = await signJWT({
+      payload: totpPayload,
+      expiresIn: this.totpGeneration.period,
       secretKey: this.secret,
-    })) as Required<TOTPGenerationOptions>
+    })
+    const magicLink = generateMagicLink({
+      code,
+      magicLinkPath: this.magicLinkPath,
+      param: this.codeFieldKey,
+      request,
+    })
 
-    // Verify TOTP (@epic-web/totp).
-    const isValid = verifyTOTP({ ...totp, otp })
-    if (!isValid) {
-      await this.updateTOTP(sessionTotp, { attempts: dbTOTP.attempts + 1 }, expiresAt)
-      throw new Error(this.customErrors.invalidTotp)
+    return { code, hash, magicLink }
+  }
+
+  private _getMagicLinkCode(request: Request) {
+    if (request.method === 'GET') {
+      const url = new URL(request.url)
+      if (url.pathname !== this.magicLinkPath) {
+        throw new Error(ERRORS.INVALID_MAGIC_LINK_PATH)
+      }
+      if (url.searchParams.has(this.codeFieldKey)) {
+        return decodeURIComponent(url.searchParams.get(this.codeFieldKey) ?? '')
+      }
+    }
+    return undefined
+  }
+
+  private async _validateEmailDefault(email: string) {
+    const regexEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/gm
+    return regexEmail.test(email)
+  }
+
+  private async _validateTOTP({
+    code,
+    sessionTotp,
+    session,
+    sessionStorage,
+    options,
+  }: {
+    code: string
+    sessionTotp: TOTPData
+    session: Session
+    sessionStorage: SessionStorage
+    options: RequiredAuthenticateOptions
+  }) {
+    try {
+      // Decryption and Verification.
+      const totpPayload = await verifyJWT({
+        jwt: sessionTotp.hash,
+        secretKey: this.secret,
+      })
+
+      // Verify TOTP (@epic-web/totp).
+      if (!verifyTOTP({ ...totpPayload, otp: code })) {
+        throw new Error(this.customErrors.invalidTotp)
+      }
+    } catch (error) {
+      if (error instanceof errors.JWTExpired) {
+        session.unset(this.sessionTotpKey)
+        session.flash(options.sessionErrorKey, { message: this.customErrors.expiredTotp })
+      } else {
+        sessionTotp.attempts += 1
+        if (sessionTotp.attempts >= this.totpGeneration.maxAttempts) {
+          session.unset(this.sessionTotpKey)
+        } else {
+          session.set(this.sessionTotpKey, sessionTotp)
+        }
+        session.flash(options.sessionErrorKey, { message: this.customErrors.invalidTotp })
+      }
+      throw redirect(options.failureRedirect, {
+        headers: {
+          'set-cookie': await sessionStorage.commitSession(session, {
+            maxAge: this.maxAge,
+          }),
+        },
+      })
     }
   }
 }

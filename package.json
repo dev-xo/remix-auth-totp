@@ -24,7 +24,7 @@
     "test": "vitest --reporter verbose",
     "test:cov": "vitest run --coverage",
     "validate": "npm run lint && npm run typecheck && npx vitest --watch=false",
-    "prepare": "husky install",
+    "prepare": "husky install && npm run build",
     "prepublishOnly": "npm run validate && npm run build"
   },
   "files": [
@@ -38,7 +38,7 @@
     "/public/dist"
   ],
   "dependencies": {
-    "@epic-web/totp": "^1.1.1",
+    "@epic-web/totp": "^1.1.2",
     "jose": "^5.2.0",
     "thirty-two": "^1.0.2"
   },
