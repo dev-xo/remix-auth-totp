@@ -9,8 +9,8 @@ Remove `Totp` model from database if one exists.
 ### Implement `remix-auth-totp` API
 
 - Remove `createTOTP`, `readTOTP` and `updateTOTP` from `TOTPStrategy` options.
-- Change `form` to `formData` if you are using it in `sendTOTP` and `verify` functions
-- Remove deprecated parameters from `verify` function
+- Change `form` to `formData` if you are using it in `sendTOTP` and `verify` functions.
+- Remove deprecated parameters from `verify` function.
 
 ```ts
 authenticator.use(
