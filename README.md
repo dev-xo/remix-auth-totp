@@ -10,9 +10,11 @@
 
 <div align="center">
   <p>
-    <a href="https://github.com/dev-xo/remix-auth-totp?tab=readme-ov-file#features"><strong>Explore Docs »</strong></a>
+    <a href="https://github.com/dev-xo/remix-auth-totp?tab=readme-ov-file#usage"><strong>Get Started »</strong></a>
     <br/><br/>
     <a href="https://totp.fly.dev">Live Demo</a>
+    ·
+    <a href="https://github.com/dev-xo/remix-auth-totp/tree/main/docs">Documentation</a>
     ·
     <a href="https://github.com/dev-xo/remix-auth-totp/blob/main/docs/examples.md">Examples</a>
   </p>
@@ -31,7 +33,6 @@ npm install remix-auth-totp
 - **😌 Easy to Set Up** - Manages the entire authentication flow for you.
 - **🔐 Secure** - Features encrypted time-based codes.
 - **📧 Built-In Magic Link** - Authenticate users with a click.
-- **📚 Single Source of Truth** - A database of your choice.
 - **🛡 Bulletproof** - Crafted in strict TypeScript with high test coverage.
 - **🚀 Remix Auth Foundation** - An amazing authentication library for Remix.
 
