@@ -150,7 +150,7 @@ export interface TOTPStrategyOptions<User> {
 
 ### Remix v2 Compiler
 
-To use on the Cloudflare runtime, you'll need to add the following to your `remix.config.js` file to specify the polyfills for a couple of node builtin modules. See the remix docs on [supportNodeBuiltinsPolyfill](https://remix.run/docs/en/main/file-conventions/remix-config#servernodebuiltinspolyfill).
+To use it on the Cloudflare runtime, you'll need to add the following to your `remix.config.js` file to specify the polyfills for a couple of Node built-in modules. See the Remix Docs on [supportNodeBuiltinsPolyfill](https://remix.run/docs/en/main/file-conventions/remix-config#servernodebuiltinspolyfill).
 
 ### `remix.config.js`
 
@@ -167,7 +167,7 @@ export default {
 
 ### Vite
 
-Enable [nodejs compatiblity](https://developers.cloudflare.com/workers/runtime-apis/nodejs/) for Cloudflare in [wrangler.toml](https://developers.cloudflare.com/workers/runtime-apis/nodejs/#enable-nodejs-with-workers), [Cloudflare dashboard](https://developers.cloudflare.com/workers/runtime-apis/nodejs/#enable-nodejs-from-the-cloudflare-dashboard), and in the start script inside package.json
+Enable [Nodejs compatiblity](https://developers.cloudflare.com/workers/runtime-apis/nodejs/) for Cloudflare in [wrangler.toml](https://developers.cloudflare.com/workers/runtime-apis/nodejs/#enable-nodejs-with-workers), [Cloudflare Dashboard](https://developers.cloudflare.com/workers/runtime-apis/nodejs/#enable-nodejs-from-the-cloudflare-dashboard), and in the start script inside `package.json`.
 
 ```json
 "scripts": {
@@ -185,7 +185,7 @@ function setUpGlobals() {
 }
 ```
 
-### Using Cloudflare KV for session storage
+### Using Cloudflare KV for Session Storage
 
 ```ts
 const sessionStorage = createWorkersKVSessionStorage({
@@ -199,7 +199,9 @@ const sessionStorage = createWorkersKVSessionStorage({
     secure: ENVIRONMENT === 'production',
   },
 })
+
 const authenticator = new Authenticator<SessionUser>(sessionStorage)
+
 authenticator.use(
   new TOTPStrategy(
     {
