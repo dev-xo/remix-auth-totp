@@ -43,10 +43,10 @@ npm install remix-auth-totp
 
 ## Getting Started
 
-Please, read the [Getting Started Documentation](https://github.com/dev-xo/remix-auth-totp/tree/main/docs#getting-started) to learn how to set up the library in your application.
+Please, read the [Getting Started Documentation](https://github.com/dev-xo/remix-auth-totp/tree/main/docs#getting-started) in order to set up **Remix Auth TOTP** in your application.
 
 > [!TIP]
-> As a simpler alternative, you can use one of the [Official Starters](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/examples.md).
+> As a faster alternative, you can start with one of the [Starters Templates](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/examples.md).
 
 ## Support
 
