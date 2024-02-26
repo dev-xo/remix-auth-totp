@@ -1,6 +1,6 @@
 # Remix Auth TOTP Documentation
 
-Welcome to the Remix Auth TOTP documentation! Here you'll find everything you need to get started with TOTP (Time-Based One-Time Password) authentication in Remix.
+Welcome to the Remix Auth TOTP Documentation!
 
 ## List of Contents
 
