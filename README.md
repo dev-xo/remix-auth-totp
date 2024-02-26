@@ -39,7 +39,7 @@ npm install remix-auth-totp
 
 ## [Live Demo](https://totp.fly.dev)
 
-[![Remix Auth TOTP](https://raw.githubusercontent.com/dev-xo/dev-xo/main/remix-auth-totp/totp-thumbnail.png)](https://totp.fly.dev)
+[![Remix Auth TOTP](https://raw.githubusercontent.com/dev-xo/dev-xo/main/remix-auth-totp/demo-thumbnail.png)](https://totp.fly.dev)
 
 ## Getting Started
 
