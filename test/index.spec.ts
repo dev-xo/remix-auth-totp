@@ -16,6 +16,7 @@ import {
   DEFAULT_EMAIL,
   sessionStorage,
   MAGIC_LINK_PATH,
+  DEFAULT_CONTEXT,
 } from './utils'
 
 /**
@@ -86,11 +87,13 @@ describe('[ Basics ]', () => {
 describe('[ TOTP ]', () => {
   describe('Generate/Send TOTP', () => {
     test('Should generate/send TOTP for form email.', async () => {
+      const context = {}
       sendTOTP.mockImplementation(async (options: SendTOTPOptions) => {
         expect(options.email).toBe(DEFAULT_EMAIL)
         expect(options.code).to.not.equal('')
         expect(options.request).toBeInstanceOf(Request)
         expect(options.formData).toBeInstanceOf(FormData)
+        expect(options.context).toBe(context)
       })
       const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
       const formData = new FormData()
@@ -102,6 +105,7 @@ describe('[ TOTP ]', () => {
       await strategy
         .authenticate(request, sessionStorage, {
           ...AUTH_OPTIONS,
+          context: context,
           successRedirect: '/verify',
           failureRedirect: '/login',
         })
@@ -539,9 +543,10 @@ describe('[ TOTP ]', () => {
 
       const strategy = new TOTPStrategy<typeof user>(
         { ...TOTP_STRATEGY_OPTIONS, ...totpStrategyOptions },
-        async ({ email, formData, request }) => {
+        async ({ email, formData, request, context }) => {
           expect(email).toBe(DEFAULT_EMAIL)
           expect(request).toBeInstanceOf(Request)
+          expect(context).toBe(DEFAULT_CONTEXT)
           if (request.method === 'POST') {
             expect(formData).toBeInstanceOf(FormData)
           } else {

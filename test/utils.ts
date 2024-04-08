@@ -12,6 +12,7 @@ import * as crypto from 'crypto'
 export const SECRET_ENV = 'SECRET_ENV'
 export const HOST_URL = 'https://prodserver.com'
 export const DEFAULT_EMAIL = 'user@gmail.com'
+export const DEFAULT_CONTEXT = {}
 export const MAGIC_LINK_PATH = '/magic-link'
 
 /**
@@ -22,6 +23,7 @@ export const AUTH_OPTIONS = {
   sessionKey: 'user',
   sessionErrorKey: 'error',
   sessionStrategyKey: 'strategy',
+  context: DEFAULT_CONTEXT,
 } satisfies AuthenticateOptions
 
 export const TOTP_GENERATION_DEFAULTS: Required<TOTPGenerationOptions> = {
