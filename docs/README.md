@@ -117,7 +117,7 @@ authenticator.use(
 ```
 
 > [!TIP]
-> You can specify session duration with `maxAge` in milliseconds. Default is `undefined`, persisting across browser restarts.
+> You can specify session duration with `maxAge` in seconds. Default is `undefined`, persisting across browser restarts.
 
 ### 2: Implementing the Strategy Logic.
 
