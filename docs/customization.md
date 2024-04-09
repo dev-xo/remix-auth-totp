@@ -114,7 +114,7 @@ export interface TOTPStrategyOptions<User> {
    */
   secret: string
   /**
-   * The maximum age of the session in milliseconds.
+   * The maximum age of the session in seconds.
    * @default undefined
    */
   maxAge?: number
