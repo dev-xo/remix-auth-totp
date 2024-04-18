@@ -1,5 +1,5 @@
-import type { Session } from '@remix-run/server-runtime'
-import type { SendTOTPOptions, TOTPStrategyOptions } from '../src/index'
+import type { AppLoadContext, Session } from '@remix-run/server-runtime'
+import type { SendTOTPOptions, TOTPStrategyOptions, TOTPVerifyParams } from '../src/index'
 
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest'
 import invariant from 'tiny-invariant'
@@ -80,6 +80,77 @@ describe('[ Basics ]', () => {
         successRedirect: '/verify',
       }),
     ).rejects.toThrow(ERRORS.REQUIRED_FAILURE_REDIRECT_URL)
+  })
+
+  test('Context should be set in sendTOTP and verify when passed to authenticate', async () => {
+    const context: AppLoadContext = {
+      cloudflare: {
+        env: {
+          SECRET_ENV: 'secret',
+        },
+      },
+    }
+    let sendTOTPOptions: SendTOTPOptions | undefined
+    sendTOTP.mockImplementation(async (options: SendTOTPOptions) => {
+      sendTOTPOptions = options
+      expect(options.context).toEqual(context)
+    })
+    verify.mockImplementation(async (options: TOTPVerifyParams) => {
+      expect(options.context).toEqual(context)
+    })
+
+    const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
+    const formData = new FormData()
+    formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
+    let request = new Request(`${HOST_URL}/login`, {
+      method: 'POST',
+      body: formData,
+    })
+
+    let session: Session | undefined
+    await strategy
+      .authenticate(request, sessionStorage, {
+        ...AUTH_OPTIONS,
+        successRedirect: '/verify',
+        failureRedirect: '/login',
+        context,
+      })
+      .catch(async (reason) => {
+        if (reason instanceof Response) {
+          session = await sessionStorage.getSession(
+            reason.headers.get('set-cookie') ?? '',
+          )
+        } else throw reason
+      })
+
+    expect(sendTOTPOptions).not.toBeUndefined()
+    expect(session).not.toBeUndefined()
+    expect(sendTOTP).toHaveBeenCalledTimes(1)
+    expect(verify).toHaveBeenCalledTimes(0)
+
+    formData.delete(FORM_FIELDS.EMAIL)
+    formData.append(FORM_FIELDS.CODE, sendTOTPOptions?.code || '')
+    request = new Request(`${HOST_URL}/verify`, {
+      method: 'POST',
+      headers: {
+        cookie: (session && (await sessionStorage.commitSession(session))) || '',
+      },
+      body: formData,
+    })
+    await strategy
+      .authenticate(request, sessionStorage, {
+        ...AUTH_OPTIONS,
+        successRedirect: '/',
+        failureRedirect: '/login',
+        context,
+      })
+      .catch(async (reason) => {
+        if (reason instanceof Response) {
+        } else throw reason
+      })
+
+    expect(sendTOTP).toHaveBeenCalledTimes(1)
+    expect(verify).toHaveBeenCalledTimes(1)
   })
 })
 
