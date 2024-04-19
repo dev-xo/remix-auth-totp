@@ -94,7 +94,6 @@ Implement the following code and replace the `secret` property with a strong str
 // app/modules/auth/auth.server.ts
 import { Authenticator } from 'remix-auth'
 import { TOTPStrategy } from 'remix-auth-totp'
-
 import { sessionStorage } from './session.server'
 import { sendEmail } from './email.server'
 import { db } from '~/db'
@@ -150,7 +149,6 @@ This should return the user data that will be stored in Session.
 authenticator.use(
   new TOTPStrategy(
     {
-      // We've already set up these options.
       // createTOTP: async (data) => {},
       // ...
     },
@@ -159,14 +157,12 @@ authenticator.use(
       let user = await db.user.findFirst({
         where: { email },
       })
-
       // Create a new user if it doesn't exist.
       if (!user) {
         user = await db.user.create({
           data: { email },
         })
       }
-
       // Return user as Session.
       return user
     },
@@ -182,18 +178,16 @@ Last but not least, we'll require to create the routes that will handle the auth
 
 ```tsx
 // app/routes/login.tsx
-import type { DataFunctionArgs } from '@remix-run/node'
+import type { LoaderFunctionArgs, ActionFunctionArgs } from '@remix-run/node'
 import { json } from '@remix-run/node'
 import { Form, useLoaderData } from '@remix-run/react'
-
 import { authenticator } from '~/modules/auth/auth.server'
 import { getSession, commitSession } from '~/modules/auth/session.server'
 
-export async function loader({ request }: DataFunctionArgs) {
+export async function loader({ request }: LoaderFunctionArgs) {
   await authenticator.isAuthenticated(request, {
     successRedirect: '/account',
   })
-
   const session = await getSession(request.headers.get('Cookie'))
   const authError = session.get(authenticator.sessionErrorKey)
 
@@ -208,15 +202,14 @@ export async function loader({ request }: DataFunctionArgs) {
   )
 }
 
-export async function action({ request }: DataFunctionArgs) {
+export async function action({ request }: ActionFunctionArgs) {
   await authenticator.authenticate('TOTP', request, {
-    // The `successRedirect` route it's required.
-    // User is not authenticated yet.
-    // We want to redirect to our verify code form. (/verify-code or any other route).
+    // The `successRedirect` route will be used to verify the OTP code.
+    // This could be the current pathname or any other route that renders the verification form.
     successRedirect: '/verify',
 
-    // The `failureRedirect` route it's required.
-    // We want to display any possible error message.
+    // The `failureRedirect` route will be used to render any possible error.
+    // If not provided, ErrorBoundary will be rendered instead.
     failureRedirect: '/login',
   })
 }
@@ -244,14 +237,13 @@ export default function Login() {
 
 ```tsx
 // app/routes/verify.tsx
-import type { DataFunctionArgs } from '@remix-run/node'
+import type { LoaderFunctionArgs, ActionFunctionArgs } from '@remix-run/node'
 import { json, redirect } from '@remix-run/node'
 import { Form, useLoaderData } from '@remix-run/react'
-
 import { authenticator } from '~/modules/auth/auth.server.ts'
 import { getSession, commitSession } from '~/modules/auth/auth-session.server.ts'
 
-export async function loader({ request }: DataFunctionArgs) {
+export async function loader({ request }: LoaderFunctionArgs) {
   await authenticator.isAuthenticated(request, {
     successRedirect: '/account',
   })
@@ -269,7 +261,7 @@ export async function loader({ request }: DataFunctionArgs) {
   })
 }
 
-export async function action({ request }: DataFunctionArgs) {
+export async function action({ request }: ActionFunctionArgs) {
   const url = new URL(request.url)
   const currentPath = url.pathname
 
@@ -297,7 +289,7 @@ export default function Verify() {
         <button type="submit">Request new Code</button>
       </Form>
 
-      {/* Code Errors Handling. */}
+      {/* Errors Handling. */}
       <span>{authError?.message}</span>
     </div>
   )
@@ -308,12 +300,12 @@ export default function Verify() {
 
 ```tsx
 // app/routes/account.tsx
-import type { DataFunctionArgs } from '@remix-run/node'
+import type { LoaderFunctionArgs } from '@remix-run/node'
 import { json } from '@remix-run/node'
 import { Form, useLoaderData } from '@remix-run/react'
 import { authenticator } from '~/modules/auth/auth.server'
 
-export async function loader({ request }: DataFunctionArgs) {
+export async function loader({ request }: LoaderFunctionArgs) {
   const user = await authenticator.isAuthenticated(request, {
     failureRedirect: '/',
   })
@@ -338,10 +330,10 @@ export default function Account() {
 
 ```tsx
 // app/routes/magic-link.tsx
-import type { DataFunctionArgs } from '@remix-run/node'
+import type { LoaderFunctionArgs } from '@remix-run/node'
 import { authenticator } from '~/modules/auth/auth.server'
 
-export async function loader({ request }: DataFunctionArgs) {
+export async function loader({ request }: LoaderFunctionArgs) {
   await authenticator.authenticate('TOTP', request, {
     successRedirect: '/account',
     failureRedirect: '/login',
@@ -353,10 +345,10 @@ export async function loader({ request }: DataFunctionArgs) {
 
 ```tsx
 // app/routes/logout.tsx
-import type { DataFunctionArgs } from '@remix-run/node'
+import type { ActionFunctionArgs } from '@remix-run/node'
 import { authenticator } from '~/modules/auth/auth.server'
 
-export async function action({ request }: DataFunctionArgs) {
+export async function action({ request }: ActionFunctionArgs) {
   return await authenticator.logout(request, {
     redirectTo: '/',
   })
