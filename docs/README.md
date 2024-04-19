@@ -9,6 +9,7 @@ Welcome to the Remix Auth TOTP Documentation!
 - [Examples](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/examples.md) - A list of community examples using Remix Auth TOTP.
 - [Customization](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/customization.md) - A detailed guide of all the available options and customizations.
 - [Migration](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/migration.md) - A `v2` to `v3` migration guide.
+- [Cloudflare](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/cloudflare.md) - A guide to using Remix Auth TOTP with Cloudflare Workers.
 
 ## Getting Started
 
