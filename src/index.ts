@@ -3,11 +3,10 @@ import type { AuthenticateOptions, StrategyVerifyCallback } from 'remix-auth'
 
 import { redirect } from '@remix-run/server-runtime'
 import { Strategy } from 'remix-auth'
-import { verifyTOTP } from '@epic-web/totp'
+import { generateTOTP, verifyTOTP } from '@epic-web/totp'
 import * as jose from 'jose'
 import {
   generateSecret,
-  generateTOTP,
   generateMagicLink,
   coerceToOptionalString,
   coerceToOptionalTotpSessionData,

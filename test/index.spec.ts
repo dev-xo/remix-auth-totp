@@ -5,7 +5,7 @@ import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest'
 import invariant from 'tiny-invariant'
 
 import { TOTPStrategy } from '../src/index'
-import { generateMagicLink } from '../src/utils'
+import { asJweKey, generateMagicLink } from '../src/utils'
 import { STRATEGY_NAME, FORM_FIELDS, SESSION_KEYS, ERRORS } from '../src/constants'
 
 import {
@@ -1072,6 +1072,18 @@ describe('[ Utils ]', () => {
           request,
         }),
       ).toBe(magicLinkUrl)
+    }
+  })
+
+  test('Should throw error on invalid secret', async () => {
+    const secrets = [
+      "b2FE35059924CDBF5B52A84765B8B010F5291993A9BC39410139D4F5110060",
+      "b2FE35059924CDBF5B52A84765B8B010F5291993A9BC39410139D4F511006034a",
+      "b2FE35059924CDBF5B52A84765B8B010F5291993A9BC39410139D4F51100603#"
+    ]
+
+    for (const secret of secrets) {
+      expect(() => asJweKey(secret)).toThrow()  
     }
   })
 })

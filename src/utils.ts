@@ -1,4 +1,4 @@
-import type { TOTPData, TOTPGenerationOptions, TOTPSessionData } from './index.js'
+import type { TOTPData, TOTPSessionData } from './index.js'
 import { AuthenticateOptions } from 'remix-auth'
 import { generateTOTP as _generateTOTP } from '@epic-web/totp'
 import { ERRORS } from './constants.js'
@@ -6,15 +6,12 @@ import { ERRORS } from './constants.js'
 // @ts-expect-error - `thirty-two` is not typed.
 import * as base32 from 'thirty-two'
 import * as crypto from 'node:crypto'
+
 /**
  * TOTP Generation.
  */
 export function generateSecret() {
   return base32.encode(crypto.randomBytes(32)).toString() as string
-}
-
-export function generateTOTP(options: TOTPGenerationOptions) {
-  return _generateTOTP(options)
 }
 
 export function generateMagicLink(options: {
