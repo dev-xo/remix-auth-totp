@@ -33,6 +33,13 @@ export function generateMagicLink(options: {
  * Miscellaneous.
  */
 
+export function asJweKey(secret: string) {
+  if (!/^[0-9a-fA-F]{64}$/.test(secret)) {
+    throw new Error('remix-auth-totp: secret must be a string with 64 hex characters')
+  }
+  return Buffer.from(secret, 'hex')
+}
+
 export function coerceToOptionalString(value: unknown) {
   if (typeof value !== 'string' && value !== undefined) {
     throw new Error('Value must be a string or undefined.')

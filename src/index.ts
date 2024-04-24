@@ -15,6 +15,7 @@ import {
   assertIsRequiredAuthenticateOptions,
   RequiredAuthenticateOptions,
   assertTOTPData,
+  asJweKey,
 } from './utils.js'
 import { STRATEGY_NAME, FORM_FIELDS, SESSION_KEYS, ERRORS } from './constants.js'
 
@@ -23,7 +24,7 @@ import { STRATEGY_NAME, FORM_FIELDS, SESSION_KEYS, ERRORS } from './constants.js
  */
 export interface TOTPSessionData {
   /**
-   * The TOTP JWE.
+   * The TOTP JWE of TOTPData.
    */
   jwe: string
 
@@ -178,7 +179,8 @@ export interface CustomErrorsOptions {
  */
 export interface TOTPStrategyOptions {
   /**
-   * The secret used to sign the JWT.
+   * The secret used to encrypt the TOTP data.
+   * Must be string of 64 hexadecimal characters.
    */
   secret: string
 
@@ -440,17 +442,12 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     })
     const totpData: TOTPData = { secret, createdAt: Date.now() }
 
-    if (!/^[0-9a-fA-F]{64}$/.test(this.secret)) {
-      throw new Error('remix-auth-totp: secret must be a string with 64 hex characters')
-    }
-    const jweKey = Buffer.from(this.secret, 'hex')
-
     // https://github.com/panva/jose/blob/main/docs/classes/jwe_compact_encrypt.CompactEncrypt.md
     const jwe = await new jose.CompactEncrypt(
       new TextEncoder().encode(JSON.stringify(totpData)),
     )
       .setProtectedHeader({ alg: 'dir', enc: 'A256GCM' })
-      .encrypt(jweKey)
+      .encrypt(asJweKey(this.secret))
 
     const magicLink = generateMagicLink({
       code,
@@ -494,13 +491,11 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     options: RequiredAuthenticateOptions
   }) {
     try {
-      if (!/^[0-9a-fA-F]{64}$/.test(this.secret)) {
-        throw new Error('remix-auth-totp: secret must be a string with 64 hex characters')
-      }
-      const secret = Buffer.from(this.secret, 'hex')
-
       // https://github.com/panva/jose/blob/main/docs/functions/jwe_compact_decrypt.compactDecrypt.md
-      const { plaintext } = await jose.compactDecrypt(sessionTotp.jwe, secret)
+      const { plaintext } = await jose.compactDecrypt(
+        sessionTotp.jwe,
+        asJweKey(this.secret),
+      )
       const totpData = JSON.parse(new TextDecoder().decode(plaintext))
       assertTOTPData(totpData)
 
