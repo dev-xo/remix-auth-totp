@@ -23,7 +23,7 @@ Here's a basic overview of the authentication flow.
 2. The Strategy generates and securely sends a Time-based One-Time Password (TOTP) to the user.
 3. Users submit the Code through a Form or Magic Link.
 4. The Strategy validates the TOTP Code, ensuring a secure authentication process.
-<br />
+   <br />
 
 > [!NOTE]
 > Remix Auth TOTP is only Remix v2.0+ compatible.
@@ -88,7 +88,7 @@ Now that we have everything set up, we can start implementing the Strategy Insta
 ### 1. Implementing the Strategy Instance.
 
 Create a file called `auth.server.ts` wherever you want.<br />
-Implement the following code and replace the `secret` property with a strong string into your `.env` file.
+Implement the following code and replace the `secret` property with a string containing exactly 64 random hexadecimal characters (0-9 and A-F)into your `.env` file. An example is `928F416BAFC49B969E62052F00450B6E974B03E86DC6984D1FA787B7EA533227`. A site like https://www.grc.com/passwords.htm can help if you decide you can trust it.
 
 ```ts
 // app/modules/auth/auth.server.ts
