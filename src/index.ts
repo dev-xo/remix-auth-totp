@@ -482,10 +482,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       const secret = Buffer.from(this.secret, 'hex')
 
       // https://github.com/panva/jose/blob/main/docs/functions/jwe_compact_decrypt.compactDecrypt.md
-      const { plaintext, protectedHeader } = await jose.compactDecrypt(
-        sessionTotp.hash,
-        secret,
-      )
+      const { plaintext } = await jose.compactDecrypt(sessionTotp.hash, secret)
       const totpPayload = JSON.parse(new TextDecoder().decode(plaintext))
 
       if (!verifyTOTP({ ...totpPayload, otp: code })) {
