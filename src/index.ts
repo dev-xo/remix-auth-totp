@@ -20,9 +20,9 @@ import { STRATEGY_NAME, FORM_FIELDS, SESSION_KEYS, ERRORS } from './constants.js
 /**
  * The TOTP data stored in the session.
  */
-export interface TOTPData {
+export interface TOTPSessionData {
   /**
-   * The encrypted TOTP.
+   * The TOTP JWE.
    */
   hash: string
 
@@ -357,7 +357,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
           context: options.context,
         })
 
-        const totpData: TOTPData = { hash, attempts: 0 }
+        const totpData: TOTPSessionData = { hash, attempts: 0 }
         session.set(this.sessionEmailKey, email)
         session.set(this.sessionTotpKey, totpData)
         session.unset(options.sessionErrorKey)
@@ -470,7 +470,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     options,
   }: {
     code: string
-    sessionTotp: TOTPData
+    sessionTotp: TOTPSessionData
     session: Session
     sessionStorage: SessionStorage
     options: RequiredAuthenticateOptions
@@ -485,7 +485,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       const { plaintext } = await jose.compactDecrypt(sessionTotp.hash, secret)
       const totpPayload = JSON.parse(new TextDecoder().decode(plaintext))
 
-      if (!verifyTOTP({ ...totpPayload, otp: code })) {
+      if (!verifyTOTP({ ...this.totpGeneration, ...totpPayload, otp: code })) {
         throw new Error(this.customErrors.invalidTotp)
       }
     } catch (error) {

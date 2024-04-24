@@ -1,4 +1,4 @@
-import type { TOTPGenerationOptions, TOTPData } from './index.js'
+import type { TOTPGenerationOptions, TOTPSessionData } from './index.js'
 import { AuthenticateOptions } from 'remix-auth'
 import { generateTOTP as _generateTOTP } from '@epic-web/totp'
 import { ERRORS } from './constants.js'
@@ -54,7 +54,7 @@ export function coerceToOptionalTotpData(value: unknown) {
     'attempts' in value &&
     typeof (value as { attempts: unknown }).attempts === 'number'
   ) {
-    return value as TOTPData
+    return value as TOTPSessionData
   }
   return undefined
 }
