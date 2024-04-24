@@ -270,7 +270,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   private readonly _totpGenerationDefaults: Required<TOTPGenerationOptions> = {
     secret: generateSecret(),
     algorithm: 'SHA1',
-    charSet: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+    charSet: 'abcdefghijklmnpqrstuvwxyzABCDEFGHIJKLMNPQRSTUVWXYZ123456789', // no O or 0
     digits: 6,
     period: 60,
     maxAttempts: 3,
