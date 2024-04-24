@@ -34,6 +34,17 @@ export interface TOTPSessionData {
 }
 
 /**
+ * The TOTP JWE data containing the secret.
+ */
+
+export interface TOTPData {
+  /**
+   * The TOTP secret.
+   */
+  secret: string
+}
+
+/**
  * The TOTP generation configuration.
  */
 export interface TOTPGenerationOptions {
@@ -417,22 +428,23 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     const isValidEmail = await this.validateEmail(email)
     if (!isValidEmail) throw new Error(this.customErrors.invalidEmail)
 
-    const { otp: code, ...totpPayload } = generateTOTP({
+    const { otp: code, secret } = generateTOTP({
       ...this.totpGeneration,
       secret: generateSecret(),
     })
+    const totpData: TOTPData = { secret }
 
     if (!/^[0-9a-fA-F]{64}$/.test(this.secret)) {
       throw new Error('remix-auth-totp: secret must be a string with 64 hex characters')
     }
-    const secret = Buffer.from(this.secret, 'hex')
+    const jweKey = Buffer.from(this.secret, 'hex')
 
     // https://github.com/panva/jose/blob/main/docs/classes/jwe_compact_encrypt.CompactEncrypt.md
     const jwe = await new jose.CompactEncrypt(
-      new TextEncoder().encode(JSON.stringify(totpPayload)),
+      new TextEncoder().encode(JSON.stringify(totpData)),
     )
       .setProtectedHeader({ alg: 'dir', enc: 'A256GCM' })
-      .encrypt(secret)
+      .encrypt(jweKey)
 
     const magicLink = generateMagicLink({
       code,
@@ -483,9 +495,10 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
 
       // https://github.com/panva/jose/blob/main/docs/functions/jwe_compact_decrypt.compactDecrypt.md
       const { plaintext } = await jose.compactDecrypt(sessionTotp.jwe, secret)
-      const totpPayload = JSON.parse(new TextDecoder().decode(plaintext))
+      const totpData = JSON.parse(new TextDecoder().decode(plaintext))
+      // TODO: VALIDATE!!!
 
-      if (!verifyTOTP({ ...this.totpGeneration, ...totpPayload, otp: code })) {
+      if (!verifyTOTP({ ...this.totpGeneration, secret: totpData.secret, otp: code })) {
         throw new Error(this.customErrors.invalidTotp)
       }
     } catch (error) {
