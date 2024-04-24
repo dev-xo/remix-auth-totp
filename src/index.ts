@@ -438,7 +438,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
 
     const { otp: code, secret } = generateTOTP({
       ...this.totpGeneration,
-      secret: generateSecret(),
+      secret: this.totpGeneration.secret ?? generateSecret(),
     })
     const totpData: TOTPData = { secret, createdAt: Date.now() }
 

@@ -10,7 +10,7 @@ import * as crypto from 'node:crypto'
  * TOTP Generation.
  */
 export function generateSecret() {
-  return base32.encode(crypto.randomBytes(10)).toString() as string
+  return base32.encode(crypto.randomBytes(32)).toString() as string
 }
 
 export function generateTOTP(options: TOTPGenerationOptions) {
