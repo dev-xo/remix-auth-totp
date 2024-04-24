@@ -35,36 +35,6 @@ export function generateMagicLink(options: {
  */
 type TOTPPayload = Omit<ReturnType<typeof _generateTOTP>, 'otp'>
 
-type EncryptJWTOptions = {
-  payload: TOTPPayload
-  expiresIn: number
-  secretKey: string
-}
-
-export async function encryptJWT({ payload, expiresIn, secretKey }: EncryptJWTOptions) {
-  const secret = new TextEncoder().encode(secretKey)
-  const expires = new Date(Date.now() + expiresIn * 1000)
-
-  const token = await new EncryptJWT(payload)
-    .setProtectedHeader({ alg: 'dir', enc: 'A128CBC-HS256' })
-    .setExpirationTime(expires)
-    .setIssuedAt()
-    .encrypt(secret)
-
-  return token
-}
-
-type DecryptJWTOptions = {
-  jwt: string
-  secretKey: string
-}
-
-export async function decryptJWT({ jwt, secretKey }: DecryptJWTOptions) {
-  const secret = new TextEncoder().encode(secretKey)
-  const { payload } = await jwtDecrypt<TOTPPayload>(jwt, secret)
-  return payload
-}
-
 type SignJWTOptions = {
   payload: TOTPPayload
   expiresIn: number

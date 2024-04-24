@@ -4,13 +4,11 @@ import type { AuthenticateOptions, StrategyVerifyCallback } from 'remix-auth'
 import { redirect } from '@remix-run/server-runtime'
 import { Strategy } from 'remix-auth'
 import { verifyTOTP } from '@epic-web/totp'
-import { errors } from 'jose'
+import * as jose from 'jose'
 import {
   generateSecret,
   generateTOTP,
   generateMagicLink,
-  signJWT,
-  verifyJWT,
   coerceToOptionalString,
   coerceToOptionalTotpData,
   coerceToOptionalNonEmptyString,
@@ -423,11 +421,25 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       ...this.totpGeneration,
       secret: generateSecret(),
     })
-    const hash = await signJWT({
-      payload: totpPayload,
-      expiresIn: this.totpGeneration.period,
-      secretKey: this.secret,
-    })
+    // const hash = await signJWT({
+    //   payload: totpPayload,
+    //   expiresIn: this.totpGeneration.period,
+    //   secretKey: this.secret,
+    // })
+
+    if (!/^[0-9a-fA-F]{64}$/.test(this.secret)) {
+      throw new Error('remix-auth-totp: secret must be a string with 64 hex characters')
+    }
+    const secret = Buffer.from(this.secret, 'hex')
+
+    // https://github.com/panva/jose/blob/main/docs/classes/jwe_compact_encrypt.CompactEncrypt.md
+    const jwe = await new jose.CompactEncrypt(
+      new TextEncoder().encode(JSON.stringify(totpPayload)),
+    )
+      .setProtectedHeader({ alg: 'dir', enc: 'A256GCM' })
+      .encrypt(secret)
+    console.log('jwe:', jwe)
+
     const magicLink = generateMagicLink({
       code,
       magicLinkPath: this.magicLinkPath,
@@ -435,7 +447,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       request,
     })
 
-    return { code, hash, magicLink }
+    return { code, hash: jwe, magicLink }
   }
 
   private _getMagicLinkCode(request: Request) {
@@ -471,28 +483,45 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   }) {
     try {
       // Decryption and Verification.
-      const totpPayload = await verifyJWT({
-        jwt: sessionTotp.hash,
-        secretKey: this.secret,
+      // const totpPayload = await verifyJWT({
+      //   jwt: sessionTotp.hash,
+      //   secretKey: this.secret,
+      // })
+      if (!/^[0-9a-fA-F]{64}$/.test(this.secret)) {
+        throw new Error('remix-auth-totp: secret must be a string with 64 hex characters')
+      }
+      const secret = Buffer.from(this.secret, 'hex')
+
+      // https://github.com/panva/jose/blob/main/docs/functions/jwe_compact_decrypt.compactDecrypt.md
+      const { plaintext, protectedHeader } = await jose.compactDecrypt(
+        sessionTotp.hash,
+        secret,
+      )
+      console.log('cpompactDecrypt:', {
+        protectedHeader,
+        plaintext: new TextDecoder().decode(plaintext),
       })
 
-      // Verify TOTP (@epic-web/totp).
+      const totpPayload = JSON.parse(new TextDecoder().decode(plaintext))
+      // validate payload
+      console.log('totpPayload:', totpPayload)
+
       if (!verifyTOTP({ ...totpPayload, otp: code })) {
         throw new Error(this.customErrors.invalidTotp)
       }
     } catch (error) {
-      if (error instanceof errors.JWTExpired) {
+      // if (error instanceof errors.JWTExpired) {
+      //   session.unset(this.sessionTotpKey)
+      //   session.flash(options.sessionErrorKey, { message: this.customErrors.expiredTotp })
+      // } else {
+      sessionTotp.attempts += 1
+      if (sessionTotp.attempts >= this.totpGeneration.maxAttempts) {
         session.unset(this.sessionTotpKey)
-        session.flash(options.sessionErrorKey, { message: this.customErrors.expiredTotp })
       } else {
-        sessionTotp.attempts += 1
-        if (sessionTotp.attempts >= this.totpGeneration.maxAttempts) {
-          session.unset(this.sessionTotpKey)
-        } else {
-          session.set(this.sessionTotpKey, sessionTotp)
-        }
-        session.flash(options.sessionErrorKey, { message: this.customErrors.invalidTotp })
+        session.set(this.sessionTotpKey, sessionTotp)
       }
+      session.flash(options.sessionErrorKey, { message: this.customErrors.invalidTotp })
+      // }
       throw redirect(options.failureRedirect, {
         headers: {
           'set-cookie': await sessionStorage.commitSession(session, {
