@@ -10,10 +10,11 @@ import {
   generateTOTP,
   generateMagicLink,
   coerceToOptionalString,
-  coerceToOptionalTotpData,
+  coerceToOptionalTotpSessionData,
   coerceToOptionalNonEmptyString,
   assertIsRequiredAuthenticateOptions,
   RequiredAuthenticateOptions,
+  assertTOTPData,
 } from './utils.js'
 import { STRATEGY_NAME, FORM_FIELDS, SESSION_KEYS, ERRORS } from './constants.js'
 
@@ -42,6 +43,11 @@ export interface TOTPData {
    * The TOTP secret.
    */
   secret: string
+
+  /**
+   * The time the TOTP was generated.
+   */
+  createdAt: number
 }
 
 /**
@@ -349,7 +355,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     const formDataEmail = coerceToOptionalNonEmptyString(formData.get(this.emailFieldKey))
     const formDataCode = coerceToOptionalNonEmptyString(formData.get(this.codeFieldKey))
     const sessionEmail = coerceToOptionalString(session.get(this.sessionEmailKey))
-    const sessionTotp = coerceToOptionalTotpData(session.get(this.sessionTotpKey))
+    const sessionTotp = coerceToOptionalTotpSessionData(session.get(this.sessionTotpKey))
     const email =
       request.method === 'POST'
         ? formDataEmail ?? (!formDataCode ? sessionEmail : null)
@@ -432,7 +438,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       ...this.totpGeneration,
       secret: generateSecret(),
     })
-    const totpData: TOTPData = { secret }
+    const totpData: TOTPData = { secret, createdAt: Date.now() }
 
     if (!/^[0-9a-fA-F]{64}$/.test(this.secret)) {
       throw new Error('remix-auth-totp: secret must be a string with 64 hex characters')
@@ -496,20 +502,28 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       // https://github.com/panva/jose/blob/main/docs/functions/jwe_compact_decrypt.compactDecrypt.md
       const { plaintext } = await jose.compactDecrypt(sessionTotp.jwe, secret)
       const totpData = JSON.parse(new TextDecoder().decode(plaintext))
-      // TODO: VALIDATE!!!
+      assertTOTPData(totpData)
+
+      if (Date.now() - totpData.createdAt > this.totpGeneration.period * 1000) {
+        throw new Error(this.customErrors.expiredTotp)
+      }
 
       if (!verifyTOTP({ ...this.totpGeneration, secret: totpData.secret, otp: code })) {
         throw new Error(this.customErrors.invalidTotp)
       }
     } catch (error) {
-      sessionTotp.attempts += 1
-      if (sessionTotp.attempts >= this.totpGeneration.maxAttempts) {
+      if (error instanceof Error && error.message === this.customErrors.expiredTotp) {
         session.unset(this.sessionTotpKey)
+        session.flash(options.sessionErrorKey, { message: this.customErrors.expiredTotp })
       } else {
-        session.set(this.sessionTotpKey, sessionTotp)
+        sessionTotp.attempts += 1
+        if (sessionTotp.attempts >= this.totpGeneration.maxAttempts) {
+          session.unset(this.sessionTotpKey)
+        } else {
+          session.set(this.sessionTotpKey, sessionTotp)
+        }
+        session.flash(options.sessionErrorKey, { message: this.customErrors.invalidTotp })
       }
-      session.flash(options.sessionErrorKey, { message: this.customErrors.invalidTotp })
-      // }
       throw redirect(options.failureRedirect, {
         headers: {
           'set-cookie': await sessionStorage.commitSession(session, {

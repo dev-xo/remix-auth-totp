@@ -1,4 +1,4 @@
-import type { TOTPGenerationOptions, TOTPSessionData } from './index.js'
+import type { TOTPData, TOTPGenerationOptions, TOTPSessionData } from './index.js'
 import { AuthenticateOptions } from 'remix-auth'
 import { generateTOTP as _generateTOTP } from '@epic-web/totp'
 import { ERRORS } from './constants.js'
@@ -45,7 +45,7 @@ export function coerceToOptionalNonEmptyString(value: unknown) {
   return undefined
 }
 
-export function coerceToOptionalTotpData(value: unknown) {
+export function coerceToOptionalTotpSessionData(value: unknown) {
   if (
     typeof value === 'object' &&
     value !== null &&
@@ -57,6 +57,19 @@ export function coerceToOptionalTotpData(value: unknown) {
     return value as TOTPSessionData
   }
   return undefined
+}
+
+export function assertTOTPData(obj: unknown): asserts obj is TOTPData {
+  if (
+    typeof obj !== 'object' ||
+    obj === null ||
+    !('secret' in obj) ||
+    typeof (obj as { secret: unknown }).secret !== 'string' ||
+    !('createdAt' in obj) ||
+    typeof (obj as { createdAt: unknown }).createdAt !== 'number'
+  ) {
+    throw new Error('Invalid totp data.')
+  }
 }
 
 export type RequiredAuthenticateOptions = Required<
