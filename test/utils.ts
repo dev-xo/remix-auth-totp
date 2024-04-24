@@ -24,11 +24,9 @@ export const AUTH_OPTIONS = {
   sessionStrategyKey: 'strategy',
 } satisfies AuthenticateOptions
 
-export const TOTP_GENERATION_DEFAULTS: Required<TOTPGenerationOptions> = {
-  secret: base32.encode(crypto.randomBytes(10)).toString() as string,
-  algorithm: 'SHA1',
-  charSet: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567',
-  digits: 6,
+export const TOTP_GENERATION_DEFAULTS: Required<
+  Pick<TOTPGenerationOptions, 'period' | 'maxAttempts'>
+> = {
   period: 60,
   maxAttempts: 3,
 }
