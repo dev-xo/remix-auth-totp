@@ -3,36 +3,50 @@ import type { AuthenticateOptions, StrategyVerifyCallback } from 'remix-auth'
 
 import { redirect } from '@remix-run/server-runtime'
 import { Strategy } from 'remix-auth'
-import { verifyTOTP } from '@epic-web/totp'
-import { errors } from 'jose'
+import { generateTOTP, verifyTOTP } from '@epic-web/totp'
+import * as jose from 'jose'
 import {
   generateSecret,
-  generateTOTP,
   generateMagicLink,
-  signJWT,
-  verifyJWT,
   coerceToOptionalString,
-  coerceToOptionalTotpData,
+  coerceToOptionalTotpSessionData,
   coerceToOptionalNonEmptyString,
   assertIsRequiredAuthenticateOptions,
   RequiredAuthenticateOptions,
+  assertTOTPData,
+  asJweKey,
 } from './utils.js'
 import { STRATEGY_NAME, FORM_FIELDS, SESSION_KEYS, ERRORS } from './constants.js'
 
 /**
  * The TOTP data stored in the session.
  */
-export interface TOTPData {
+export interface TOTPSessionData {
   /**
-   * The encrypted TOTP.
+   * The TOTP JWE of TOTPData.
    */
-  hash: string
+  jwe: string
 
   /**
    * The number of attempts the user tried to verify the TOTP.
    * @default 0
    */
   attempts: number
+}
+
+/**
+ * The TOTP JWE data containing the secret.
+ */
+export interface TOTPData {
+  /**
+   * The TOTP secret.
+   */
+  secret: string
+
+  /**
+   * The time the TOTP was generated.
+   */
+  createdAt: number
 }
 
 /**
@@ -163,7 +177,8 @@ export interface CustomErrorsOptions {
  */
 export interface TOTPStrategyOptions {
   /**
-   * The secret used to sign the JWT.
+   * The secret used to encrypt the TOTP data.
+   * Must be string of 64 hexadecimal characters.
    */
   secret: string
 
@@ -257,7 +272,8 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
 
   private readonly secret: string
   private readonly maxAge: number | undefined
-  private readonly totpGeneration: Required<TOTPGenerationOptions>
+  private readonly totpGeneration: Pick<TOTPGenerationOptions, 'secret'> &
+    Required<Omit<TOTPGenerationOptions, 'secret'>>
   private readonly magicLinkPath: string
   private readonly customErrors: Required<CustomErrorsOptions>
   private readonly emailFieldKey: string
@@ -266,11 +282,9 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   private readonly sessionTotpKey: string
   private readonly sendTOTP: SendTOTP
   private readonly validateEmail: ValidateEmail
-
-  private readonly _totpGenerationDefaults: Required<TOTPGenerationOptions> = {
-    secret: generateSecret(),
-    algorithm: 'SHA1',
-    charSet: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
+  private readonly _totpGenerationDefaults = {
+    algorithm: 'SHA256', // More secure than SHA1
+    charSet: 'abcdefghijklmnpqrstuvwxyzABCDEFGHIJKLMNPQRSTUVWXYZ123456789', // No O or 0
     digits: 6,
     period: 60,
     maxAttempts: 3,
@@ -340,7 +354,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     const formDataEmail = coerceToOptionalNonEmptyString(formData.get(this.emailFieldKey))
     const formDataCode = coerceToOptionalNonEmptyString(formData.get(this.codeFieldKey))
     const sessionEmail = coerceToOptionalString(session.get(this.sessionEmailKey))
-    const sessionTotp = coerceToOptionalTotpData(session.get(this.sessionTotpKey))
+    const sessionTotp = coerceToOptionalTotpSessionData(session.get(this.sessionTotpKey))
     const email =
       request.method === 'POST'
         ? formDataEmail ?? (!formDataCode ? sessionEmail : null)
@@ -348,8 +362,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
 
     try {
       if (email) {
-        // Generate and Send TOTP.
-        const { code, hash, magicLink } = await this._generateTOTP({ email, request })
+        const { code, jwe, magicLink } = await this._generateTOTP({ email, request })
         await this.sendTOTP({
           email,
           code,
@@ -359,7 +372,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
           context: options.context,
         })
 
-        const totpData: TOTPData = { hash, attempts: 0 }
+        const totpData: TOTPSessionData = { jwe, attempts: 0 }
         session.set(this.sessionEmailKey, email)
         session.set(this.sessionTotpKey, totpData)
         session.unset(options.sessionErrorKey)
@@ -375,7 +388,6 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
 
       const code = formDataCode ?? this._getMagicLinkCode(request)
       if (code) {
-        // Validate TOTP.
         if (!sessionEmail || !sessionTotp) throw new Error(this.customErrors.expiredTotp)
         await this._validateTOTP({ code, sessionTotp, session, sessionStorage, options })
 
@@ -419,15 +431,19 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     const isValidEmail = await this.validateEmail(email)
     if (!isValidEmail) throw new Error(this.customErrors.invalidEmail)
 
-    const { otp: code, ...totpPayload } = generateTOTP({
+    const { otp: code, secret } = generateTOTP({
       ...this.totpGeneration,
-      secret: generateSecret(),
+      secret: this.totpGeneration.secret ?? generateSecret(),
     })
-    const hash = await signJWT({
-      payload: totpPayload,
-      expiresIn: this.totpGeneration.period,
-      secretKey: this.secret,
-    })
+    const totpData: TOTPData = { secret, createdAt: Date.now() }
+
+    // https://github.com/panva/jose/blob/main/docs/classes/jwe_compact_encrypt.CompactEncrypt.md
+    const jwe = await new jose.CompactEncrypt(
+      new TextEncoder().encode(JSON.stringify(totpData)),
+    )
+      .setProtectedHeader({ alg: 'dir', enc: 'A256GCM' })
+      .encrypt(asJweKey(this.secret))
+
     const magicLink = generateMagicLink({
       code,
       magicLinkPath: this.magicLinkPath,
@@ -435,7 +451,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       request,
     })
 
-    return { code, hash, magicLink }
+    return { code, jwe, magicLink }
   }
 
   private _getMagicLinkCode(request: Request) {
@@ -464,24 +480,28 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     options,
   }: {
     code: string
-    sessionTotp: TOTPData
+    sessionTotp: TOTPSessionData
     session: Session
     sessionStorage: SessionStorage
     options: RequiredAuthenticateOptions
   }) {
     try {
-      // Decryption and Verification.
-      const totpPayload = await verifyJWT({
-        jwt: sessionTotp.hash,
-        secretKey: this.secret,
-      })
+      // https://github.com/panva/jose/blob/main/docs/functions/jwe_compact_decrypt.compactDecrypt.md
+      const { plaintext } = await jose.compactDecrypt(
+        sessionTotp.jwe,
+        asJweKey(this.secret),
+      )
+      const totpData = JSON.parse(new TextDecoder().decode(plaintext))
+      assertTOTPData(totpData)
 
-      // Verify TOTP (@epic-web/totp).
-      if (!verifyTOTP({ ...totpPayload, otp: code })) {
+      if (Date.now() - totpData.createdAt > this.totpGeneration.period * 1000) {
+        throw new Error(this.customErrors.expiredTotp)
+      }
+      if (!verifyTOTP({ ...this.totpGeneration, secret: totpData.secret, otp: code })) {
         throw new Error(this.customErrors.invalidTotp)
       }
     } catch (error) {
-      if (error instanceof errors.JWTExpired) {
+      if (error instanceof Error && error.message === this.customErrors.expiredTotp) {
         session.unset(this.sessionTotpKey)
         session.flash(options.sessionErrorKey, { message: this.customErrors.expiredTotp })
       } else {

@@ -1,21 +1,16 @@
-import type { TOTPGenerationOptions, TOTPData } from './index.js'
-import { AuthenticateOptions } from 'remix-auth'
-import { SignJWT, jwtVerify } from 'jose'
-import { generateTOTP as _generateTOTP } from '@epic-web/totp'
+import type { TOTPData, TOTPSessionData } from './index.js'
+import type { AuthenticateOptions } from 'remix-auth'
 import { ERRORS } from './constants.js'
 
 // @ts-expect-error - `thirty-two` is not typed.
 import * as base32 from 'thirty-two'
 import * as crypto from 'node:crypto'
+
 /**
  * TOTP Generation.
  */
 export function generateSecret() {
-  return base32.encode(crypto.randomBytes(10)).toString() as string
-}
-
-export function generateTOTP(options: TOTPGenerationOptions) {
-  return _generateTOTP(options)
+  return base32.encode(crypto.randomBytes(32)).toString() as string
 }
 
 export function generateMagicLink(options: {
@@ -31,44 +26,14 @@ export function generateMagicLink(options: {
 }
 
 /**
- * JSON Web Token (JWT).
- */
-type TOTPPayload = Omit<ReturnType<typeof _generateTOTP>, 'otp'>
-
-type SignJWTOptions = {
-  payload: TOTPPayload
-  expiresIn: number
-  secretKey: string
-}
-
-export async function signJWT({ payload, expiresIn, secretKey }: SignJWTOptions) {
-  const algorithm = 'HS256'
-  const secret = new TextEncoder().encode(secretKey)
-  const expires = new Date(Date.now() + expiresIn * 1000)
-
-  const token = await new SignJWT(payload)
-    .setProtectedHeader({ alg: algorithm })
-    .setExpirationTime(expires)
-    .setIssuedAt()
-    .sign(secret)
-
-  return token
-}
-
-type VerifyJWTOptions = {
-  jwt: string
-  secretKey: string
-}
-
-export async function verifyJWT({ jwt, secretKey }: VerifyJWTOptions) {
-  const secret = new TextEncoder().encode(secretKey)
-  const { payload } = await jwtVerify<TOTPPayload>(jwt, secret)
-  return payload
-}
-
-/**
  * Miscellaneous.
  */
+export function asJweKey(secret: string) {
+  if (!/^[0-9a-fA-F]{64}$/.test(secret)) {
+    throw new Error('Secret must be a string with 64 hex characters.')
+  }
+  return Buffer.from(secret, 'hex')
+}
 
 export function coerceToOptionalString(value: unknown) {
   if (typeof value !== 'string' && value !== undefined) {
@@ -82,18 +47,31 @@ export function coerceToOptionalNonEmptyString(value: unknown) {
   return undefined
 }
 
-export function coerceToOptionalTotpData(value: unknown) {
+export function coerceToOptionalTotpSessionData(value: unknown) {
   if (
     typeof value === 'object' &&
     value !== null &&
-    'hash' in value &&
-    typeof (value as { hash: unknown }).hash === 'string' &&
+    'jwe' in value &&
+    typeof (value as { jwe: unknown }).jwe === 'string' &&
     'attempts' in value &&
     typeof (value as { attempts: unknown }).attempts === 'number'
   ) {
-    return value as TOTPData
+    return value as TOTPSessionData
   }
   return undefined
+}
+
+export function assertTOTPData(obj: unknown): asserts obj is TOTPData {
+  if (
+    typeof obj !== 'object' ||
+    obj === null ||
+    !('secret' in obj) ||
+    typeof (obj as { secret: unknown }).secret !== 'string' ||
+    !('createdAt' in obj) ||
+    typeof (obj as { createdAt: unknown }).createdAt !== 'number'
+  ) {
+    throw new Error('Invalid totp data.')
+  }
 }
 
 export type RequiredAuthenticateOptions = Required<

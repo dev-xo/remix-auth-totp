@@ -9,8 +9,8 @@ dependencies:
     specifier: ^1.1.2
     version: 1.1.2
   jose:
-    specifier: ^5.2.2
-    version: 5.2.2
+    specifier: ^5.2.4
+    version: 5.2.4
   remix-auth:
     specifier: ^3.6.0
     version: 3.6.0(@remix-run/react@2.7.2)(@remix-run/server-runtime@2.7.2)
@@ -1864,8 +1864,8 @@ packages:
       istanbul-lib-report: 3.0.1
     dev: true
 
-  /jose@5.2.2:
-    resolution: {integrity: sha512-/WByRr4jDcsKlvMd1dRJnPfS1GVO3WuKyaurJ/vvXcOaUQO8rnNObCQMlv/5uCceVQIq5Q4WLF44ohsdiTohdg==}
+  /jose@5.2.4:
+    resolution: {integrity: sha512-6ScbIk2WWCeXkmzF6bRPmEuaqy1m8SbsRFMa/FLrSCkGIhj8OLVG/IH+XHVmNMx/KUo8cVWEE6oKR4dJ+S0Rkg==}
     dev: false
 
   /js-tokens@4.0.0:

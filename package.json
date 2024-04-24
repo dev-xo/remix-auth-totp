@@ -39,7 +39,7 @@
   ],
   "dependencies": {
     "@epic-web/totp": "^1.1.2",
-    "jose": "^5.2.2",
+    "jose": "^5.2.4",
     "thirty-two": "^1.0.2"
   },
   "peerDependencies": {
