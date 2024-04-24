@@ -89,7 +89,7 @@ Now that we have everything set up, we can start implementing the Strategy Insta
 
 Create a file called `auth.server.ts` wherever you want. <br />
 
-> [!NOTE]
+> [!IMPORTANT]
 > A random 64-character hexadecimal string is required to generate the TOTP codes. This string should be stored securely and not shared with anyone.
 > You can use a site like https://www.grc.com/passwords.htm to generate a strong secret.
 
