@@ -24,7 +24,7 @@ export interface TOTPSessionData {
   /**
    * The TOTP JWE.
    */
-  hash: string
+  jwe: string
 
   /**
    * The number of attempts the user tried to verify the TOTP.
@@ -347,7 +347,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     try {
       if (email) {
         // Generate and Send TOTP.
-        const { code, hash, magicLink } = await this._generateTOTP({ email, request })
+        const { code, jwe, magicLink } = await this._generateTOTP({ email, request })
         await this.sendTOTP({
           email,
           code,
@@ -357,7 +357,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
           context: options.context,
         })
 
-        const totpData: TOTPSessionData = { hash, attempts: 0 }
+        const totpData: TOTPSessionData = { jwe, attempts: 0 }
         session.set(this.sessionEmailKey, email)
         session.set(this.sessionTotpKey, totpData)
         session.unset(options.sessionErrorKey)
@@ -441,7 +441,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       request,
     })
 
-    return { code, hash: jwe, magicLink }
+    return { code, jwe, magicLink }
   }
 
   private _getMagicLinkCode(request: Request) {
@@ -482,7 +482,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       const secret = Buffer.from(this.secret, 'hex')
 
       // https://github.com/panva/jose/blob/main/docs/functions/jwe_compact_decrypt.compactDecrypt.md
-      const { plaintext } = await jose.compactDecrypt(sessionTotp.hash, secret)
+      const { plaintext } = await jose.compactDecrypt(sessionTotp.jwe, secret)
       const totpPayload = JSON.parse(new TextDecoder().decode(plaintext))
 
       if (!verifyTOTP({ ...this.totpGeneration, ...totpPayload, otp: code })) {

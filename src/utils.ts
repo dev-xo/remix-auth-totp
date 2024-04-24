@@ -49,8 +49,8 @@ export function coerceToOptionalTotpData(value: unknown) {
   if (
     typeof value === 'object' &&
     value !== null &&
-    'hash' in value &&
-    typeof (value as { hash: unknown }).hash === 'string' &&
+    'jwe' in value &&
+    typeof (value as { jwe: unknown }).jwe === 'string' &&
     'attempts' in value &&
     typeof (value as { attempts: unknown }).attempts === 'number'
   ) {
