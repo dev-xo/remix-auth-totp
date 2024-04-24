@@ -87,8 +87,13 @@ Now that we have everything set up, we can start implementing the Strategy Insta
 
 ### 1. Implementing the Strategy Instance.
 
-Create a file called `auth.server.ts` wherever you want.<br />
-Implement the following code and replace the `secret` property with a string containing exactly 64 random hexadecimal characters (0-9 and A-F)into your `.env` file. An example is `928F416BAFC49B969E62052F00450B6E974B03E86DC6984D1FA787B7EA533227`. A site like https://www.grc.com/passwords.htm can help if you decide you can trust it.
+Create a file called `auth.server.ts` wherever you want. <br />
+
+> [!NOTE]
+> A random 64-character hexadecimal string is required to generate the TOTP codes. This string should be stored securely and not shared with anyone.
+> You can use a site like https://www.grc.com/passwords.htm to generate a strong secret.
+
+Implement the following code and replace the `secret` property with a string containing exactly 64 random hexadecimal characters (0-9 and A-F) into your `.env` file. An example is `928F416BAFC49B969E62052F00450B6E974B03E86DC6984D1FA787B7EA533227`. 
 
 ```ts
 // app/modules/auth/auth.server.ts
