@@ -257,7 +257,8 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
 
   private readonly secret: string
   private readonly maxAge: number | undefined
-  private readonly totpGeneration: Required<TOTPGenerationOptions>
+  private readonly totpGeneration: Pick<TOTPGenerationOptions, 'secret'> &
+    Required<Omit<TOTPGenerationOptions, 'secret'>>
   private readonly magicLinkPath: string
   private readonly customErrors: Required<CustomErrorsOptions>
   private readonly emailFieldKey: string
@@ -267,8 +268,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   private readonly sendTOTP: SendTOTP
   private readonly validateEmail: ValidateEmail
 
-  private readonly _totpGenerationDefaults: Required<TOTPGenerationOptions> = {
-    secret: generateSecret(),
+  private readonly _totpGenerationDefaults = {
     algorithm: 'SHA256', // More secure than SHA1
     charSet: 'abcdefghijklmnpqrstuvwxyzABCDEFGHIJKLMNPQRSTUVWXYZ123456789', // No O or 0
     digits: 6,

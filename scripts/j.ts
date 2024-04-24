@@ -43,7 +43,7 @@ const jwe = await new jose.CompactEncrypt(
 )
   .setProtectedHeader({ alg: 'dir', enc: 'A256GCM' })
   .encrypt(secret)
-console.log(jwe)
+console.log('jwe:', jwe)
 
 // https://github.com/panva/jose/blob/main/docs/functions/jwe_compact_decrypt.compactDecrypt.md
 const { plaintext, protectedHeader } = await jose.compactDecrypt(jwe, secret)
