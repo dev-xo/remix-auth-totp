@@ -1,6 +1,5 @@
 import type { TOTPData, TOTPSessionData } from './index.js'
 import { AuthenticateOptions } from 'remix-auth'
-import { generateTOTP as _generateTOTP } from '@epic-web/totp'
 import { ERRORS } from './constants.js'
 
 // @ts-expect-error - `thirty-two` is not typed.
