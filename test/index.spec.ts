@@ -82,7 +82,7 @@ describe('[ Basics ]', () => {
     ).rejects.toThrow(ERRORS.REQUIRED_FAILURE_REDIRECT_URL)
   })
 
-  test('Context should be set in sendTOTP and verify when passed to authenticate', async () => {
+  test('Should set context in sendTOTP and verify when passed to authenticate.', async () => {
     const context: AppLoadContext = {
       cloudflare: {
         env: {
@@ -1075,7 +1075,7 @@ describe('[ Utils ]', () => {
     }
   })
 
-  test('Should throw error on invalid secret', async () => {
+  test('Should throw an error on invalid secret.', async () => {
     const secrets = [
       "b2FE35059924CDBF5B52A84765B8B010F5291993A9BC39410139D4F5110060",
       "b2FE35059924CDBF5B52A84765B8B010F5291993A9BC39410139D4F511006034a",

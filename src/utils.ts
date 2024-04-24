@@ -1,5 +1,5 @@
 import type { TOTPData, TOTPSessionData } from './index.js'
-import { AuthenticateOptions } from 'remix-auth'
+import type { AuthenticateOptions } from 'remix-auth'
 import { ERRORS } from './constants.js'
 
 // @ts-expect-error - `thirty-two` is not typed.
@@ -28,10 +28,9 @@ export function generateMagicLink(options: {
 /**
  * Miscellaneous.
  */
-
 export function asJweKey(secret: string) {
   if (!/^[0-9a-fA-F]{64}$/.test(secret)) {
-    throw new Error('remix-auth-totp: secret must be a string with 64 hex characters')
+    throw new Error('Secret must be a string with 64 hex characters.')
   }
   return Buffer.from(secret, 'hex')
 }

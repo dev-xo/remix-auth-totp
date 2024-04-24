@@ -37,7 +37,6 @@ export interface TOTPSessionData {
 /**
  * The TOTP JWE data containing the secret.
  */
-
 export interface TOTPData {
   /**
    * The TOTP secret.
@@ -283,7 +282,6 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   private readonly sessionTotpKey: string
   private readonly sendTOTP: SendTOTP
   private readonly validateEmail: ValidateEmail
-
   private readonly _totpGenerationDefaults = {
     algorithm: 'SHA256', // More secure than SHA1
     charSet: 'abcdefghijklmnpqrstuvwxyzABCDEFGHIJKLMNPQRSTUVWXYZ123456789', // No O or 0
@@ -364,7 +362,6 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
 
     try {
       if (email) {
-        // Generate and Send TOTP.
         const { code, jwe, magicLink } = await this._generateTOTP({ email, request })
         await this.sendTOTP({
           email,
@@ -391,7 +388,6 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
 
       const code = formDataCode ?? this._getMagicLinkCode(request)
       if (code) {
-        // Validate TOTP.
         if (!sessionEmail || !sessionTotp) throw new Error(this.customErrors.expiredTotp)
         await this._validateTOTP({ code, sessionTotp, session, sessionStorage, options })
 
@@ -501,7 +497,6 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       if (Date.now() - totpData.createdAt > this.totpGeneration.period * 1000) {
         throw new Error(this.customErrors.expiredTotp)
       }
-
       if (!verifyTOTP({ ...this.totpGeneration, secret: totpData.secret, otp: code })) {
         throw new Error(this.customErrors.invalidTotp)
       }
