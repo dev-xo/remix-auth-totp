@@ -1,11 +1,10 @@
 import * as jose from 'jose'
 
+// pnpm tsx scripts/j.ts
+
 function hexStringToUint8Array(hexString) {
-    return new Uint8Array(
-      hexString.match(/.{1,2}/g).map(byte => parseInt(byte, 16))
-    );
-  }
-  
+  return new Uint8Array(hexString.match(/.{1,2}/g).map((byte) => parseInt(byte, 16)))
+}
 
 // https://github.com/panva/jose/blob/main/docs/functions/key_generate_secret.generateSecret.md
 // const secret = await jose.generateSecret('HS256') // 256 bit (32 byte) secret
@@ -17,8 +16,8 @@ function hexStringToUint8Array(hexString) {
 
 // https://www.grc.com/passwords.htm
 // 64 hex characters  =  256 binary bits
-const hex64 = "8089BECBD6DB20F96EE78A6EE81B7076E1A319D5AC7DE27E476E81BF7BF545D4"
-const secret = hexStringToUint8Array(hex64);
+const hex64 = 'B2FE35059924CDBF5B52A84765B8B010F5291993A9BC39410139D4F511006034'
+const secret = hexStringToUint8Array(hex64)
 
 // https://github.com/panva/jose/blob/main/docs/classes/jwe_compact_encrypt.CompactEncrypt.md
 const jwe = await new jose.CompactEncrypt(
