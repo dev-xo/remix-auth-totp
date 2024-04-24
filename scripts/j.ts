@@ -2,19 +2,7 @@ import * as jose from 'jose'
 import { generateTOTP, verifyTOTP } from '@epic-web/totp'
 import { generateSecret } from '../src/utils'
 
-// pnpm tsx scripts/j.ts
-
-// export const TOTP_GENERATION_DEFAULTS: Required<TOTPGenerationOptions> = {
-//   secret: base32.encode(crypto.randomBytes(10)).toString() as string,
-//   algorithm: 'SHA1',
-//   charSet: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567',
-//   digits: 6,
-//   period: 60,
-//   maxAttempts: 3,
-// }
-
 const totpOptions = {
-  //   algorithm: 'SHA1',
   algorithm: 'SHA256',
   charSet: 'abcdefghijklmnpqrstuvwxyzABCDEFGHIJKLMNPQRSTUVWXYZ123456789', // no O or 0
   digits: 6,
@@ -47,13 +35,12 @@ console.log('jwe:', jwe)
 
 // https://github.com/panva/jose/blob/main/docs/functions/jwe_compact_decrypt.compactDecrypt.md
 const { plaintext, protectedHeader } = await jose.compactDecrypt(jwe, secret)
-console.log('cpompactDecrypt:', {
+console.log('compactDecrypt:', {
   protectedHeader,
   plaintext: new TextDecoder().decode(plaintext),
 })
 
 const totpPayloadDecrypted = JSON.parse(new TextDecoder().decode(plaintext))
-// validate payload
 console.log('totpPayloadDecrypted:', totpPayloadDecrypted)
 
 const verifyResult = verifyTOTP({ ...totpPayloadDecrypted, otp: code })
