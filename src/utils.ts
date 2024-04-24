@@ -1,6 +1,5 @@
 import type { TOTPGenerationOptions, TOTPData } from './index.js'
 import { AuthenticateOptions } from 'remix-auth'
-import { EncryptJWT, SignJWT, jwtDecrypt, jwtVerify } from 'jose'
 import { generateTOTP as _generateTOTP } from '@epic-web/totp'
 import { ERRORS } from './constants.js'
 
@@ -28,42 +27,6 @@ export function generateMagicLink(options: {
   url.searchParams.set(options.param, options.code)
 
   return url.toString()
-}
-
-/**
- * JSON Web Token (JWT).
- */
-type TOTPPayload = Omit<ReturnType<typeof _generateTOTP>, 'otp'>
-
-type SignJWTOptions = {
-  payload: TOTPPayload
-  expiresIn: number
-  secretKey: string
-}
-
-export async function signJWT({ payload, expiresIn, secretKey }: SignJWTOptions) {
-  const algorithm = 'HS256'
-  const secret = new TextEncoder().encode(secretKey)
-  const expires = new Date(Date.now() + expiresIn * 1000)
-
-  const token = await new SignJWT(payload)
-    .setProtectedHeader({ alg: algorithm })
-    .setExpirationTime(expires)
-    .setIssuedAt()
-    .sign(secret)
-
-  return token
-}
-
-type VerifyJWTOptions = {
-  jwt: string
-  secretKey: string
-}
-
-export async function verifyJWT({ jwt, secretKey }: VerifyJWTOptions) {
-  const secret = new TextEncoder().encode(secretKey)
-  const { payload } = await jwtVerify<TOTPPayload>(jwt, secret)
-  return payload
 }
 
 /**

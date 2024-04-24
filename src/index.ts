@@ -421,11 +421,6 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       ...this.totpGeneration,
       secret: generateSecret(),
     })
-    // const hash = await signJWT({
-    //   payload: totpPayload,
-    //   expiresIn: this.totpGeneration.period,
-    //   secretKey: this.secret,
-    // })
 
     if (!/^[0-9a-fA-F]{64}$/.test(this.secret)) {
       throw new Error('remix-auth-totp: secret must be a string with 64 hex characters')
@@ -438,7 +433,6 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     )
       .setProtectedHeader({ alg: 'dir', enc: 'A256GCM' })
       .encrypt(secret)
-    console.log('jwe:', jwe)
 
     const magicLink = generateMagicLink({
       code,
@@ -482,11 +476,6 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     options: RequiredAuthenticateOptions
   }) {
     try {
-      // Decryption and Verification.
-      // const totpPayload = await verifyJWT({
-      //   jwt: sessionTotp.hash,
-      //   secretKey: this.secret,
-      // })
       if (!/^[0-9a-fA-F]{64}$/.test(this.secret)) {
         throw new Error('remix-auth-totp: secret must be a string with 64 hex characters')
       }
@@ -497,23 +486,12 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
         sessionTotp.hash,
         secret,
       )
-      console.log('cpompactDecrypt:', {
-        protectedHeader,
-        plaintext: new TextDecoder().decode(plaintext),
-      })
-
       const totpPayload = JSON.parse(new TextDecoder().decode(plaintext))
-      // validate payload
-      console.log('totpPayload:', totpPayload)
 
       if (!verifyTOTP({ ...totpPayload, otp: code })) {
         throw new Error(this.customErrors.invalidTotp)
       }
     } catch (error) {
-      // if (error instanceof errors.JWTExpired) {
-      //   session.unset(this.sessionTotpKey)
-      //   session.flash(options.sessionErrorKey, { message: this.customErrors.expiredTotp })
-      // } else {
       sessionTotp.attempts += 1
       if (sessionTotp.attempts >= this.totpGeneration.maxAttempts) {
         session.unset(this.sessionTotpKey)
