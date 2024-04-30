@@ -223,7 +223,7 @@ export default function Login() {
   let { authError } = useLoaderData<typeof loader>()
 
   return (
-    <div style={{ display: 'flex' flexDirection: 'column' }}>
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
       {/* Login Form. */}
         <Form method="POST">
           <label htmlFor="email">Email</label>
