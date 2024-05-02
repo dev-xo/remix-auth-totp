@@ -350,7 +350,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     const user: User | null = session.get(options.sessionKey) ?? null
     if (user) return this.success(user, request, sessionStorage, options)
 
-    const formData = request.method === 'POST' ? await request.formData() : new FormData()
+    const formData = await this._readFormData(request, options)
     const formDataEmail = coerceToOptionalNonEmptyString(formData.get(this.emailFieldKey))
     const formDataCode = coerceToOptionalNonEmptyString(formData.get(this.codeFieldKey))
     const sessionEmail = coerceToOptionalString(session.get(this.sessionEmailKey))
@@ -521,5 +521,17 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
         },
       })
     }
+  }
+
+  private async _readFormData(request: Request, options: AuthenticateOptions) {
+    if (request.method !== 'POST') {
+      return new FormData()
+    }
+
+    if (options.context?.formData instanceof FormData) {
+      return options.context.formData
+    }
+
+    return await request.formData()
   }
 }

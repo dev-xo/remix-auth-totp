@@ -152,6 +152,49 @@ describe('[ Basics ]', () => {
     expect(sendTOTP).toHaveBeenCalledTimes(1)
     expect(verify).toHaveBeenCalledTimes(1)
   })
+
+  test('Should throw after pre-reading FormData', async () => {
+    const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
+
+    const body = new FormData()
+    body.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
+    const request = new Request(`${HOST_URL}/login`, {
+      method: 'POST',
+      body,
+    })
+
+    const _unused_preRead = await request.formData()
+
+    await expect(() =>
+      strategy.authenticate(request, sessionStorage, {
+        ...AUTH_OPTIONS,
+        successRedirect: '/',
+        failureRedirect: '/login',
+      }),
+    ).rejects.toThrow(TypeError)
+  })
+
+  test('Should pass a pre-read FormData object', async () => {
+    const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
+
+    const body = new FormData()
+    body.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
+    const request = new Request(`${HOST_URL}/login`, {
+      method: 'POST',
+      body,
+    })
+
+    const formData = await request.formData()
+
+    await expect(() =>
+      strategy.authenticate(request, sessionStorage, {
+        ...AUTH_OPTIONS,
+        successRedirect: '/',
+        failureRedirect: '/login',
+        context: { formData },
+      }),
+    ).rejects.toThrow(Response)
+  })
 })
 
 describe('[ TOTP ]', () => {
@@ -1077,13 +1120,13 @@ describe('[ Utils ]', () => {
 
   test('Should throw an error on invalid secret.', async () => {
     const secrets = [
-      "b2FE35059924CDBF5B52A84765B8B010F5291993A9BC39410139D4F5110060",
-      "b2FE35059924CDBF5B52A84765B8B010F5291993A9BC39410139D4F511006034a",
-      "b2FE35059924CDBF5B52A84765B8B010F5291993A9BC39410139D4F51100603#"
+      'b2FE35059924CDBF5B52A84765B8B010F5291993A9BC39410139D4F5110060',
+      'b2FE35059924CDBF5B52A84765B8B010F5291993A9BC39410139D4F511006034a',
+      'b2FE35059924CDBF5B52A84765B8B010F5291993A9BC39410139D4F51100603#',
     ]
 
     for (const secret of secrets) {
-      expect(() => asJweKey(secret)).toThrow()  
+      expect(() => asJweKey(secret)).toThrow()
     }
   })
 })
