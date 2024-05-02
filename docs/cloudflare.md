@@ -1,6 +1,6 @@
 ## Cloudflare
 
-A guide to using Remix Auth TOTP with Cloudflare Workers.
+A guide to using Remix Auth TOTP with Cloudflare Pages.
 
 ### Remix v2 Compiler
 

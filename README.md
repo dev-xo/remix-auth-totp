@@ -31,7 +31,7 @@ npm install remix-auth-totp
 ## Features
 
 - **📧 Built-In Magic Link** - Authenticate users with a Click.
-- **⛅ Cloudflare Support** - Works with Cloudflare Workers.
+- **⛅ Cloudflare Support** - Works with Cloudflare Pages.
 - **🔐 Secure** - Encrypted Time-Based Codes.
 - **🛡 Bulletproof** - Crafted in strict TypeScript with high test coverage.
 - **😌 Easy to Set Up** - Start with one of the Official Starters.
