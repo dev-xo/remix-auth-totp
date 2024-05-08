@@ -93,7 +93,7 @@ Create a file called `auth.server.ts` wherever you want. <br />
 > A random 64-character hexadecimal string is required to generate the TOTP codes. This string should be stored securely and not shared with anyone.
 > You can use a site like https://www.grc.com/passwords.htm to generate a strong secret.
 
-Implement the following code and replace the `secret` property with a string containing exactly 64 random hexadecimal characters (0-9 and A-F) into your `.env` file. An example is `928F416BAFC49B969E62052F00450B6E974B03E86DC6984D1FA787B7EA533227`. 
+Implement the following code and replace the `secret` property with a string containing exactly 64 random hexadecimal characters (0-9 and A-F) into your `.env` file. An example is `928F416BAFC49B969E62052F00450B6E974B03E86DC6984D1FA787B7EA533227`.
 
 ```ts
 // app/modules/auth/auth.server.ts
@@ -225,11 +225,11 @@ export default function Login() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       {/* Login Form. */}
-        <Form method="POST">
-          <label htmlFor="email">Email</label>
-          <input type="email" name="email" placeholder="Insert email .." required />
-          <button type="submit">Send Code</button>
-        </Form>
+      <Form method="POST">
+        <label htmlFor="email">Email</label>
+        <input type="email" name="email" placeholder="Insert email .." required />
+        <button type="submit">Send Code</button>
+      </Form>
 
       {/* Login Errors Handling. */}
       <span>{authError?.message}</span>
@@ -367,3 +367,26 @@ Done! 🎉 Feel free to check the [Starter Example](https://github.com/dev-xo/to
 The Strategy includes a few options that can be customized.
 
 You can find a detailed list of all the available options in the [customization](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/customization.md) documentation.
+
+## [Passing a pre-read FormData](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/customization.md)
+
+Sometimes, you might want to validate passed form inputs, for example, when you have more than one strategy in one login page and they have a different `successRedirect` or `failureRedirect`. You can pass a pre-read FormData to the `authenticate` method or of course you can clone the current request `request.clone()` and read the FormData from the cloned request.
+
+```ts
+export async function action({ request }: ActionFunctionArgs) {
+  const formData = await request.formData()
+  const type = formData.get('type') as string
+
+  await authenticator.authenticate(type, request, {
+    // The `successRedirect` route will be used to verify the OTP code.
+    // This could be the current pathname or any other route that renders the verification form.
+    successRedirect: '/verify',
+
+    // The `failureRedirect` route will be used to render any possible error.
+    // If not provided, ErrorBoundary will be rendered instead.
+    failureRedirect: '/login',
+    // Pass the pre-read FormData to the authenticate method.
+    context: { formData },
+  })
+}
+```
