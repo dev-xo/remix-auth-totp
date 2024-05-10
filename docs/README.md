@@ -280,7 +280,7 @@ export default function Verify() {
   const { authError } = useLoaderData<typeof loader>()
 
   return (
-    <div style={{ display: 'flex' flexDirection: 'column' }}>
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
       {/* Code Verification Form */}
       <Form method="POST">
         <label htmlFor="code">Code</label>
