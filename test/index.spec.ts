@@ -152,6 +152,69 @@ describe('[ Basics ]', () => {
     expect(sendTOTP).toHaveBeenCalledTimes(1)
     expect(verify).toHaveBeenCalledTimes(1)
   })
+
+  test('Should use pre-read Form Data in context.', async () => {
+    let sendTOTPOptions: SendTOTPOptions | undefined
+    sendTOTP.mockImplementation(async (options: SendTOTPOptions) => {
+      sendTOTPOptions = options
+    })
+
+    const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
+    let formData = new FormData()
+    formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
+    formData.append('type', 'remix-auth-totp')
+    let request = new Request(`${HOST_URL}/login`, {
+      method: 'POST',
+      body: formData,
+    })
+    let preReadFormData = await request.formData()
+
+    let session: Session | undefined
+    await strategy
+      .authenticate(request, sessionStorage, {
+        ...AUTH_OPTIONS,
+        successRedirect: '/verify',
+        failureRedirect: '/login',
+        context: { formData: preReadFormData },
+      })
+      .catch(async (reason) => {
+        if (reason instanceof Response) {
+          session = await sessionStorage.getSession(
+            reason.headers.get('set-cookie') ?? '',
+          )
+        } else throw reason
+      })
+
+    expect(sendTOTPOptions).not.toBeUndefined()
+    expect(session).not.toBeUndefined()
+    expect(sendTOTP).toHaveBeenCalledTimes(1)
+    expect(verify).toHaveBeenCalledTimes(0)
+
+    formData = new FormData()
+    formData.append(FORM_FIELDS.CODE, sendTOTPOptions?.code || '')
+    request = new Request(`${HOST_URL}/verify`, {
+      method: 'POST',
+      headers: {
+        cookie: (session && (await sessionStorage.commitSession(session))) || '',
+      },
+      body: formData,
+    })
+    preReadFormData = await request.formData()
+    await strategy
+      .authenticate(request, sessionStorage, {
+        ...AUTH_OPTIONS,
+        successRedirect: '/',
+        failureRedirect: '/login',
+        context: { formData: preReadFormData },
+      })
+      .catch(async (reason) => {
+        if (reason instanceof Response) {
+        } else throw reason
+      })
+
+    expect(sendTOTP).toHaveBeenCalledTimes(1)
+    expect(verify).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe('[ TOTP ]', () => {
@@ -1077,13 +1140,13 @@ describe('[ Utils ]', () => {
 
   test('Should throw an error on invalid secret.', async () => {
     const secrets = [
-      "b2FE35059924CDBF5B52A84765B8B010F5291993A9BC39410139D4F5110060",
-      "b2FE35059924CDBF5B52A84765B8B010F5291993A9BC39410139D4F511006034a",
-      "b2FE35059924CDBF5B52A84765B8B010F5291993A9BC39410139D4F51100603#"
+      'b2FE35059924CDBF5B52A84765B8B010F5291993A9BC39410139D4F5110060',
+      'b2FE35059924CDBF5B52A84765B8B010F5291993A9BC39410139D4F511006034a',
+      'b2FE35059924CDBF5B52A84765B8B010F5291993A9BC39410139D4F51100603#',
     ]
 
     for (const secret of secrets) {
-      expect(() => asJweKey(secret)).toThrow()  
+      expect(() => asJweKey(secret)).toThrow()
     }
   })
 })
