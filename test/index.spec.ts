@@ -153,47 +153,67 @@ describe('[ Basics ]', () => {
     expect(verify).toHaveBeenCalledTimes(1)
   })
 
-  test('Should throw after pre-reading FormData', async () => {
-    const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
-
-    const body = new FormData()
-    body.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
-    const request = new Request(`${HOST_URL}/login`, {
-      method: 'POST',
-      body,
+  test('Should use pre-read Form Data in context.', async () => {
+    let sendTOTPOptions: SendTOTPOptions | undefined
+    sendTOTP.mockImplementation(async (options: SendTOTPOptions) => {
+      sendTOTPOptions = options
     })
 
-    const _unused_preRead = await request.formData()
+    const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
+    let formData = new FormData()
+    formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
+    formData.append('type', 'remix-auth-totp')
+    let request = new Request(`${HOST_URL}/login`, {
+      method: 'POST',
+      body: formData,
+    })
+    let preReadFormData = await request.formData()
 
-    await expect(() =>
-      strategy.authenticate(request, sessionStorage, {
+    let session: Session | undefined
+    await strategy
+      .authenticate(request, sessionStorage, {
+        ...AUTH_OPTIONS,
+        successRedirect: '/verify',
+        failureRedirect: '/login',
+        context: { formData: preReadFormData },
+      })
+      .catch(async (reason) => {
+        if (reason instanceof Response) {
+          session = await sessionStorage.getSession(
+            reason.headers.get('set-cookie') ?? '',
+          )
+        } else throw reason
+      })
+
+    expect(sendTOTPOptions).not.toBeUndefined()
+    expect(session).not.toBeUndefined()
+    expect(sendTOTP).toHaveBeenCalledTimes(1)
+    expect(verify).toHaveBeenCalledTimes(0)
+
+    formData = new FormData()
+    formData.append(FORM_FIELDS.CODE, sendTOTPOptions?.code || '')
+    request = new Request(`${HOST_URL}/verify`, {
+      method: 'POST',
+      headers: {
+        cookie: (session && (await sessionStorage.commitSession(session))) || '',
+      },
+      body: formData,
+    })
+    preReadFormData = await request.formData()
+    await strategy
+      .authenticate(request, sessionStorage, {
         ...AUTH_OPTIONS,
         successRedirect: '/',
         failureRedirect: '/login',
-      }),
-    ).rejects.toThrow(TypeError)
-  })
+        context: { formData: preReadFormData },
+      })
+      .catch(async (reason) => {
+        if (reason instanceof Response) {
+        } else throw reason
+      })
 
-  test('Should pass a pre-read FormData object', async () => {
-    const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
-
-    const body = new FormData()
-    body.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
-    const request = new Request(`${HOST_URL}/login`, {
-      method: 'POST',
-      body,
-    })
-
-    const formData = await request.formData()
-
-    await expect(() =>
-      strategy.authenticate(request, sessionStorage, {
-        ...AUTH_OPTIONS,
-        successRedirect: '/',
-        failureRedirect: '/login',
-        context: { formData },
-      }),
-    ).rejects.toThrow(Response)
+    expect(sendTOTP).toHaveBeenCalledTimes(1)
+    expect(verify).toHaveBeenCalledTimes(1)
   })
 })
 

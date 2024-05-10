@@ -362,31 +362,32 @@ export async function action({ request }: ActionFunctionArgs) {
 
 Done! 🎉 Feel free to check the [Starter Example](https://github.com/dev-xo/totp-starter-example) for a detailed implementation.
 
+## Passing a pre-read FormData object
+
+Because you may want to do validations or read values from the FormData before calling `authenticate`, `remix-auth-totp` allows you to pass a FormData object as part of the optional context.
+
+```ts
+export async function action({ request }: ActionFunctionArgs) {
+  const formData = await request.formData()
+  await authenticator.authenticate(type, request, {
+    // use formData here
+    successRedirect: formData.get('redirectTo'),
+    failureRedirect: '/login',
+    context: { formData }, // pass pre-read formData here
+  })
+}
+```
+
+This way, you don't need to clone the request yourself.
+
+See https://github.com/sergiodxa/remix-auth-form?tab=readme-ov-file#passing-a-pre-read-formdata-object
+
 ## [Options and Customization](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/customization.md)
 
 The Strategy includes a few options that can be customized.
 
 You can find a detailed list of all the available options in the [customization](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/customization.md) documentation.
 
-## [Passing a pre-read FormData](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/customization.md)
+```
 
-Sometimes, you might want to validate passed form inputs, for example, when you have more than one strategy in one login page and they have a different `successRedirect` or `failureRedirect`. You can pass a pre-read FormData to the `authenticate` method or of course you can clone the current request `request.clone()` and read the FormData from the cloned request.
-
-```ts
-export async function action({ request }: ActionFunctionArgs) {
-  const formData = await request.formData()
-  const type = formData.get('type') as string
-
-  await authenticator.authenticate(type, request, {
-    // The `successRedirect` route will be used to verify the OTP code.
-    // This could be the current pathname or any other route that renders the verification form.
-    successRedirect: '/verify',
-
-    // The `failureRedirect` route will be used to render any possible error.
-    // If not provided, ErrorBoundary will be rendered instead.
-    failureRedirect: '/login',
-    // Pass the pre-read FormData to the authenticate method.
-    context: { formData },
-  })
-}
 ```
