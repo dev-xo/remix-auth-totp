@@ -367,5 +367,3 @@ Done! 🎉 Feel free to check the [Starter Example](https://github.com/dev-xo/to
 The Strategy includes a few options that can be customized.
 
 You can find a detailed list of all the available options in the [customization](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/customization.md) documentation.
-
-.
