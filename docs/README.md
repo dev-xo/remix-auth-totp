@@ -321,7 +321,7 @@ export default function Account() {
   let { user } = useLoaderData<typeof loader>()
 
   return (
-    <div style={{ display: 'flex' flexDirection: 'column' }}>
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
       <h1>{user && `Welcome ${user.email}`}</h1>
       <Form action="/logout" method="POST">
         <button>Log out</button>
