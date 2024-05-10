@@ -21,7 +21,7 @@ This way, you don't need to clone the request yourself.
 
 See https://github.com/sergiodxa/remix-auth-form?tab=readme-ov-file#passing-a-pre-read-formdata-object
 
-### Email Validation
+## Email Validation
 
 The email validation will match by default against a basic RegEx email pattern.
 Feel free to customize it by passing `validateEmail` method to the TOTPStrategy Instance.
@@ -39,7 +39,7 @@ authenticator.use(
 )
 ```
 
-### TOTP Generation
+## TOTP Generation
 
 The TOTP generation can customized by passing an object called `totpGeneration` to the TOTPStrategy Instance.
 
@@ -89,7 +89,7 @@ authenticator.use(
 )
 ```
 
-### Custom Error Messages
+## Custom Error Messages
 
 The Strategy includes a few default error messages that can be customized by passing an object called `customErrors` to the TOTPStrategy Instance.
 
@@ -122,7 +122,7 @@ authenticator.use(
 )
 ```
 
-### More Options
+## More Options
 
 The Strategy includes a few more options that can be customized.
 
