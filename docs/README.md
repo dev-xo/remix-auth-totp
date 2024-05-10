@@ -362,26 +362,6 @@ export async function action({ request }: ActionFunctionArgs) {
 
 Done! 🎉 Feel free to check the [Starter Example](https://github.com/dev-xo/totp-starter-example) for a detailed implementation.
 
-## Passing a pre-read FormData object
-
-Because you may want to do validations or read values from the FormData before calling `authenticate`, `remix-auth-totp` allows you to pass a FormData object as part of the optional context.
-
-```ts
-export async function action({ request }: ActionFunctionArgs) {
-  const formData = await request.formData()
-  await authenticator.authenticate(type, request, {
-    // use formData here
-    successRedirect: formData.get('redirectTo'),
-    failureRedirect: '/login',
-    context: { formData }, // pass pre-read formData here
-  })
-}
-```
-
-This way, you don't need to clone the request yourself.
-
-See https://github.com/sergiodxa/remix-auth-form?tab=readme-ov-file#passing-a-pre-read-formdata-object
-
 ## [Options and Customization](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/customization.md)
 
 The Strategy includes a few options that can be customized.

@@ -2,6 +2,25 @@
 
 The Strategy includes a few options that can be customized.
 
+## Passing a pre-read FormData Object
+
+Because you may want to do validations or read values from the FormData before calling `authenticate`, `remix-auth-totp` allows you to pass a FormData object as part of the optional context.
+
+```ts
+export async function action({ request }: ActionFunctionArgs) {
+  const formData = await request.formData()
+  await authenticator.authenticate(type, request, {
+    successRedirect: formData.get('redirectTo'),
+    failureRedirect: '/login',
+    context: { formData }, // Pass pre-read formData.
+  })
+}
+```
+
+This way, you don't need to clone the request yourself.
+
+See https://github.com/sergiodxa/remix-auth-form?tab=readme-ov-file#passing-a-pre-read-formdata-object
+
 ### Email Validation
 
 The email validation will match by default against a basic RegEx email pattern.
