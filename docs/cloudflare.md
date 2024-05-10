@@ -44,11 +44,11 @@ function setUpGlobals() {
 If you need `context` to be populated with the `AppLoadContext` in `SendTOTPOptions` or `TOTPVerifyParams`, be sure to include it in the call to `authenticate` on the remix-auth `Authenticator`.
 
 ```ts
-  await authenticator.authenticate("TOTP", request, {
-    successRedirect: "/verify",
-    failureRedirect: new URL(request.url).pathname,
-    context: appLoadContext
-  });
+await authenticator.authenticate('TOTP', request, {
+  successRedirect: '/verify',
+  failureRedirect: new URL(request.url).pathname,
+  context: appLoadContext,
+})
 ```
 
 ### Using Cloudflare KV for Session Storage
