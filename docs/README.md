@@ -93,7 +93,7 @@ Create a file called `auth.server.ts` wherever you want. <br />
 > A random 64-character hexadecimal string is required to generate the TOTP codes. This string should be stored securely and not shared with anyone.
 > You can use a site like https://www.grc.com/passwords.htm to generate a strong secret.
 
-Implement the following code and replace the `secret` property with a string containing exactly 64 random hexadecimal characters (0-9 and A-F) into your `.env` file. An example is `928F416BAFC49B969E62052F00450B6E974B03E86DC6984D1FA787B7EA533227`. 
+Implement the following code and replace the `secret` property with a string containing exactly 64 random hexadecimal characters (0-9 and A-F) into your `.env` file. An example is `928F416BAFC49B969E62052F00450B6E974B03E86DC6984D1FA787B7EA533227`.
 
 ```ts
 // app/modules/auth/auth.server.ts
@@ -225,11 +225,11 @@ export default function Login() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       {/* Login Form. */}
-        <Form method="POST">
-          <label htmlFor="email">Email</label>
-          <input type="email" name="email" placeholder="Insert email .." required />
-          <button type="submit">Send Code</button>
-        </Form>
+      <Form method="POST">
+        <label htmlFor="email">Email</label>
+        <input type="email" name="email" placeholder="Insert email .." required />
+        <button type="submit">Send Code</button>
+      </Form>
 
       {/* Login Errors Handling. */}
       <span>{authError?.message}</span>
@@ -280,7 +280,7 @@ export default function Verify() {
   const { authError } = useLoaderData<typeof loader>()
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column' }}>
+    <div style={{ display: 'flex' flexDirection: 'column' }}>
       {/* Code Verification Form */}
       <Form method="POST">
         <label htmlFor="code">Code</label>
@@ -321,7 +321,7 @@ export default function Account() {
   let { user } = useLoaderData<typeof loader>()
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column' }}>
+    <div style={{ display: 'flex' flexDirection: 'column' }}>
       <h1>{user && `Welcome ${user.email}`}</h1>
       <Form action="/logout" method="POST">
         <button>Log out</button>
@@ -361,6 +361,26 @@ export async function action({ request }: ActionFunctionArgs) {
 ```
 
 Done! 🎉 Feel free to check the [Starter Example](https://github.com/dev-xo/totp-starter-example) for a detailed implementation.
+
+## Passing a pre-read FormData object
+
+Because you may want to do validations or read values from the FormData before calling `authenticate`, `remix-auth-totp` allows you to pass a FormData object as part of the optional context.
+
+```ts
+export async function action({ request }: ActionFunctionArgs) {
+  const formData = await request.formData()
+  await authenticator.authenticate(type, request, {
+    // use formData here
+    successRedirect: formData.get('redirectTo'),
+    failureRedirect: '/login',
+    context: { formData }, // pass pre-read formData here
+  })
+}
+```
+
+This way, you don't need to clone the request yourself.
+
+See https://github.com/sergiodxa/remix-auth-form?tab=readme-ov-file#passing-a-pre-read-formdata-object
 
 ## [Options and Customization](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/customization.md)
 
