@@ -99,7 +99,12 @@ export interface SendTOTPOptions {
   /**
    * The email address provided by the user.
    */
-  email: string
+  email?: string
+
+  /**
+   * The phone number provided by the user.
+   */
+  phone?: string
 
   /**
    * The decrypted TOTP code.
@@ -148,6 +153,15 @@ export interface ValidateEmail {
 }
 
 /**
+ * The validate phone method.
+ *
+ * @param phone The phone number to validate.
+ */
+export interface ValidatePhone {
+  (phone: string): Promise<boolean>
+}
+
+/**
  * The custom errors configuration.
  */
 export interface CustomErrorsOptions {
@@ -155,11 +169,20 @@ export interface CustomErrorsOptions {
    * The required email error message.
    */
   requiredEmail?: string
+  /**
+   * The required phone error message.
+   */
+  requiredPhone?: string
 
   /**
    * The invalid email error message.
    */
   invalidEmail?: string
+
+  /**
+   * The invalid phone error message.
+   */
+  invalidPhone?: string
 
   /**
    * The invalid TOTP error message.
@@ -211,6 +234,12 @@ export interface TOTPStrategyOptions {
   emailFieldKey?: string
 
   /**
+   * The form input name used to get the phone.
+   * @default "phone"
+   */
+  phoneFieldKey?: string
+
+  /**
    * The form input name used to get the TOTP.
    * @default "code"
    */
@@ -221,6 +250,12 @@ export interface TOTPStrategyOptions {
    * @default "auth:email"
    */
   sessionEmailKey?: string
+
+  /**
+   * The session key that stores the phone number.
+   * @default "auth:phone"
+   */
+  sessionPhoneKey?: string
 
   /**
    * The session key that stores the signed TOTP.
@@ -237,6 +272,11 @@ export interface TOTPStrategyOptions {
    * The validate email method.
    */
   validateEmail?: ValidateEmail
+
+  /**
+   * The validate phone method.
+   */
+  validatePhone?: ValidatePhone
 }
 
 /**
@@ -247,7 +287,12 @@ export interface TOTPVerifyParams {
   /**
    * The email address provided by the user.
    */
-  email: string
+  email?: string
+
+  /**
+   * The phone number provided by the user.
+   */
+  phone?: string
 
   /**
    * The formData object from the Request.
@@ -277,8 +322,10 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   private readonly magicLinkPath: string
   private readonly customErrors: Required<CustomErrorsOptions>
   private readonly emailFieldKey: string
+  private readonly phoneFieldKey: string
   private readonly codeFieldKey: string
   private readonly sessionEmailKey: string
+  private readonly sessionPhoneKey: string
   private readonly sessionTotpKey: string
   private readonly sendTOTP: SendTOTP
   private readonly validateEmail: ValidateEmail
@@ -305,6 +352,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     this.maxAge = options.maxAge
     this.magicLinkPath = options.magicLinkPath ?? '/magic-link'
     this.emailFieldKey = options.emailFieldKey ?? FORM_FIELDS.EMAIL
+    this.phoneFieldKey = options.phoneFieldKey ?? FORM_FIELDS.PHONE
     this.codeFieldKey = options.codeFieldKey ?? FORM_FIELDS.CODE
     this.sessionEmailKey = options.sessionEmailKey ?? SESSION_KEYS.EMAIL
     this.sessionTotpKey = options.sessionTotpKey ?? SESSION_KEYS.TOTP
@@ -355,13 +403,10 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     const formDataCode = coerceToOptionalNonEmptyString(formData.get(this.codeFieldKey))
     const sessionEmail = coerceToOptionalString(session.get(this.sessionEmailKey))
     const sessionTotp = coerceToOptionalTotpSessionData(session.get(this.sessionTotpKey))
-    const email =
-      request.method === 'POST'
-        ? formDataEmail ?? (!formDataCode ? sessionEmail : null)
-        : null
+    const email = formDataEmail ?? (!formDataCode ? sessionEmail : null)
 
     try {
-      if (email) {
+      if (request.method === 'POST' && email) {
         const { code, jwe, magicLink } = await this._generateTOTP({ email, request })
         await this.sendTOTP({
           email,

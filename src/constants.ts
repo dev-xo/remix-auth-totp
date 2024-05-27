@@ -2,11 +2,13 @@ export const STRATEGY_NAME = 'TOTP'
 
 export const FORM_FIELDS = {
   EMAIL: 'email',
+  PHONE: 'phone',
   CODE: 'code',
 } as const
 
 export const SESSION_KEYS = {
   EMAIL: 'auth:email',
+  PHONE: 'auth:phone',
   TOTP: 'auth:totp',
 } as const
 
@@ -14,6 +16,8 @@ export const ERRORS = {
   // Customizable errors.
   REQUIRED_EMAIL: 'Email is required.',
   INVALID_EMAIL: 'Email is not valid.',
+  REQUIRED_PHONE: 'Phone is required.',
+  INVALID_PHONE: 'Phone is not valid.',
   INVALID_TOTP: 'Code is not valid.',
   EXPIRED_TOTP: 'Code has expired.',
 
