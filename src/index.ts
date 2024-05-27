@@ -339,6 +339,8 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   private readonly _customErrorsDefaults: Required<CustomErrorsOptions> = {
     requiredEmail: ERRORS.REQUIRED_EMAIL,
     invalidEmail: ERRORS.INVALID_EMAIL,
+    requiredPhone: ERRORS.REQUIRED_PHONE,
+    invalidPhone: ERRORS.INVALID_PHONE,
     invalidTotp: ERRORS.INVALID_TOTP,
     expiredTotp: ERRORS.EXPIRED_TOTP,
   }
@@ -355,6 +357,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     this.phoneFieldKey = options.phoneFieldKey ?? FORM_FIELDS.PHONE
     this.codeFieldKey = options.codeFieldKey ?? FORM_FIELDS.CODE
     this.sessionEmailKey = options.sessionEmailKey ?? SESSION_KEYS.EMAIL
+    this.sessionPhoneKey = options.sessionPhoneKey ?? SESSION_KEYS.PHONE
     this.sessionTotpKey = options.sessionTotpKey ?? SESSION_KEYS.TOTP
     this.sendTOTP = options.sendTOTP
     this.validateEmail = options.validateEmail ?? this._validateEmailDefault
