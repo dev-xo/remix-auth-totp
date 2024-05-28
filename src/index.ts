@@ -329,6 +329,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   private readonly sessionTotpKey: string
   private readonly sendTOTP: SendTOTP
   private readonly validateEmail: ValidateEmail
+  private readonly validatePhone: ValidatePhone
   private readonly _totpGenerationDefaults = {
     algorithm: 'SHA256', // More secure than SHA1
     charSet: 'abcdefghijklmnpqrstuvwxyzABCDEFGHIJKLMNPQRSTUVWXYZ123456789', // No O or 0
@@ -361,6 +362,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     this.sessionTotpKey = options.sessionTotpKey ?? SESSION_KEYS.TOTP
     this.sendTOTP = options.sendTOTP
     this.validateEmail = options.validateEmail ?? this._validateEmailDefault
+    this.validatePhone = options.validatePhone ?? this._validatePhoneDefault
 
     this.totpGeneration = {
       ...this._totpGenerationDefaults,
@@ -403,16 +405,24 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
 
     const formData = await this._readFormData(request, options)
     const formDataEmail = coerceToOptionalNonEmptyString(formData.get(this.emailFieldKey))
+    const formDataPhone = coerceToOptionalNonEmptyString(formData.get(this.phoneFieldKey))
     const formDataCode = coerceToOptionalNonEmptyString(formData.get(this.codeFieldKey))
     const sessionEmail = coerceToOptionalString(session.get(this.sessionEmailKey))
+    const sessionPhone = coerceToOptionalString(session.get(this.sessionPhoneKey))
     const sessionTotp = coerceToOptionalTotpSessionData(session.get(this.sessionTotpKey))
-    const email = formDataEmail ?? (!formDataCode ? sessionEmail : null)
+    const email = formDataEmail ?? (!formDataCode ? sessionEmail : undefined)
+    const phone = formDataPhone ?? (!formDataCode ? sessionPhone : undefined)
 
     try {
-      if (request.method === 'POST' && email) {
-        const { code, jwe, magicLink } = await this._generateTOTP({ email, request })
+      if (request.method === 'POST' && (email || phone)) {
+        const { code, jwe, magicLink } = await this._generateTOTP({
+          email,
+          phone,
+          request,
+        })
         await this.sendTOTP({
           email,
+          phone,
           code,
           magicLink,
           formData,
@@ -475,9 +485,19 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     }
   }
 
-  private async _generateTOTP({ email, request }: { email: string; request: Request }) {
-    const isValidEmail = await this.validateEmail(email)
+  private async _generateTOTP({
+    email,
+    phone,
+    request,
+  }: {
+    email?: string
+    phone?: string
+    request: Request
+  }) {
+    const isValidEmail = email ? await this.validateEmail(email) : true
+    const isValidPhone = phone ? await this.validatePhone(phone) : true
     if (!isValidEmail) throw new Error(this.customErrors.invalidEmail)
+    if (!isValidPhone) throw new Error(this.customErrors.invalidPhone)
 
     const { otp: code, secret } = generateTOTP({
       ...this.totpGeneration,
@@ -518,6 +538,11 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   private async _validateEmailDefault(email: string) {
     const regexEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/gm
     return regexEmail.test(email)
+  }
+
+  private async _validatePhoneDefault(phone: string) {
+    const regexPhone = /^\+[1-9]\d{1,14}$/ // Basic E.164 validation
+    return regexPhone.test(phone)
   }
 
   private async _validateTOTP({
