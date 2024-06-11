@@ -214,7 +214,7 @@ export async function action({ request }: ActionFunctionArgs) {
     successRedirect: '/verify',
 
     // The `failureRedirect` route will be used to render any possible error.
-    // If not provided, ErrorBoundary will be rendered instead.
+    // This could be the current pathname or any other route that renders the login form.
     failureRedirect: '/login',
   })
 }
