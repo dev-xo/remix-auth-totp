@@ -1051,10 +1051,45 @@ describe('[ TOTP ]', () => {
         })
     })
 
-    test('Should failure redirect on stale magic-link.', async () => {
+    test('Should failure redirect on missing session email.', async () => {
+      let { session } = await setupGenerateSendTOTP()
+      session.unset(SESSION_KEYS.EMAIL)
       const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
       const request = new Request('https://prodserver.com/magic-link?code=KJJERI', {
         method: 'GET',
+        headers: {
+          cookie: await sessionStorage.commitSession(session),
+        },
+      })
+      await strategy
+        .authenticate(request, sessionStorage, {
+          ...AUTH_OPTIONS,
+          successRedirect: '/account',
+          failureRedirect: '/login',
+        })
+        .catch(async (reason) => {
+          if (reason instanceof Response) {
+            expect(reason.status).toBe(302)
+            expect(reason.headers.get('location')).toBe(`/login`)
+            const session = await sessionStorage.getSession(
+              reason.headers.get('set-cookie') ?? '',
+            )
+            expect(session.get(AUTH_OPTIONS.sessionErrorKey)).toEqual({
+              message: ERRORS.MISSING_SESSION_EMAIL,
+            })
+          } else throw reason
+        })
+    })
+
+    test('Should failure redirect on stale magic-link.', async () => {
+      let { session } = await setupGenerateSendTOTP()
+      session.unset(SESSION_KEYS.TOTP)
+      const strategy = new TOTPStrategy(TOTP_STRATEGY_OPTIONS, verify)
+      const request = new Request('https://prodserver.com/magic-link?code=KJJERI', {
+        method: 'GET',
+        headers: {
+          cookie: await sessionStorage.commitSession(session),
+        },
       })
       await strategy
         .authenticate(request, sessionStorage, {

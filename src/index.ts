@@ -170,6 +170,11 @@ export interface CustomErrorsOptions {
    * The expired TOTP error message.
    */
   expiredTotp?: string
+
+  /**
+   * The missing session email error message.
+   */
+  missingSessionEmail?: string
 }
 
 /**
@@ -294,6 +299,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     invalidEmail: ERRORS.INVALID_EMAIL,
     invalidTotp: ERRORS.INVALID_TOTP,
     expiredTotp: ERRORS.EXPIRED_TOTP,
+    missingSessionEmail: ERRORS.MISSING_SESSION_EMAIL,
   }
 
   constructor(
@@ -388,7 +394,8 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
 
       const code = formDataCode ?? this._getMagicLinkCode(request)
       if (code) {
-        if (!sessionEmail || !sessionTotp) throw new Error(this.customErrors.expiredTotp)
+        if (!sessionEmail) throw new Error(this.customErrors.missingSessionEmail);
+        if (!sessionTotp) throw new Error(this.customErrors.expiredTotp)
         await this._validateTOTP({ code, sessionTotp, session, sessionStorage, options })
 
         const user = await this.verify({
