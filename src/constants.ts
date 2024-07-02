@@ -16,6 +16,7 @@ export const ERRORS = {
   INVALID_EMAIL: 'Email is not valid.',
   INVALID_TOTP: 'Code is not valid.',
   EXPIRED_TOTP: 'Code has expired.',
+  MISSING_SESSION_EMAIL: 'Missing email to verify. Check that same browser used for verification.',
 
   // Miscellaneous errors.
   REQUIRED_ENV_SECRET: 'Missing required .env secret.',

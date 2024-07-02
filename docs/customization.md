@@ -111,6 +111,10 @@ export interface CustomErrorsOptions {
    * The expired TOTP error message.
    */
   expiredTotp?: string
+  /**
+   * The missing session email error message.
+   */
+  missingSessionEmail?: string
 }
 
 authenticator.use(
