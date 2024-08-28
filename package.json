@@ -39,8 +39,8 @@
   ],
   "dependencies": {
     "@epic-web/totp": "^1.1.2",
-    "jose": "^5.2.4",
-    "thirty-two": "^1.0.2"
+    "base32-encode": "^2.0.0",
+    "jose": "^5.2.4"
   },
   "peerDependencies": {
     "remix-auth": "^3.6.0"
