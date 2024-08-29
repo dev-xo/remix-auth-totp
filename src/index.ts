@@ -394,7 +394,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
 
       const code = formDataCode ?? this._getMagicLinkCode(request)
       if (code) {
-        if (!sessionEmail) throw new Error(this.customErrors.missingSessionEmail);
+        if (!sessionEmail) throw new Error(this.customErrors.missingSessionEmail)
         if (!sessionTotp) throw new Error(this.customErrors.expiredTotp)
         await this._validateTOTP({ code, sessionTotp, session, sessionStorage, options })
 

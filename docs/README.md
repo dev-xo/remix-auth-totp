@@ -259,11 +259,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
   if (!authEmail) return redirect('/login')
 
   // Commit session to clear any `flash` error message.
-  return json({ authError }, {
-    headers: {
-      'set-cookie': await commitSession(session),
+  return json(
+    { authError },
+    {
+      headers: {
+        'set-cookie': await commitSession(session),
+      },
     },
-  })
+  )
 }
 
 export async function action({ request }: ActionFunctionArgs) {
