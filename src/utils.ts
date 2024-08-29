@@ -2,15 +2,14 @@ import type { TOTPData, TOTPSessionData } from './index.js'
 import type { AuthenticateOptions } from 'remix-auth'
 import { ERRORS } from './constants.js'
 
-// @ts-expect-error - `thirty-two` is not typed.
-import * as base32 from 'thirty-two'
+import base32Encode from 'base32-encode'
 import * as crypto from 'node:crypto'
 
 /**
  * TOTP Generation.
  */
 export function generateSecret() {
-  return base32.encode(crypto.randomBytes(32)).toString() as string
+  return base32Encode(crypto.randomBytes(32), 'RFC4648').toString() as string
 }
 
 export function generateMagicLink(options: {
