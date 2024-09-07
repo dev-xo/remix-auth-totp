@@ -24,6 +24,53 @@ export function generateMagicLink(options: {
   return url.toString()
 }
 
+// https://github.com/sindresorhus/uint8array-extras/blob/main/index.js#L222
+const hexToDecimalLookupTable = {
+	0: 0,
+	1: 1,
+	2: 2,
+	3: 3,
+	4: 4,
+	5: 5,
+	6: 6,
+	7: 7,
+	8: 8,
+	9: 9,
+	a: 10,
+	b: 11,
+	c: 12,
+	d: 13,
+	e: 14,
+	f: 15,
+	A: 10,
+	B: 11,
+	C: 12,
+	D: 13,
+	E: 14,
+	F: 15,
+};
+function hexToUint8Array(hexString: string) {
+	if (hexString.length % 2 !== 0) {
+		throw new Error('Invalid Hex string length.');
+	}
+
+	const resultLength = hexString.length / 2;
+	const bytes = new Uint8Array(resultLength);
+
+	for (let index = 0; index < resultLength; index++) {
+		const highNibble = hexToDecimalLookupTable[hexString[index * 2]];
+		const lowNibble = hexToDecimalLookupTable[hexString[(index * 2) + 1]];
+
+		if (highNibble === undefined || lowNibble === undefined) {
+			throw new Error(`Invalid Hex character encountered at position ${index * 2}`);
+		}
+
+		bytes[index] = (highNibble << 4) | lowNibble;
+	}
+
+	return bytes;
+}
+
 /**
  * Miscellaneous.
  */
@@ -31,7 +78,7 @@ export function asJweKey(secret: string) {
   if (!/^[0-9a-fA-F]{64}$/.test(secret)) {
     throw new Error('Secret must be a string with 64 hex characters.')
   }
-  return Buffer.from(secret, 'hex')
+  return hexToUint8Array(secret)
 }
 
 export function coerceToOptionalString(value: unknown) {
