@@ -1,15 +1,15 @@
 import type { TOTPData, TOTPSessionData } from './index.js'
 import type { AuthenticateOptions } from 'remix-auth'
 import { ERRORS } from './constants.js'
-
 import base32Encode from 'base32-encode'
-import * as crypto from 'node:crypto'
 
 /**
  * TOTP Generation.
  */
 export function generateSecret() {
-  return base32Encode(crypto.randomBytes(32), 'RFC4648').toString() as string
+  const randomBytes = new Uint8Array(32);
+  crypto.getRandomValues(randomBytes);
+  return base32Encode(randomBytes, 'RFC4648').toString() as string
 }
 
 export function generateMagicLink(options: {
