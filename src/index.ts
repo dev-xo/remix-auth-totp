@@ -288,7 +288,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   private readonly sendTOTP: SendTOTP
   private readonly validateEmail: ValidateEmail
   private readonly _totpGenerationDefaults = {
-    algorithm: 'SHA256', // More secure than SHA1
+    algorithm: 'SHA-256', // More secure than SHA1
     charSet: 'abcdefghijklmnpqrstuvwxyzABCDEFGHIJKLMNPQRSTUVWXYZ123456789', // No O or 0
     digits: 6,
     period: 60,
@@ -438,7 +438,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     const isValidEmail = await this.validateEmail(email)
     if (!isValidEmail) throw new Error(this.customErrors.invalidEmail)
 
-    const { otp: code, secret } = generateTOTP({
+    const { otp: code, secret } = await generateTOTP({
       ...this.totpGeneration,
       secret: this.totpGeneration.secret ?? generateSecret(),
     })
@@ -504,7 +504,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       if (Date.now() - totpData.createdAt > this.totpGeneration.period * 1000) {
         throw new Error(this.customErrors.expiredTotp)
       }
-      if (!verifyTOTP({ ...this.totpGeneration, secret: totpData.secret, otp: code })) {
+      if (!await verifyTOTP({ ...this.totpGeneration, secret: totpData.secret, otp: code })) {
         throw new Error(this.customErrors.invalidTotp)
       }
     } catch (error) {
