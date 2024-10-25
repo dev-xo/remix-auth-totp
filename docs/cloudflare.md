@@ -19,26 +19,6 @@ export default {
 }
 ```
 
-### Vite
-
-Enable [Node.js compatibility](https://developers.cloudflare.com/workers/runtime-apis/nodejs/) for Cloudflare in [wrangler.toml](https://developers.cloudflare.com/workers/runtime-apis/nodejs/#enable-nodejs-with-workers), [Cloudflare Dashboard](https://developers.cloudflare.com/workers/runtime-apis/nodejs/#enable-nodejs-from-the-cloudflare-dashboard), and in the start script inside `package.json`.
-
-```json
-"scripts": {
-  "start": "wrangler pages dev ./build/client --compatibility-flags=nodejs_compat"
-}
-```
-
-Ensure the `Buffer` global is set up before using `remix-auth-totp`.
-
-```ts
-import { Buffer } from 'node:buffer'
-
-function setUpGlobals() {
-  globalThis.Buffer = Buffer
-}
-```
-
 ### AppLoadContext
 
 If you need `context` to be populated with the `AppLoadContext` in `SendTOTPOptions` or `TOTPVerifyParams`, be sure to include it in the call to `authenticate` on the remix-auth `Authenticator`.
