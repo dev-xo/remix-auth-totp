@@ -1,6 +1,4 @@
 import type { TOTPData, TOTPSessionData } from './index.js'
-import type { AuthenticateOptions } from 'remix-auth'
-import { ERRORS } from './constants.js'
 import base32Encode from 'base32-encode'
 
 /**
@@ -117,21 +115,5 @@ export function assertTOTPData(obj: unknown): asserts obj is TOTPData {
     typeof (obj as { createdAt: unknown }).createdAt !== 'number'
   ) {
     throw new Error('Invalid totp data.')
-  }
-}
-
-export type RequiredAuthenticateOptions = Required<
-  Pick<AuthenticateOptions, 'failureRedirect' | 'successRedirect'>
-> &
-  Omit<AuthenticateOptions, 'failureRedirect' | 'successRedirect'>
-
-export function assertIsRequiredAuthenticateOptions(
-  options: AuthenticateOptions,
-): asserts options is RequiredAuthenticateOptions {
-  if (options.successRedirect === undefined) {
-    throw new Error(ERRORS.REQUIRED_SUCCESS_REDIRECT_URL)
-  }
-  if (options.failureRedirect === undefined) {
-    throw new Error(ERRORS.REQUIRED_FAILURE_REDIRECT_URL)
   }
 }
