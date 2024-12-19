@@ -1,7 +1,4 @@
-import type { AuthenticateOptions } from 'remix-auth'
 import type { TOTPGenerationOptions } from '../src'
-
-import { createCookieSessionStorage } from '@remix-run/node'
 
 /**
  * Constants.
@@ -20,7 +17,7 @@ export const AUTH_OPTIONS = {
   sessionKey: 'user',
   sessionErrorKey: 'error',
   sessionStrategyKey: 'strategy',
-} satisfies AuthenticateOptions
+}
 
 export const TOTP_GENERATION_DEFAULTS: Required<
   Pick<TOTPGenerationOptions, 'period' | 'maxAttempts'>
@@ -28,10 +25,3 @@ export const TOTP_GENERATION_DEFAULTS: Required<
   period: 60,
   maxAttempts: 3,
 }
-
-/**
- * Session Storage.
- */
-export const sessionStorage = createCookieSessionStorage({
-  cookie: { secrets: ['SESSION_SECRET'] },
-})

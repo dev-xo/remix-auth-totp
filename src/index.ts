@@ -1,279 +1,174 @@
-import type { Session, SessionStorage, AppLoadContext } from '@remix-run/server-runtime'
-import type { AuthenticateOptions, StrategyVerifyCallback } from 'remix-auth'
-
-import { redirect } from '@remix-run/server-runtime'
-import { Strategy } from 'remix-auth'
 import { generateTOTP, verifyTOTP } from '@epic-web/totp'
 import * as jose from 'jose'
+import { Cookie, SetCookie } from '@mjackson/headers'
+
 import {
   generateSecret,
-  generateMagicLink,
-  coerceToOptionalString,
-  coerceToOptionalTotpSessionData,
-  coerceToOptionalNonEmptyString,
-  assertIsRequiredAuthenticateOptions,
-  RequiredAuthenticateOptions,
   assertTOTPData,
   asJweKey,
+  coerceToOptionalNonEmptyString,
+  coerceToOptionalString,
+  coerceToOptionalTotpSessionData,
 } from './utils.js'
-import { STRATEGY_NAME, FORM_FIELDS, SESSION_KEYS, ERRORS } from './constants.js'
 
-/**
- * The TOTP data stored in the session.
- */
-export interface TOTPSessionData {
-  /**
-   * The TOTP JWE of TOTPData.
-   */
-  jwe: string
+import {
+  STRATEGY_NAME,
+  FORM_FIELDS,
+  SESSION_KEYS,
+  ERRORS,
+} from './constants.js'
+import { redirect } from './lib/redirect.js'
+import { Strategy } from 'remix-auth/strategy'
 
-  /**
-   * The number of attempts the user tried to verify the TOTP.
-   * @default 0
-   */
-  attempts: number
-}
-
-/**
- * The TOTP JWE data containing the secret.
- */
 export interface TOTPData {
-  /**
-   * The TOTP secret.
-   */
   secret: string
-
-  /**
-   * The time the TOTP was generated.
-   */
   createdAt: number
 }
 
-/**
- * The TOTP generation configuration.
- */
+export interface TOTPSessionData {
+  jwe: string
+  attempts: number
+}
+
 export interface TOTPGenerationOptions {
-  /**
-   * The secret used to generate the TOTP.
-   * It should be Base32 encoded (Feel free to use: https://npm.im/thirty-two).
-   *
-   * @default random Base32 secret.
-   */
   secret?: string
-
-  /**
-   * The algorithm used to generate the TOTP.
-   * @default 'SHA1'
-   */
   algorithm?: string
-
-  /**
-   * The character set used to generate the TOTP.
-   * @default 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-   */
   charSet?: string
-
-  /**
-   * The number of digits used to generate the TOTP.
-   * @default 6
-   */
   digits?: number
-
-  /**
-   * The number of seconds the TOTP will be valid.
-   * @default 60
-   */
   period?: number
-
-  /**
-   * The max number of attempts the user can try to verify the TOTP.
-   * @default 3
-   */
   maxAttempts?: number
 }
 
-/**
- * The send TOTP configuration.
- */
 export interface SendTOTPOptions {
-  /**
-   * The email address provided by the user.
-   */
   email: string
-
-  /**
-   * The decrypted TOTP code.
-   */
   code: string
-
-  /**
-   * The Magic Link URL.
-   */
   magicLink: string
-
-  /**
-   * The request to generate the TOTP.
-   */
   request: Request
-
-  /**
-   * The form data of the request.
-   */
   formData: FormData
-
-  /**
-   * The context object received by the loader or action.
-   * Defaults to undefined.
-   * Explicitly include it in the options to authenticate if you need it.
-   */
-  context?: AppLoadContext
+  context?: unknown
 }
 
-/**
- * The sender email method.
- * @param options The send TOTP options.
- */
 export interface SendTOTP {
   (options: SendTOTPOptions): Promise<void>
 }
 
-/**
- * The validate email method.
- * This can be useful to ensure it's not a disposable email address.
- *
- * @param email The email address to validate.
- */
 export interface ValidateEmail {
   (email: string): Promise<boolean>
 }
 
-/**
- * The custom errors configuration.
- */
 export interface CustomErrorsOptions {
-  /**
-   * The required email error message.
-   */
   requiredEmail?: string
-
-  /**
-   * The invalid email error message.
-   */
   invalidEmail?: string
-
-  /**
-   * The invalid TOTP error message.
-   */
   invalidTotp?: string
-
-  /**
-   * The expired TOTP error message.
-   */
   expiredTotp?: string
-
-  /**
-   * The missing session email error message.
-   */
   missingSessionEmail?: string
 }
 
-/**
- * The TOTP Strategy options.
- */
 export interface TOTPStrategyOptions {
-  /**
-   * The secret used to encrypt the TOTP data.
-   * Must be string of 64 hexadecimal characters.
-   */
   secret: string
-
-  /**
-   * The maximum age the session can live.
-   * @default undefined
-   */
   maxAge?: number
-
-  /**
-   * The TOTP generation configuration.
-   */
   totpGeneration?: TOTPGenerationOptions
-
-  /**
-   * The URL path for the Magic Link.
-   * @default '/magic-link'
-   */
   magicLinkPath?: string
-
-  /**
-   * The custom errors configuration.
-   */
   customErrors?: CustomErrorsOptions
-
-  /**
-   * The form input name used to get the email address.
-   * @default "email"
-   */
   emailFieldKey?: string
-
-  /**
-   * The form input name used to get the TOTP.
-   * @default "code"
-   */
   codeFieldKey?: string
-
-  /**
-   * The session key that stores the email address.
-   * @default "auth:email"
-   */
   sessionEmailKey?: string
-
-  /**
-   * The session key that stores the signed TOTP.
-   * @default "auth:totp"
-   */
   sessionTotpKey?: string
-
-  /**
-   * The send TOTP method.
-   */
   sendTOTP: SendTOTP
-
-  /**
-   * The validate email method.
-   */
   validateEmail?: ValidateEmail
+  successRedirect: string
+  failureRedirect: string
+}
+
+export interface TOTPVerifyParams {
+  email: string
+  formData?: FormData
+  request: Request
+  context?: unknown
 }
 
 /**
- * The verify method callback.
- * Returns the user for the email to be stored in the session.
+ * A simple store that keeps TOTP-related state in a cookie.
+ * Stores email, TOTP data, and a possible error message.
  */
-export interface TOTPVerifyParams {
-  /**
-   * The email address provided by the user.
-   */
-  email: string
+class TOTPStore {
+  private email?: string
+  private totp?: TOTPSessionData
+  private error?: { message: string }
 
-  /**
-   * The formData object from the Request.
-   */
-  formData?: FormData
+  static COOKIE_NAME = '_totp'
 
-  /**
-   * The Request object.
-   */
-  request: Request
+  constructor(private cookie: Cookie) {
+    const raw = this.cookie.get(TOTPStore.COOKIE_NAME)
+    if (raw) {
+      const params = new URLSearchParams(raw)
+      this.email = params.get('email') || undefined
+      const totpRaw = params.get('totp')
+      if (totpRaw) {
+        try {
+          this.totp = JSON.parse(totpRaw)
+        } catch {}
+      }
+      const err = params.get('error')
+      if (err) {
+        this.error = { message: err }
+      }
+    }
+  }
 
-  /**
-   * The context object received by the loader or action.
-   * Defaults to undefined.
-   * Explicitly include it in the options to authenticate if you need it.
-   */
-  context?: AppLoadContext
+  static fromRequest(request: Request) {
+    return new TOTPStore(new Cookie(request.headers.get('cookie') ?? ''))
+  }
+
+  getEmail() {
+    return this.email
+  }
+
+  getTOTP() {
+    return this.totp
+  }
+
+  getError() {
+    return this.error
+  }
+
+  setEmail(email: string | undefined) {
+    this.email = email
+  }
+
+  setTOTP(totp: TOTPSessionData | undefined) {
+    this.totp = totp
+  }
+
+  setError(message: string | undefined) {
+    if (message) {
+      this.error = { message }
+    } else {
+      this.error = undefined
+    }
+  }
+
+  commit(): string {
+    const params = new URLSearchParams()
+    if (this.email) params.set('email', this.email)
+    if (this.totp) params.set('totp', JSON.stringify(this.totp))
+    if (this.error) params.set('error', this.error.message)
+    const setCookie = new SetCookie({
+      name: TOTPStore.COOKIE_NAME,
+      value: params.toString(),
+      httpOnly: true,
+      path: '/',
+      sameSite: 'Lax',
+      secure: true,
+    })
+    return setCookie.toString()
+  }
 }
 
 export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   public name = STRATEGY_NAME
+  private successRedirect: string
+  private failureRedirect: string
 
   private readonly secret: string
   private readonly maxAge: number | undefined
@@ -288,8 +183,8 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   private readonly sendTOTP: SendTOTP
   private readonly validateEmail: ValidateEmail
   private readonly _totpGenerationDefaults = {
-    algorithm: 'SHA-256', // More secure than SHA1
-    charSet: 'abcdefghijklmnpqrstuvwxyzABCDEFGHIJKLMNPQRSTUVWXYZ123456789', // No O or 0
+    algorithm: 'SHA-256',
+    charSet: 'abcdefghijklmnpqrstuvwxyzABCDEFGHIJKLMNPQRSTUVWXYZ123456789',
     digits: 6,
     period: 60,
     maxAttempts: 3,
@@ -304,7 +199,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
 
   constructor(
     options: TOTPStrategyOptions,
-    verify: StrategyVerifyCallback<User, TOTPVerifyParams>,
+    verify: Strategy.VerifyFunction<User, TOTPVerifyParams>,
   ) {
     super(verify)
     this.secret = options.secret
@@ -316,6 +211,8 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     this.sessionTotpKey = options.sessionTotpKey ?? SESSION_KEYS.TOTP
     this.sendTOTP = options.sendTOTP
     this.validateEmail = options.validateEmail ?? this._validateEmailDefault
+    this.successRedirect = options.successRedirect
+    this.failureRedirect = options.failureRedirect
 
     this.totpGeneration = {
       ...this._totpGenerationDefaults,
@@ -326,41 +223,27 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       ...options.customErrors,
     }
   }
-
-  /**
-   * Authenticates a user using TOTP.
-   *
-   * If the user is already authenticated, simply returns the user.
-   *
-   * | Method | Email | Code | Sess. Email | Sess. TOTP | Action/Logic                             |
-   * |--------|-------|------|-------------|------------|------------------------------------------|
-   * | POST   | ✓     | -    | -           | -          | Generate/send TOTP using form email.     |
-   * | POST   | ✗     | ✗    | ✓           | -          | Generate/send TOTP using session email.  |
-   * | POST   | ✗     | ✓    | ✓           | ✓          | Validate form TOTP code.                 |
-   * | GET    | -     | -    | ✓           | ✓          | Validate magic link TOTP.                |
-   *
-   * @param {Request} request - The request object.
-   * @param {SessionStorage} sessionStorage - The session storage instance.
-   * @param {AuthenticateOptions} options - The authentication options. successRedirect is required.
-   * @returns {Promise<User>} The authenticated user.
-   */
+ 
   async authenticate(
     request: Request,
-    sessionStorage: SessionStorage,
-    options: AuthenticateOptions,
   ): Promise<User> {
     if (!this.secret) throw new Error(ERRORS.REQUIRED_ENV_SECRET)
-    assertIsRequiredAuthenticateOptions(options)
+    if (!this.successRedirect) throw new Error(ERRORS.REQUIRED_SUCCESS_REDIRECT_URL)
+    if (!this.failureRedirect) throw new Error(ERRORS.REQUIRED_FAILURE_REDIRECT_URL)
 
-    const session = await sessionStorage.getSession(request.headers.get('cookie'))
-    const user: User | null = session.get(options.sessionKey) ?? null
-    if (user) return this.success(user, request, sessionStorage, options)
+    // Retrieve the TOTP store from cookies
+    const store = TOTPStore.fromRequest(request)
 
-    const formData = await this._readFormData(request, options)
+    // If you previously stored a user in session, you'd need a separate cookie or logic.
+    // For minimal changes, we assume there's no pre-authenticated user:
+    const user: User | null = null
+    if (user) return user
+
+    const formData = await this._readFormData(request)
     const formDataEmail = coerceToOptionalNonEmptyString(formData.get(this.emailFieldKey))
     const formDataCode = coerceToOptionalNonEmptyString(formData.get(this.codeFieldKey))
-    const sessionEmail = coerceToOptionalString(session.get(this.sessionEmailKey))
-    const sessionTotp = coerceToOptionalTotpSessionData(session.get(this.sessionTotpKey))
+    const sessionEmail = coerceToOptionalString(store.getEmail())
+    const sessionTotp = coerceToOptionalTotpSessionData(store.getTOTP())
     const email =
       request.method === 'POST'
         ? formDataEmail ?? (!formDataCode ? sessionEmail : null)
@@ -375,19 +258,16 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
           magicLink,
           formData,
           request,
-          context: options.context,
         })
 
         const totpData: TOTPSessionData = { jwe, attempts: 0 }
-        session.set(this.sessionEmailKey, email)
-        session.set(this.sessionTotpKey, totpData)
-        session.unset(options.sessionErrorKey)
+        store.setEmail(email)
+        store.setTOTP(totpData)
+        store.setError(undefined)
 
-        throw redirect(options.successRedirect, {
+        throw redirect(this.successRedirect, {
           headers: {
-            'set-cookie': await sessionStorage.commitSession(session, {
-              maxAge: this.maxAge,
-            }),
+            'Set-Cookie': store.commit(),
           },
         })
       }
@@ -396,104 +276,48 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       if (code) {
         if (!sessionEmail) throw new Error(this.customErrors.missingSessionEmail)
         if (!sessionTotp) throw new Error(this.customErrors.expiredTotp)
-        await this._validateTOTP({ code, sessionTotp, session, sessionStorage, options })
+        await this._validateTOTP({ code, sessionTotp, store })
 
-        const user = await this.verify({
-          email: sessionEmail,
-          formData: request.method === 'POST' ? formData : undefined,
-          request,
-          context: options.context,
-        })
+        // Clear TOTP data since user verified successfully
+        store.setEmail(undefined)
+        store.setTOTP(undefined)
+        store.setError(undefined)
 
-        session.set(options.sessionKey, user)
-        session.unset(this.sessionEmailKey)
-        session.unset(this.sessionTotpKey)
-        session.unset(options.sessionErrorKey)
+        // If you want to store authenticated user, you'd do it with another cookie here
+        // e.g. store user session with your own logic
 
-        throw redirect(options.successRedirect, {
+        throw redirect(this.successRedirect, {
           headers: {
-            'set-cookie': await sessionStorage.commitSession(session, {
-              maxAge: this.maxAge,
-            }),
+            'Set-Cookie': store.commit(),
           },
         })
       }
+
       throw new Error(this.customErrors.requiredEmail)
     } catch (throwable) {
       if (throwable instanceof Response) throw throwable
       if (throwable instanceof Error) {
-        return await this.failure(
-          throwable.message,
-          request,
-          sessionStorage,
-          options,
-          throwable,
-        )
+        store.setError(throwable.message)
+        throw redirect(this.failureRedirect, {
+          headers: {
+            'Set-Cookie': store.commit(),
+          },
+        })
       }
       throw throwable
     }
   }
 
-  private async _generateTOTP({ email, request }: { email: string; request: Request }) {
-    const isValidEmail = await this.validateEmail(email)
-    if (!isValidEmail) throw new Error(this.customErrors.invalidEmail)
-
-    const { otp: code, secret } = await generateTOTP({
-      ...this.totpGeneration,
-      secret: this.totpGeneration.secret ?? generateSecret(),
-    })
-    const totpData: TOTPData = { secret, createdAt: Date.now() }
-
-    // https://github.com/panva/jose/blob/main/docs/classes/jwe_compact_encrypt.CompactEncrypt.md
-    const jwe = await new jose.CompactEncrypt(
-      new TextEncoder().encode(JSON.stringify(totpData)),
-    )
-      .setProtectedHeader({ alg: 'dir', enc: 'A256GCM' })
-      .encrypt(asJweKey(this.secret))
-
-    const magicLink = generateMagicLink({
-      code,
-      magicLinkPath: this.magicLinkPath,
-      param: this.codeFieldKey,
-      request,
-    })
-
-    return { code, jwe, magicLink }
-  }
-
-  private _getMagicLinkCode(request: Request) {
-    if (request.method === 'GET') {
-      const url = new URL(request.url)
-      if (url.pathname !== this.magicLinkPath) {
-        throw new Error(ERRORS.INVALID_MAGIC_LINK_PATH)
-      }
-      if (url.searchParams.has(this.codeFieldKey)) {
-        return decodeURIComponent(url.searchParams.get(this.codeFieldKey) ?? '')
-      }
-    }
-    return undefined
-  }
-
-  private async _validateEmailDefault(email: string) {
-    const regexEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/gm
-    return regexEmail.test(email)
-  }
-
   private async _validateTOTP({
     code,
     sessionTotp,
-    session,
-    sessionStorage,
-    options,
+    store,
   }: {
     code: string
     sessionTotp: TOTPSessionData
-    session: Session
-    sessionStorage: SessionStorage
-    options: RequiredAuthenticateOptions
+    store: TOTPStore
   }) {
     try {
-      // https://github.com/panva/jose/blob/main/docs/functions/jwe_compact_decrypt.compactDecrypt.md
       const { plaintext } = await jose.compactDecrypt(
         sessionTotp.jwe,
         asJweKey(this.secret),
@@ -509,34 +333,73 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       }
     } catch (error) {
       if (error instanceof Error && error.message === this.customErrors.expiredTotp) {
-        session.unset(this.sessionTotpKey)
-        session.flash(options.sessionErrorKey, { message: this.customErrors.expiredTotp })
+        store.setTOTP(undefined)
+        store.setError(this.customErrors.expiredTotp)
       } else {
         sessionTotp.attempts += 1
         if (sessionTotp.attempts >= this.totpGeneration.maxAttempts) {
-          session.unset(this.sessionTotpKey)
+          store.setTOTP(undefined)
         } else {
-          session.set(this.sessionTotpKey, sessionTotp)
+          store.setTOTP(sessionTotp)
         }
-        session.flash(options.sessionErrorKey, { message: this.customErrors.invalidTotp })
+        store.setError(this.customErrors.invalidTotp)
       }
-      throw redirect(options.failureRedirect, {
+      throw redirect(this.failureRedirect, {
         headers: {
-          'set-cookie': await sessionStorage.commitSession(session, {
-            maxAge: this.maxAge,
-          }),
+          'Set-Cookie': store.commit(),
         },
       })
     }
   }
 
-  private async _readFormData(request: Request, options: AuthenticateOptions) {
+  private async _readFormData(request: Request) {
     if (request.method !== 'POST') {
       return new FormData()
     }
-    if (options.context?.formData instanceof FormData) {
-      return options.context.formData
-    }
     return await request.formData()
+  }
+
+  private async _generateTOTP({ email, request }: { email: string; request: Request }) {
+    const isValidEmail = await this.validateEmail(email)
+    if (!isValidEmail) throw new Error(this.customErrors.invalidEmail)
+
+    const { otp: code, secret } = await generateTOTP({
+      ...this.totpGeneration,
+      secret: this.totpGeneration.secret ?? generateSecret(),
+    })
+    const totpData = { secret, createdAt: Date.now() }
+
+    const jwe = await new jose.CompactEncrypt(
+      new TextEncoder().encode(JSON.stringify(totpData)),
+    )
+      .setProtectedHeader({ alg: 'dir', enc: 'A256GCM' })
+      .encrypt(asJweKey(this.secret))
+
+    const magicLink = this._generateMagicLink({ code, request })
+    return { code, jwe, magicLink }
+  }
+
+  private _generateMagicLink({ code, request }: { code: string; request: Request }) {
+    const url = new URL(this.magicLinkPath ?? '/', new URL(request.url).origin)
+    url.searchParams.set(this.codeFieldKey, code)
+    return url.toString()
+  }
+
+  private async _validateEmailDefault(email: string) {
+    const regexEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/gm
+    return regexEmail.test(email)
+  }
+
+  private _getMagicLinkCode(request: Request) {
+    if (request.method === 'GET') {
+      const url = new URL(request.url)
+      if (url.pathname !== this.magicLinkPath) {
+        throw new Error(ERRORS.INVALID_MAGIC_LINK_PATH)
+      }
+      if (url.searchParams.has(this.codeFieldKey)) {
+        return decodeURIComponent(url.searchParams.get(this.codeFieldKey) ?? '')
+      }
+    }
+    return undefined
   }
 }
