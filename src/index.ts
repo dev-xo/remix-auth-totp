@@ -11,12 +11,7 @@ import {
   coerceToOptionalTotpSessionData,
 } from './utils.js'
 
-import {
-  STRATEGY_NAME,
-  FORM_FIELDS,
-  SESSION_KEYS,
-  ERRORS,
-} from './constants.js'
+import { STRATEGY_NAME, FORM_FIELDS, SESSION_KEYS, ERRORS } from './constants.js'
 import { redirect } from './lib/redirect.js'
 import { Strategy } from 'remix-auth/strategy'
 
@@ -64,7 +59,7 @@ export interface CustomErrorsOptions {
   missingSessionEmail?: string
 }
 
-export interface TOTPStrategyOptions {
+export interface TOTPStrategyOptions<User> {
   secret: string
   maxAge?: number
   totpGeneration?: TOTPGenerationOptions
@@ -78,6 +73,16 @@ export interface TOTPStrategyOptions {
   validateEmail?: ValidateEmail
   successRedirect: string
   failureRedirect: string
+
+  /**
+   * Optional callback invoked after successful TOTP verification.
+   * Allows storing authenticated user details, e.g., setting a session cookie.
+   *
+   * @param user The authenticated user object returned by the verify function.
+   * @param request The original HTTP request.
+   * @returns An array of `SetCookie` objects to be included in the response headers.
+   */
+  onAuthenticated?: (user: User, request: Request) => Promise<SetCookie[] | undefined>
 }
 
 export interface TOTPVerifyParams {
@@ -182,6 +187,10 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   private readonly sessionTotpKey: string
   private readonly sendTOTP: SendTOTP
   private readonly validateEmail: ValidateEmail
+  private readonly onAuthenticated?: (
+    user: User,
+    request: Request,
+  ) => Promise<SetCookie[] | undefined>
   private readonly _totpGenerationDefaults = {
     algorithm: 'SHA-256',
     charSet: 'abcdefghijklmnpqrstuvwxyzABCDEFGHIJKLMNPQRSTUVWXYZ123456789',
@@ -198,7 +207,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   }
 
   constructor(
-    options: TOTPStrategyOptions,
+    options: TOTPStrategyOptions<User>,
     verify: Strategy.VerifyFunction<User, TOTPVerifyParams>,
   ) {
     super(verify)
@@ -213,6 +222,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     this.validateEmail = options.validateEmail ?? this._validateEmailDefault
     this.successRedirect = options.successRedirect
     this.failureRedirect = options.failureRedirect
+    this.onAuthenticated = options.onAuthenticated
 
     this.totpGeneration = {
       ...this._totpGenerationDefaults,
@@ -223,19 +233,14 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       ...options.customErrors,
     }
   }
- 
-  async authenticate(
-    request: Request,
-  ): Promise<User> {
+
+  async authenticate(request: Request): Promise<User> {
     if (!this.secret) throw new Error(ERRORS.REQUIRED_ENV_SECRET)
     if (!this.successRedirect) throw new Error(ERRORS.REQUIRED_SUCCESS_REDIRECT_URL)
     if (!this.failureRedirect) throw new Error(ERRORS.REQUIRED_FAILURE_REDIRECT_URL)
 
-    // Retrieve the TOTP store from cookies
     const store = TOTPStore.fromRequest(request)
 
-    // If you previously stored a user in session, you'd need a separate cookie or logic.
-    // For minimal changes, we assume there's no pre-authenticated user:
     const user: User | null = null
     if (user) return user
 
@@ -278,18 +283,39 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
         if (!sessionTotp) throw new Error(this.customErrors.expiredTotp)
         await this._validateTOTP({ code, sessionTotp, store })
 
+        const user = await this.verify({
+          email: sessionEmail,
+          formData,
+          request,
+          context: undefined,
+        })
+
+        if (!user) {
+          throw new Error(this.customErrors.invalidTotp)
+        }
+
         // Clear TOTP data since user verified successfully
         store.setEmail(undefined)
         store.setTOTP(undefined)
         store.setError(undefined)
 
-        // If you want to store authenticated user, you'd do it with another cookie here
-        // e.g. store user session with your own logic
+        let additionalSetCookies: SetCookie[] | undefined
+        if (this.onAuthenticated) {
+          additionalSetCookies = await this.onAuthenticated(user, request)
+        }
+
+        const headers = new Headers()
+
+        if (additionalSetCookies && additionalSetCookies.length > 0) {
+          // Add each cookie as a separate Set-Cookie header
+          headers.append('Set-Cookie', store.commit())
+          for (const cookie of additionalSetCookies) {
+            headers.append('Set-Cookie', cookie.toString())
+          }
+        }
 
         throw redirect(this.successRedirect, {
-          headers: {
-            'Set-Cookie': store.commit(),
-          },
+          headers,
         })
       }
 
@@ -328,7 +354,13 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       if (Date.now() - totpData.createdAt > this.totpGeneration.period * 1000) {
         throw new Error(this.customErrors.expiredTotp)
       }
-      if (!await verifyTOTP({ ...this.totpGeneration, secret: totpData.secret, otp: code })) {
+      if (
+        !(await verifyTOTP({
+          ...this.totpGeneration,
+          secret: totpData.secret,
+          otp: code,
+        }))
+      ) {
         throw new Error(this.customErrors.invalidTotp)
       }
     } catch (error) {
