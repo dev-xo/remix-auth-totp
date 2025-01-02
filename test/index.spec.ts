@@ -1,12 +1,10 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion */
 import type { SendTOTPOptions, TOTPStrategyOptions } from '../src/index'
-
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest'
-import invariant from 'tiny-invariant'
-
+import { Cookie, SetCookie } from '@mjackson/headers'
 import { TOTPStrategy } from '../src/index'
-import { asJweKey, generateMagicLink } from '../src/utils'
+import { asJweKey } from '../src/utils'
 import { STRATEGY_NAME, FORM_FIELDS, ERRORS } from '../src/constants'
-
 import {
   SECRET_ENV,
   HOST_URL,
@@ -14,7 +12,6 @@ import {
   DEFAULT_EMAIL,
   MAGIC_LINK_PATH,
 } from './utils'
-import { Cookie, SetCookie } from '@mjackson/headers'
 
 /**
  * Mocks.
@@ -24,7 +21,7 @@ const sendTOTP = vi.fn()
 
 const BASE_STRATEGY_OPTIONS: Omit<
   TOTPStrategyOptions,
-  'successRedirect' | 'failureRedirect'
+  'successRedirect' | 'failureRedirect' | 'emailSentRedirect'
 > = {
   secret: SECRET_ENV,
   sendTOTP,
@@ -47,6 +44,7 @@ describe('[ Basics ]', () => {
         ...BASE_STRATEGY_OPTIONS,
         successRedirect: '/verify',
         failureRedirect: '/login',
+        emailSentRedirect: '/check-email',
       },
       verify,
     )
@@ -60,6 +58,7 @@ describe('[ Basics ]', () => {
         sendTOTP,
         successRedirect: '/verify',
         failureRedirect: '/login',
+        emailSentRedirect: '/check-email',
       },
       verify,
     )
@@ -71,12 +70,31 @@ describe('[ Basics ]', () => {
     )
   })
 
+  test('Should throw an Error on missing required emailSentRedirect option.', async () => {
+    const strategy = new TOTPStrategy(
+      // @ts-expect-error - Error is expected since missing emailSentRedirect
+      {
+        ...BASE_STRATEGY_OPTIONS,
+        successRedirect: '/verify',
+        failureRedirect: '/login',
+      },
+      verify,
+    )
+    const request = new Request(`${HOST_URL}/login`, {
+      method: 'POST',
+    })
+    await expect(() => strategy.authenticate(request)).rejects.toThrow(
+      ERRORS.REQUIRED_EMAIL_SENT_REDIRECT_URL,
+    )
+  })
+
   test('Should throw an Error on missing required successRedirect option.', async () => {
     const strategy = new TOTPStrategy(
       // @ts-expect-error - Error is expected since missing successRedirect
       {
         ...BASE_STRATEGY_OPTIONS,
         failureRedirect: '/login',
+        emailSentRedirect: '/check-email',
       },
       verify,
     )
@@ -94,6 +112,7 @@ describe('[ Basics ]', () => {
       {
         ...BASE_STRATEGY_OPTIONS,
         successRedirect: '/verify',
+        emailSentRedirect: '/check-email',
       },
       verify,
     )
@@ -120,6 +139,7 @@ describe('[ TOTP ]', () => {
           ...BASE_STRATEGY_OPTIONS,
           successRedirect: '/verify',
           failureRedirect: '/login',
+          emailSentRedirect: '/verify',
         },
         verify,
       )
@@ -132,8 +152,8 @@ describe('[ TOTP ]', () => {
       await strategy.authenticate(request).catch(async (reason) => {
         if (reason instanceof Response) {
           expect(reason.status).toBe(302)
-          expect(reason.headers.get('location')).toBe('/verify')
-          const setCookieHeader = reason.headers.get('set-cookie') ?? ''
+          expect(reason.headers.get('Location')).toBe('/verify')
+          const setCookieHeader = reason.headers.get('Set-Cookie') ?? ''
           const cookie = new Cookie(setCookieHeader)
           const raw = cookie.get('_totp')
           const params = new URLSearchParams(raw!)
@@ -162,6 +182,7 @@ describe('[ TOTP ]', () => {
           ...BASE_STRATEGY_OPTIONS,
           successRedirect: '/verify',
           failureRedirect: '/login',
+          emailSentRedirect: '/verify',
         },
         verify,
       )
@@ -175,8 +196,8 @@ describe('[ TOTP ]', () => {
       await strategy.authenticate(request).catch(async (reason) => {
         if (reason instanceof Response) {
           expect(reason.status).toBe(302)
-          expect(reason.headers.get('location')).toBe('/verify')
-          const setCookieHeader = reason.headers.get('set-cookie') ?? ''
+          expect(reason.headers.get('Location')).toBe('/verify')
+          const setCookieHeader = reason.headers.get('Set-Cookie') ?? ''
           const cookie = new Cookie(setCookieHeader)
           const raw = cookie.get('_totp')
           const params = new URLSearchParams(raw!)
@@ -202,6 +223,7 @@ describe('[ TOTP ]', () => {
           ...BASE_STRATEGY_OPTIONS,
           successRedirect: '/verify',
           failureRedirect: '/login',
+          emailSentRedirect: '/verify',
         },
         verify,
       )
@@ -215,8 +237,8 @@ describe('[ TOTP ]', () => {
       await strategy.authenticate(request).catch(async (reason) => {
         if (reason instanceof Response) {
           expect(reason.status).toBe(302)
-          expect(reason.headers.get('location')).toMatch('/verify')
-          const setCookieHeader = reason.headers.get('set-cookie') ?? ''
+          expect(reason.headers.get('Location')).toMatch('/verify')
+          const setCookieHeader = reason.headers.get('Set-Cookie') ?? ''
           const cookie = new Cookie(setCookieHeader)
           const raw = cookie.get('_totp')
           const params = new URLSearchParams(raw!)
@@ -236,6 +258,7 @@ describe('[ TOTP ]', () => {
           ...BASE_STRATEGY_OPTIONS,
           successRedirect: '/verify',
           failureRedirect: '/login',
+          emailSentRedirect: '/verify',
         },
         verify,
       )
@@ -250,8 +273,8 @@ describe('[ TOTP ]', () => {
       await strategy.authenticate(requestToPopulateSessionEmail).catch((reason) => {
         if (reason instanceof Response) {
           expect(reason.status).toBe(302)
-          expect(reason.headers.get('location')).toBe('/verify')
-          const setCookieHeader = reason.headers.get('set-cookie') ?? ''
+          expect(reason.headers.get('Location')).toBe('/verify')
+          const setCookieHeader = reason.headers.get('Set-Cookie') ?? ''
           const cookie = new Cookie(setCookieHeader)
           const raw = cookie.get('_totp')
           expect(raw).toBeDefined()
@@ -281,9 +304,9 @@ describe('[ TOTP ]', () => {
       await strategy.authenticate(request).catch((reason) => {
         if (reason instanceof Response) {
           expect(reason.status).toBe(302)
-          expect(reason.headers.get('location')).toBe('/verify')
+          expect(reason.headers.get('Location')).toBe('/verify')
 
-          const setCookieHeader = reason.headers.get('set-cookie') ?? ''
+          const setCookieHeader = reason.headers.get('Set-Cookie') ?? ''
           const cookie = new Cookie(setCookieHeader)
           const raw = cookie.get('_totp')
           expect(raw).toBeDefined()
@@ -313,6 +336,7 @@ describe('[ TOTP ]', () => {
           ...BASE_STRATEGY_OPTIONS,
           successRedirect: '/verify',
           failureRedirect: '/login',
+          emailSentRedirect: '/verify',
         },
         verify,
       )
@@ -327,8 +351,8 @@ describe('[ TOTP ]', () => {
       await strategy.authenticate(requestToPopulate).catch(async (reason) => {
         if (reason instanceof Response) {
           expect(reason.status).toBe(302)
-          expect(reason.headers.get('location')).toBe('/verify')
-          const setCookieHeader = reason.headers.get('set-cookie') ?? ''
+          expect(reason.headers.get('Location')).toBe('/verify')
+          const setCookieHeader = reason.headers.get('Set-Cookie') ?? ''
           const cookie = new Cookie(setCookieHeader)
           const raw = cookie.get('_totp')
           const params = new URLSearchParams(raw!)
@@ -350,8 +374,8 @@ describe('[ TOTP ]', () => {
       await strategy.authenticate(emptyFormRequest).catch(async (reason) => {
         if (reason instanceof Response) {
           expect(reason.status).toBe(302)
-          expect(reason.headers.get('location')).toBe('/verify')
-          const setCookieHeader = reason.headers.get('set-cookie') ?? ''
+          expect(reason.headers.get('Location')).toBe('/verify')
+          const setCookieHeader = reason.headers.get('Set-Cookie') ?? ''
           const cookie = new Cookie(setCookieHeader)
           const raw = cookie.get('_totp')
           expect(raw).toBeDefined()
@@ -382,6 +406,7 @@ describe('[ TOTP ]', () => {
           ...BASE_STRATEGY_OPTIONS,
           successRedirect: '/verify',
           failureRedirect: '/login',
+          emailSentRedirect: '/verify',
         },
         verify,
       )
@@ -395,8 +420,8 @@ describe('[ TOTP ]', () => {
       await strategy.authenticate(requestToPopulateEmail).catch(async (reason) => {
         if (reason instanceof Response) {
           expect(reason.status).toBe(302)
-          expect(reason.headers.get('location')).toBe('/verify')
-          const setCookieHeader = reason.headers.get('set-cookie') ?? ''
+          expect(reason.headers.get('Location')).toBe('/verify')
+          const setCookieHeader = reason.headers.get('Set-Cookie') ?? ''
           const cookie = new Cookie(setCookieHeader)
           const raw = cookie.get('_totp')
           expect(raw).toBeDefined()
@@ -420,8 +445,8 @@ describe('[ TOTP ]', () => {
       await strategy.authenticate(appFormRequest).catch(async (reason) => {
         if (reason instanceof Response) {
           expect(reason.status).toBe(302)
-          expect(reason.headers.get('location')).toBe('/verify')
-          const setCookieHeader = reason.headers.get('set-cookie') ?? ''
+          expect(reason.headers.get('Location')).toBe('/verify')
+          const setCookieHeader = reason.headers.get('Set-Cookie') ?? ''
           const cookie = new Cookie(setCookieHeader)
           const raw = cookie.get('_totp')
           expect(raw).toBeDefined()
@@ -441,6 +466,7 @@ describe('[ TOTP ]', () => {
           ...BASE_STRATEGY_OPTIONS,
           successRedirect: '/verify',
           failureRedirect: '/login',
+          emailSentRedirect: '/check-email',
         },
         verify,
       )
@@ -454,9 +480,9 @@ describe('[ TOTP ]', () => {
       await strategy.authenticate(request).catch(async (reason) => {
         if (reason instanceof Response) {
           expect(reason.status).toBe(302)
-          expect(reason.headers.get('location')).toBe('/login')
+          expect(reason.headers.get('Location')).toBe('/login')
 
-          const setCookieHeader = reason.headers.get('set-cookie') ?? ''
+          const setCookieHeader = reason.headers.get('Set-Cookie') ?? ''
           const cookie = new Cookie(setCookieHeader)
           const raw = cookie.get('_totp')
           expect(raw).toBeDefined()
@@ -474,6 +500,7 @@ describe('[ TOTP ]', () => {
           ...BASE_STRATEGY_OPTIONS,
           successRedirect: '/verify',
           failureRedirect: '/login',
+          emailSentRedirect: '/check-email',
           customErrors: {
             invalidEmail: CUSTOM_ERROR,
           },
@@ -491,9 +518,9 @@ describe('[ TOTP ]', () => {
       await strategy.authenticate(request).catch(async (reason) => {
         if (reason instanceof Response) {
           expect(reason.status).toBe(302)
-          expect(reason.headers.get('location')).toBe('/login')
+          expect(reason.headers.get('Location')).toBe('/login')
 
-          const setCookieHeader = reason.headers.get('set-cookie') ?? ''
+          const setCookieHeader = reason.headers.get('Set-Cookie') ?? ''
           const cookie = new Cookie(setCookieHeader)
           const raw = cookie.get('_totp')
           expect(raw).toBeDefined()
@@ -511,6 +538,7 @@ describe('[ TOTP ]', () => {
           ...BASE_STRATEGY_OPTIONS,
           successRedirect: '/verify',
           failureRedirect: '/login',
+          emailSentRedirect: '/check-email',
           customErrors: {
             invalidEmail: ERROR_MESSAGE,
           },
@@ -529,8 +557,8 @@ describe('[ TOTP ]', () => {
       await strategy.authenticate(request).catch(async (reason) => {
         if (reason instanceof Response) {
           expect(reason.status).toBe(302)
-          expect(reason.headers.get('location')).toBe('/login')
-          const setCookieHeader = reason.headers.get('set-cookie') ?? ''
+          expect(reason.headers.get('Location')).toBe('/login')
+          const setCookieHeader = reason.headers.get('Set-Cookie') ?? ''
           const cookie = new Cookie(setCookieHeader)
           const raw = cookie.get('_totp')
           expect(raw).toBeDefined()
@@ -546,6 +574,7 @@ describe('[ TOTP ]', () => {
           ...BASE_STRATEGY_OPTIONS,
           successRedirect: '/verify',
           failureRedirect: '/login',
+          emailSentRedirect: '/check-email',
         },
         verify,
       )
@@ -556,8 +585,8 @@ describe('[ TOTP ]', () => {
       await strategy.authenticate(request).catch(async (reason) => {
         if (reason instanceof Response) {
           expect(reason.status).toBe(302)
-          expect(reason.headers.get('location')).toBe('/login')
-          const setCookieHeader = reason.headers.get('set-cookie') ?? ''
+          expect(reason.headers.get('Location')).toBe('/login')
+          const setCookieHeader = reason.headers.get('Set-Cookie') ?? ''
           const cookie = new Cookie(setCookieHeader)
           const raw = cookie.get('_totp')
           expect(raw).toBeDefined()
@@ -590,18 +619,19 @@ describe('[ TOTP ]', () => {
           ...BASE_STRATEGY_OPTIONS,
           successRedirect: '/verify',
           failureRedirect: '/login',
+          emailSentRedirect: '/verify',
           ...totpStrategyOptions,
         },
         async ({ email, formData, request }) => {
-          expect(email).toBe(DEFAULT_EMAIL)
-          expect(request).toBeInstanceOf(Request)
-          if (request.method === 'POST') {
-            expect(formData).toBeInstanceOf(FormData)
+          expect(email).toBe(DEFAULT_EMAIL);
+          expect(request).toBeInstanceOf(Request);
+          if (formData) {
+            expect(formData).toBeInstanceOf(FormData);
           } else {
-            expect(formData).not.toBeDefined()
+            expect(request.method).toBe('GET');
           }
-          return Promise.resolve(user)
-        },
+          return Promise.resolve(user);
+        }
       )
       const formData = new FormData()
       formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
@@ -612,8 +642,8 @@ describe('[ TOTP ]', () => {
       await strategy.authenticate(request).catch(async (reason) => {
         if (reason instanceof Response) {
           expect(reason.status).toBe(302)
-          expect(reason.headers.get('location')).toBe('/verify')
-          totpCookie = reason.headers.get('set-cookie') ?? ''
+          expect(reason.headers.get('Location')).toBe('/verify')
+          totpCookie = reason.headers.get('Set-Cookie') ?? ''
           const cookie = new Cookie(totpCookie)
           const raw = cookie.get('_totp')
           expect(raw).toBeDefined()
@@ -625,55 +655,56 @@ describe('[ TOTP ]', () => {
 
       expect(sendTOTP).toHaveBeenCalledTimes(1)
       expect(sendTOTPOptions).toBeDefined()
-      invariant(sendTOTPOptions, 'Undefined sendTOTPOptions')
+      if (!sendTOTPOptions) throw new Error('Undefined sendTOTPOptions.')
       expect(totpCookie).toBeDefined()
-      invariant(totpCookie, 'Undefined cookie')
+      if (!totpCookie) throw new Error('Undefined cookie.')
       return { strategy, sendTOTPOptions, totpCookie, user }
     }
 
-    // test('Should successfully validate totp code.', async () => {
-    //   const { sendTOTPOptions, totpCookie, user } = await setupGenerateSendTOTP()
-    //   const strategy = new TOTPStrategy<typeof user>(
-    //     {
-    //       ...BASE_STRATEGY_OPTIONS,
-    //       successRedirect: '/account',
-    //       failureRedirect: '/login',
-    //     },
-    //     async ({ email, formData, request }) => {
-    //       expect(email).toBe(DEFAULT_EMAIL)
-    //       expect(request).toBeInstanceOf(Request)
-    //       if (request.method === 'POST') {
-    //         expect(formData).toBeInstanceOf(FormData)
-    //       } else {
-    //         expect(formData).not.toBeDefined()
-    //       }
-    //       return Promise.resolve(user)
-    //     },
-    //   )
-    //   const formData = new FormData()
-    //   formData.append(FORM_FIELDS.CODE, sendTOTPOptions.code)
-    //   const request = new Request(`${HOST_URL}/verify`, {
-    //     method: 'POST',
-    //     headers: {
-    //       cookie: totpCookie,
-    //     },
-    //     body: formData,
-    //   })
-    //   await strategy.authenticate(request).catch(async (reason) => {
-    //     if (reason instanceof Response) {
-    //       expect(reason.status).toBe(302)
-    //       expect(reason.headers.get('location')).toBe(`/account`)
-    //       const setCookieHeader = reason.headers.get('set-cookie') ?? ''
-    //       const cookie = new Cookie(setCookieHeader)
-    //       const raw = cookie.get('_totp')
-    //       expect(raw).toBeDefined()
-    //       const params = new URLSearchParams(raw!)
-    //       expect(params.get('email')).toBeNull()
-    //       expect(params.get('totp')).toBeNull()
-    //       expect(params.get('error')).toBeNull()
-    //     } else throw reason
-    //   })
-    // })
+    test('Should successfully validate totp code.', async () => {
+      const { sendTOTPOptions, totpCookie, user } = await setupGenerateSendTOTP()
+      const strategy = new TOTPStrategy<typeof user>(
+        {
+          ...BASE_STRATEGY_OPTIONS,
+          successRedirect: '/account',
+          failureRedirect: '/login',
+          emailSentRedirect: '/check-email',
+        },
+        async ({ email, formData, request }) => {
+          expect(email).toBe(DEFAULT_EMAIL);
+          expect(request).toBeInstanceOf(Request);
+          if (formData) {
+            expect(formData).toBeInstanceOf(FormData);
+          } else {
+            expect(request.method).toBe('GET');
+          }
+          return Promise.resolve(user);
+        },
+      )
+      const formData = new FormData()
+      formData.append(FORM_FIELDS.CODE, sendTOTPOptions.code)
+      const request = new Request(`${HOST_URL}/verify`, {
+        method: 'POST',
+        headers: {
+          cookie: totpCookie,
+        },
+        body: formData,
+      })
+      await strategy.authenticate(request).catch(async (reason) => {
+        if (reason instanceof Response) {
+          expect(reason.status).toBe(302)
+          expect(reason.headers.get('Location')).toBe(`/account`)
+          const setCookieHeader = reason.headers.get('Set-Cookie') ?? ''
+          const cookie = new Cookie(setCookieHeader)
+          const raw = cookie.get('_totp')
+          expect(raw).toBeDefined()
+          const params = new URLSearchParams(raw!)
+          expect(params.get('email')).toBeNull()
+          expect(params.get('totp')).toBeNull()
+          expect(params.get('error')).toBeNull()
+        } else throw reason
+      })
+    })
 
     test('Should failure redirect on invalid totp code.', async () => {
       const { user, sendTOTPOptions, totpCookie } = await setupGenerateSendTOTP()
@@ -682,16 +713,17 @@ describe('[ TOTP ]', () => {
           ...BASE_STRATEGY_OPTIONS,
           successRedirect: '/account',
           failureRedirect: '/verify',
+          emailSentRedirect: '/check-email',
         },
         async ({ email, formData, request }) => {
-          expect(email).toBe(DEFAULT_EMAIL)
-          expect(request).toBeInstanceOf(Request)
-          if (request.method === 'POST') {
-            expect(formData).toBeInstanceOf(FormData)
+          expect(email).toBe(DEFAULT_EMAIL);
+          expect(request).toBeInstanceOf(Request);
+          if (formData) {
+            expect(formData).toBeInstanceOf(FormData);
           } else {
-            expect(formData).not.toBeDefined()
+            expect(request.method).toBe('GET');
           }
-          return Promise.resolve(user)
+          return Promise.resolve(user);
         },
       )
       const formData = new FormData()
@@ -706,8 +738,8 @@ describe('[ TOTP ]', () => {
       await strategy.authenticate(request).catch(async (reason) => {
         if (reason instanceof Response) {
           expect(reason.status).toBe(302)
-          expect(reason.headers.get('location')).toBe(`/verify`)
-          const setCookieHeader = reason.headers.get('set-cookie') ?? ''
+          expect(reason.headers.get('Location')).toBe(`/verify`)
+          const setCookieHeader = reason.headers.get('Set-Cookie') ?? ''
           const cookie = new Cookie(setCookieHeader)
           const raw = cookie.get('_totp')
           expect(raw).toBeDefined()
@@ -726,19 +758,20 @@ describe('[ TOTP ]', () => {
           ...BASE_STRATEGY_OPTIONS,
           successRedirect: '/account',
           failureRedirect: '/verify',
+          emailSentRedirect: '/check-email',
           customErrors: {
             invalidTotp: CUSTOM_ERROR,
           },
         },
         async ({ email, formData, request }) => {
-          expect(email).toBe(DEFAULT_EMAIL)
-          expect(request).toBeInstanceOf(Request)
-          if (request.method === 'POST') {
-            expect(formData).toBeInstanceOf(FormData)
+          expect(email).toBe(DEFAULT_EMAIL);
+          expect(request).toBeInstanceOf(Request);
+          if (formData) {
+            expect(formData).toBeInstanceOf(FormData);
           } else {
-            expect(formData).not.toBeDefined()
+            expect(request.method).toBe('GET');
           }
-          return Promise.resolve(user)
+          return Promise.resolve(user);
         },
       )
       const formData = new FormData()
@@ -753,8 +786,8 @@ describe('[ TOTP ]', () => {
       await strategy.authenticate(request).catch(async (reason) => {
         if (reason instanceof Response) {
           expect(reason.status).toBe(302)
-          expect(reason.headers.get('location')).toBe(`/verify`)
-          const setCookieHeader = reason.headers.get('set-cookie') ?? ''
+          expect(reason.headers.get('Location')).toBe(`/verify`)
+          const setCookieHeader = reason.headers.get('Set-Cookie') ?? ''
           const cookie = new Cookie(setCookieHeader)
           const raw = cookie.get('_totp')
           expect(raw).toBeDefined()
@@ -765,22 +798,24 @@ describe('[ TOTP ]', () => {
     })
 
     test('Should failure redirect on invalid and max TOTP attempts.', async () => {
+      // eslint-disable-next-line prefer-const
       let { user, totpCookie, sendTOTPOptions } = await setupGenerateSendTOTP()
       const strategy = new TOTPStrategy<typeof user>(
         {
           ...BASE_STRATEGY_OPTIONS,
           successRedirect: '/account',
           failureRedirect: '/verify',
+          emailSentRedirect: '/check-email',
         },
         async ({ email, formData, request }) => {
-          expect(email).toBe(DEFAULT_EMAIL)
-          expect(request).toBeInstanceOf(Request)
-          if (request.method === 'POST') {
-            expect(formData).toBeInstanceOf(FormData)
+          expect(email).toBe(DEFAULT_EMAIL);
+          expect(request).toBeInstanceOf(Request);
+          if (formData) {
+            expect(formData).toBeInstanceOf(FormData);
           } else {
-            expect(formData).not.toBeDefined()
+            expect(request.method).toBe('GET');
           }
-          return Promise.resolve(user)
+          return Promise.resolve(user);
         },
       )
       for (let i = 0; i <= TOTP_GENERATION_DEFAULTS.maxAttempts; i++) {
@@ -796,8 +831,8 @@ describe('[ TOTP ]', () => {
         await strategy.authenticate(request).catch(async (reason) => {
           if (reason instanceof Response) {
             expect(reason.status).toBe(302)
-            expect(reason.headers.get('location')).toBe(`/verify`)
-            const setCookieHeader = reason.headers.get('set-cookie') ?? ''
+            expect(reason.headers.get('Location')).toBe(`/verify`)
+            const setCookieHeader = reason.headers.get('Set-Cookie') ?? ''
             totpCookie = setCookieHeader
             const cookie = new Cookie(setCookieHeader)
             const raw = cookie.get('_totp')
@@ -823,16 +858,17 @@ describe('[ TOTP ]', () => {
           ...BASE_STRATEGY_OPTIONS,
           successRedirect: '/account',
           failureRedirect: '/verify',
+          emailSentRedirect: '/check-email',
         },
         async ({ email, formData, request }) => {
-          expect(email).toBe(DEFAULT_EMAIL)
-          expect(request).toBeInstanceOf(Request)
-          if (request.method === 'POST') {
-            expect(formData).toBeInstanceOf(FormData)
+          expect(email).toBe(DEFAULT_EMAIL);
+          expect(request).toBeInstanceOf(Request);
+          if (formData) {
+            expect(formData).toBeInstanceOf(FormData);
           } else {
-            expect(formData).not.toBeDefined()
+            expect(request.method).toBe('GET');
           }
-          return Promise.resolve(user)
+          return Promise.resolve(user);
         },
       )
       vi.setSystemTime(
@@ -850,8 +886,8 @@ describe('[ TOTP ]', () => {
       await strategy.authenticate(request).catch(async (reason) => {
         if (reason instanceof Response) {
           expect(reason.status).toBe(302)
-          expect(reason.headers.get('location')).toBe(`/verify`)
-          const setCookieHeader = reason.headers.get('set-cookie') ?? ''
+          expect(reason.headers.get('Location')).toBe(`/verify`)
+          const setCookieHeader = reason.headers.get('Set-Cookie') ?? ''
           const cookie = new Cookie(setCookieHeader)
           const raw = cookie.get('_totp')
           expect(raw).toBeDefined()
@@ -870,19 +906,20 @@ describe('[ TOTP ]', () => {
           ...BASE_STRATEGY_OPTIONS,
           successRedirect: '/account',
           failureRedirect: '/verify',
+          emailSentRedirect: '/check-email',
           customErrors: {
             expiredTotp: CUSTOM_ERROR,
           },
         },
         async ({ email, formData, request }) => {
-          expect(email).toBe(DEFAULT_EMAIL)
-          expect(request).toBeInstanceOf(Request)
-          if (request.method === 'POST') {
-            expect(formData).toBeInstanceOf(FormData)
+          expect(email).toBe(DEFAULT_EMAIL);
+          expect(request).toBeInstanceOf(Request);
+          if (formData) {
+            expect(formData).toBeInstanceOf(FormData);
           } else {
-            expect(formData).not.toBeDefined()
+            expect(request.method).toBe('GET');
           }
-          return Promise.resolve(user)
+          return Promise.resolve(user);
         },
       )
       vi.setSystemTime(
@@ -900,8 +937,8 @@ describe('[ TOTP ]', () => {
       await strategy.authenticate(request).catch(async (reason) => {
         if (reason instanceof Response) {
           expect(reason.status).toBe(302)
-          expect(reason.headers.get('location')).toBe(`/verify`)
-          const setCookieHeader = reason.headers.get('set-cookie') ?? ''
+          expect(reason.headers.get('Location')).toBe(`/verify`)
+          const setCookieHeader = reason.headers.get('Set-Cookie') ?? ''
           const cookie = new Cookie(setCookieHeader)
           const raw = cookie.get('_totp')
           expect(raw).toBeDefined()
@@ -912,53 +949,54 @@ describe('[ TOTP ]', () => {
       })
     })
 
-    // test('Should successfully validate magic-link.', async () => {
-    //   const { user, sendTOTPOptions, totpCookie } = await setupGenerateSendTOTP()
-    //   const strategy = new TOTPStrategy<typeof user>(
-    //     {
-    //       ...BASE_STRATEGY_OPTIONS,
-    //       successRedirect: '/account',
-    //       failureRedirect: '/verify',
-    //     },
-    //     async ({ email, formData, request }) => {
-    //       expect(email).toBe(DEFAULT_EMAIL)
-    //       expect(request).toBeInstanceOf(Request)
-    //       if (request.method === 'POST') {
-    //         expect(formData).toBeInstanceOf(FormData)
-    //       } else {
-    //         expect(formData).not.toBeDefined()
-    //       }
-    //       return Promise.resolve(user)
-    //     },
-    //   )
-    //   expect(sendTOTPOptions.magicLink).toBeDefined()
-    //   invariant(sendTOTPOptions.magicLink, 'Magic link is undefined.')
-    //   const request = new Request(sendTOTPOptions.magicLink, {
-    //     method: 'GET',
-    //     headers: {
-    //       cookie: totpCookie,
-    //     },
-    //   })
-    //   await strategy.authenticate(request).catch(async (reason) => {
-    //     if (reason instanceof Response) {
-    //       expect(reason.status).toBe(302)
-    //       expect(reason.headers.get('location')).toBe(`/account`)
-    //       const setCookieHeader = reason.headers.get('set-cookie') ?? ''
-    //       const cookie = new Cookie(setCookieHeader)
-    //       const raw = cookie.get('_totp')
-    //       expect(raw).toBeDefined()
-    //       const params = new URLSearchParams(raw!)
-    //       expect(params.get('email')).toBeNull()
-    //       expect(params.get('totp')).toBeNull()
-    //       expect(params.get('error')).toBeNull()
-    //     } else throw reason
-    //   })
-    // })
+    test('Should successfully validate magic-link.', async () => {
+      const { user, sendTOTPOptions, totpCookie } = await setupGenerateSendTOTP()
+      const strategy = new TOTPStrategy<typeof user>(
+        {
+          ...BASE_STRATEGY_OPTIONS,
+          successRedirect: '/account',
+          failureRedirect: '/verify',
+          emailSentRedirect: '/check-email',
+        },
+        async ({ email, formData, request }) => {
+          expect(email).toBe(DEFAULT_EMAIL);
+          expect(request).toBeInstanceOf(Request);
+          if (formData) {
+            expect(formData).toBeInstanceOf(FormData);
+          } else {
+            expect(request.method).toBe('GET');
+          }
+          return Promise.resolve(user);
+        },
+      )
+      expect(sendTOTPOptions.magicLink).toBeDefined()
+      if (!sendTOTPOptions.magicLink) throw new Error('Magic link is undefined.')
+      const request = new Request(sendTOTPOptions.magicLink, {
+        method: 'GET',
+        headers: {
+          cookie: totpCookie,
+        },
+      })
+      await strategy.authenticate(request).catch(async (reason) => {
+        if (reason instanceof Response) {
+          expect(reason.status).toBe(302)
+          expect(reason.headers.get('Location')).toBe(`/account`)
+          const setCookieHeader = reason.headers.get('Set-Cookie') ?? ''
+          const cookie = new Cookie(setCookieHeader)
+          const raw = cookie.get('_totp')
+          expect(raw).toBeDefined()
+          const params = new URLSearchParams(raw!)
+          expect(params.get('email')).toBeNull()
+          expect(params.get('totp')).toBeNull()
+          expect(params.get('error')).toBeNull()
+        } else throw reason
+      })
+    })
 
     test('Should failure redirect on invalid magic-link code.', async () => {
       const { strategy, sendTOTPOptions, totpCookie } = await setupGenerateSendTOTP()
       expect(sendTOTPOptions.magicLink).toBeDefined()
-      invariant(sendTOTPOptions.magicLink, 'Magic link is undefined.')
+      if (!sendTOTPOptions.magicLink) throw new Error('Magic link is undefined.')
       const request = new Request(sendTOTPOptions.magicLink + 'INVALID', {
         method: 'GET',
         headers: {
@@ -968,8 +1006,8 @@ describe('[ TOTP ]', () => {
       await strategy.authenticate(request).catch(async (reason) => {
         if (reason instanceof Response) {
           expect(reason.status).toBe(302)
-          expect(reason.headers.get('location')).toBe(`/login`)
-          const setCookieHeader = reason.headers.get('set-cookie') ?? ''
+          expect(reason.headers.get('Location')).toBe(`/login`)
+          const setCookieHeader = reason.headers.get('Set-Cookie') ?? ''
           const cookie = new Cookie(setCookieHeader)
           const raw = cookie.get('_totp')
           expect(raw).toBeDefined()
@@ -982,7 +1020,7 @@ describe('[ TOTP ]', () => {
     test('Should failure redirect on expired magic-link.', async () => {
       const { strategy, sendTOTPOptions, totpCookie } = await setupGenerateSendTOTP()
       expect(sendTOTPOptions.magicLink).toBeDefined()
-      invariant(sendTOTPOptions.magicLink, 'Magic link is undefined.')
+      if (!sendTOTPOptions.magicLink) throw new Error('Magic link is undefined.')
       vi.setSystemTime(
         new Date(Date.now() + 1000 * 60 * (TOTP_GENERATION_DEFAULTS.period + 1)),
       )
@@ -995,8 +1033,8 @@ describe('[ TOTP ]', () => {
       await strategy.authenticate(request).catch(async (reason) => {
         if (reason instanceof Response) {
           expect(reason.status).toBe(302)
-          expect(reason.headers.get('location')).toBe(`/login`)
-          const setCookieHeader = reason.headers.get('set-cookie') ?? ''
+          expect(reason.headers.get('Location')).toBe(`/login`)
+          const setCookieHeader = reason.headers.get('Set-Cookie') ?? ''
           const cookie = new Cookie(setCookieHeader)
           const raw = cookie.get('_totp')
           expect(raw).toBeDefined()
@@ -1009,7 +1047,7 @@ describe('[ TOTP ]', () => {
     test('Should failure redirect on invalid magic-link path.', async () => {
       const { strategy, sendTOTPOptions, totpCookie } = await setupGenerateSendTOTP()
       expect(sendTOTPOptions.magicLink).toBeDefined()
-      invariant(sendTOTPOptions.magicLink, 'Magic link is undefined.')
+      if (!sendTOTPOptions.magicLink) throw new Error('Magic link is undefined.')
       expect(sendTOTPOptions.magicLink).toMatch(MAGIC_LINK_PATH)
       const request = new Request(
         sendTOTPOptions.magicLink.replace(MAGIC_LINK_PATH, '/invalid-magic-link'),
@@ -1023,8 +1061,8 @@ describe('[ TOTP ]', () => {
       await strategy.authenticate(request).catch(async (reason) => {
         if (reason instanceof Response) {
           expect(reason.status).toBe(302)
-          expect(reason.headers.get('location')).toBe(`/login`)
-          const setCookieHeader = reason.headers.get('set-cookie') ?? ''
+          expect(reason.headers.get('Location')).toBe(`/login`)
+          const setCookieHeader = reason.headers.get('Set-Cookie') ?? ''
           const cookie = new Cookie(setCookieHeader)
           const raw = cookie.get('_totp')
           expect(raw).toBeDefined()
@@ -1036,7 +1074,7 @@ describe('[ TOTP ]', () => {
     })
 
     test('Should failure redirect on missing email.', async () => {
-      const { strategy, sendTOTPOptions, totpCookie } = await setupGenerateSendTOTP()
+      const { strategy, totpCookie } = await setupGenerateSendTOTP()
       const modifiedCookie = new Cookie(totpCookie)
       const raw = modifiedCookie.get('_totp')
       expect(raw).toBeDefined()
@@ -1062,9 +1100,9 @@ describe('[ TOTP ]', () => {
       await strategy.authenticate(request).catch(async (reason) => {
         if (reason instanceof Response) {
           expect(reason.status).toBe(302)
-          expect(reason.headers.get('location')).toBe(`/login`)
+          expect(reason.headers.get('Location')).toBe(`/login`)
 
-          const setCookieHeader = reason.headers.get('set-cookie') ?? ''
+          const setCookieHeader = reason.headers.get('Set-Cookie') ?? ''
           const cookie = new Cookie(setCookieHeader)
           const raw = cookie.get('_totp')
           expect(raw).toBeDefined()
@@ -1076,7 +1114,7 @@ describe('[ TOTP ]', () => {
     })
 
     test('Should failure redirect on stale magic-link.', async () => {
-      let { strategy, sendTOTPOptions, totpCookie } = await setupGenerateSendTOTP()
+      const { strategy, totpCookie } = await setupGenerateSendTOTP()
       const modifiedCookie = new Cookie(totpCookie)
       const raw = modifiedCookie.get('_totp')
       expect(raw).toBeDefined()
@@ -1102,9 +1140,9 @@ describe('[ TOTP ]', () => {
       await strategy.authenticate(request).catch(async (reason) => {
         if (reason instanceof Response) {
           expect(reason.status).toBe(302)
-          expect(reason.headers.get('location')).toBe(`/login`)
+          expect(reason.headers.get('Location')).toBe(`/login`)
 
-          const setCookieHeader = reason.headers.get('set-cookie') ?? ''
+          const setCookieHeader = reason.headers.get('Set-Cookie') ?? ''
           const cookie = new Cookie(setCookieHeader)
           const raw = cookie.get('_totp')
           expect(raw).toBeDefined()
@@ -1116,26 +1154,28 @@ describe('[ TOTP ]', () => {
     })
 
     test('Should failure redirect on magic-link invalid and max TOTP attempts.', async () => {
+      // eslint-disable-next-line prefer-const
       let { user, totpCookie, sendTOTPOptions } = await setupGenerateSendTOTP()
       const strategy = new TOTPStrategy<typeof user>(
         {
           ...BASE_STRATEGY_OPTIONS,
           successRedirect: '/account',
           failureRedirect: '/verify',
+          emailSentRedirect: '/check-email',
         },
         async ({ email, formData, request }) => {
-          expect(email).toBe(DEFAULT_EMAIL)
-          expect(request).toBeInstanceOf(Request)
-          if (request.method === 'POST') {
-            expect(formData).toBeInstanceOf(FormData)
+          expect(email).toBe(DEFAULT_EMAIL);
+          expect(request).toBeInstanceOf(Request);
+          if (formData) {
+            expect(formData).toBeInstanceOf(FormData);
           } else {
-            expect(formData).not.toBeDefined()
+            expect(request.method).toBe('GET');
           }
-          return Promise.resolve(user)
+          return Promise.resolve(user);
         },
       )
       expect(sendTOTPOptions.magicLink).toBeDefined()
-      invariant(sendTOTPOptions.magicLink, 'Magic link is undefined.')
+      if (!sendTOTPOptions.magicLink) throw new Error('Magic link is undefined.')
 
       for (let i = 0; i <= TOTP_GENERATION_DEFAULTS.maxAttempts; i++) {
         const request = new Request(sendTOTPOptions.magicLink + 'INVALID', {
@@ -1148,9 +1188,9 @@ describe('[ TOTP ]', () => {
         await strategy.authenticate(request).catch(async (reason) => {
           if (reason instanceof Response) {
             expect(reason.status).toBe(302)
-            expect(reason.headers.get('location')).toBe(`/verify`)
+            expect(reason.headers.get('Location')).toBe(`/verify`)
 
-            const setCookieHeader = reason.headers.get('set-cookie') ?? ''
+            const setCookieHeader = reason.headers.get('Set-Cookie') ?? ''
             totpCookie = setCookieHeader
             const cookie = new Cookie(setCookieHeader)
             const raw = cookie.get('_totp')
@@ -1176,25 +1216,46 @@ describe('[ TOTP ]', () => {
 describe('[ Utils ]', () => {
   test('Should use the origin from the request for the magic-link.', async () => {
     const samples: Array<[string, string]> = [
-      ['http://localhost/login', 'http://localhost/magic-link?code=U2N2EY'],
-      ['http://localhost:3000/login', 'http://localhost:3000/magic-link?code=U2N2EY'],
-      ['http://127.0.0.1/login', 'http://127.0.0.1/magic-link?code=U2N2EY'],
-      ['http://127.0.0.1:3000/login', 'http://127.0.0.1:3000/magic-link?code=U2N2EY'],
-      ['http://localhost:8788/signin', 'http://localhost:8788/magic-link?code=U2N2EY'],
-      ['https://host.com/login', 'https://host.com/magic-link?code=U2N2EY'],
-      ['https://host.com:3000/login', 'https://host.com:3000/magic-link?code=U2N2EY'],
+      ['http://localhost/login', 'http://localhost/magic-link\\?code='],
+      ['http://localhost:3000/login', 'http://localhost:3000/magic-link\\?code='],
+      ['http://127.0.0.1/login', 'http://127\\.0\\.0\\.1/magic-link\\?code='],
+      ['http://127.0.0.1:3000/login', 'http://127\\.0\\.0\\.1:3000/magic-link\\?code='],
+      ['http://localhost:8788/signin', 'http://localhost:8788/magic-link\\?code='],
+      ['https://host.com/login', 'https://host\\.com/magic-link\\?code='],
+      ['https://host.com:3000/login', 'https://host\\.com:3000/magic-link\\?code='],
     ]
 
-    for (const [requestUrl, magicLinkUrl] of samples) {
-      const request = new Request(requestUrl)
-      expect(
-        generateMagicLink({
-          magicLinkPath: '/magic-link',
-          param: 'code',
-          code: 'U2N2EY',
-          request,
-        }),
-      ).toBe(magicLinkUrl)
+    for (const [requestUrl, magicLinkBase] of samples) {
+      let capturedMagicLink: string | undefined
+
+      // Mock sendTOTP to capture the generated magic link.
+      sendTOTP.mockImplementation(async (options: SendTOTPOptions) => {
+        capturedMagicLink = options.magicLink
+      })
+
+      const strategy = new TOTPStrategy(
+        {
+          ...BASE_STRATEGY_OPTIONS,
+          successRedirect: '/verify',
+          failureRedirect: '/login',
+          emailSentRedirect: '/check-email',
+        },
+        verify,
+      )
+
+      const formData = new FormData()
+      formData.append(FORM_FIELDS.EMAIL, DEFAULT_EMAIL)
+      const request = new Request(requestUrl, {
+        method: 'POST',
+        body: formData,
+      })
+
+      await strategy.authenticate(request).catch(() => {
+        // We expect this to throw since it redirects.
+        expect(capturedMagicLink).toBeDefined()
+        const regex = new RegExp(`^${magicLinkBase}[A-Za-z0-9]+$`)
+        expect(capturedMagicLink).toMatch(regex)
+      })
     }
   })
 
