@@ -609,9 +609,7 @@ describe('[ TOTP ]', () => {
         sendTOTPOptions = options
         expect(options.email).toBe(DEFAULT_EMAIL)
         expect(options.code).to.not.equal('')
-        expect(options.magicLink).toBe(
-          `${HOST_URL}${MAGIC_LINK_PATH}?code=${options.code}`,
-        )
+        expect(options.magicLink).toMatch(new RegExp(`^${HOST_URL}${MAGIC_LINK_PATH}\\?t=`))
       })
 
       const strategy = new TOTPStrategy<typeof user>(
@@ -800,6 +798,7 @@ describe('[ TOTP ]', () => {
     test('Should failure redirect on invalid and max TOTP attempts.', async () => {
       // eslint-disable-next-line prefer-const
       let { user, totpCookie, sendTOTPOptions } = await setupGenerateSendTOTP()
+
       const strategy = new TOTPStrategy<typeof user>(
         {
           ...BASE_STRATEGY_OPTIONS,
@@ -818,15 +817,18 @@ describe('[ TOTP ]', () => {
           return Promise.resolve(user);
         },
       )
+
+      const url = new URL(sendTOTPOptions.magicLink)
+      const invalidToken = 'eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..invalid.token'
+
       for (let i = 0; i <= TOTP_GENERATION_DEFAULTS.maxAttempts; i++) {
-        const formData = new FormData()
-        formData.append(FORM_FIELDS.CODE, sendTOTPOptions.code + 'INVALID')
-        const request = new Request(`${HOST_URL}/verify`, {
-          method: 'POST',
+        url.searchParams.set('t', invalidToken)
+        
+        const request = new Request(url.toString(), {
+          method: 'GET',
           headers: {
             cookie: totpCookie,
           },
-          body: formData,
         })
         await strategy.authenticate(request).catch(async (reason) => {
           if (reason instanceof Response) {
@@ -841,7 +843,7 @@ describe('[ TOTP ]', () => {
             expect(params.get('error')).toBe(
               i < TOTP_GENERATION_DEFAULTS.maxAttempts
                 ? ERRORS.INVALID_TOTP
-                : ERRORS.EXPIRED_TOTP,
+                : ERRORS.RATE_LIMIT_EXCEEDED,
             )
             if (i >= TOTP_GENERATION_DEFAULTS.maxAttempts) {
               expect(params.get('totp')).toBeNull()
@@ -1074,7 +1076,11 @@ describe('[ TOTP ]', () => {
     })
 
     test('Should failure redirect on missing email.', async () => {
-      const { strategy, totpCookie } = await setupGenerateSendTOTP()
+      const { strategy, sendTOTPOptions, totpCookie } = await setupGenerateSendTOTP()
+
+      expect(sendTOTPOptions.magicLink).toBeDefined()
+  if (!sendTOTPOptions.magicLink) throw new Error('Magic link is undefined.')
+
       const modifiedCookie = new Cookie(totpCookie)
       const raw = modifiedCookie.get('_totp')
       expect(raw).toBeDefined()
@@ -1090,7 +1096,7 @@ describe('[ TOTP ]', () => {
         secure: true,
       })
 
-      const request = new Request('https://prodserver.com/magic-link?code=KJJERI', {
+      const request = new Request(sendTOTPOptions.magicLink, {
         method: 'GET',
         headers: {
           cookie: newCookie.toString(),
@@ -1114,7 +1120,11 @@ describe('[ TOTP ]', () => {
     })
 
     test('Should failure redirect on stale magic-link.', async () => {
-      const { strategy, totpCookie } = await setupGenerateSendTOTP()
+      const { strategy, sendTOTPOptions, totpCookie } = await setupGenerateSendTOTP()
+
+      expect(sendTOTPOptions.magicLink).toBeDefined();
+  if (!sendTOTPOptions.magicLink) throw new Error('Magic link is undefined.');
+
       const modifiedCookie = new Cookie(totpCookie)
       const raw = modifiedCookie.get('_totp')
       expect(raw).toBeDefined()
@@ -1130,7 +1140,7 @@ describe('[ TOTP ]', () => {
         secure: true,
       })
 
-      const request = new Request('https://prodserver.com/magic-link?code=KJJERI', {
+      const request = new Request(sendTOTPOptions.magicLink, {
         method: 'GET',
         headers: {
           cookie: newCookie.toString(),
@@ -1148,7 +1158,7 @@ describe('[ TOTP ]', () => {
           expect(raw).toBeDefined()
 
           const params = new URLSearchParams(raw!)
-          expect(params.get('error')).toBe(ERRORS.EXPIRED_TOTP)
+          expect(params.get('error')).toBe(ERRORS.MISSING_SESSION_TOTP)
         } else throw reason
       })
     })
@@ -1200,7 +1210,7 @@ describe('[ TOTP ]', () => {
             expect(params.get('error')).toBe(
               i < TOTP_GENERATION_DEFAULTS.maxAttempts
                 ? ERRORS.INVALID_TOTP
-                : ERRORS.EXPIRED_TOTP,
+                : ERRORS.RATE_LIMIT_EXCEEDED,
             )
 
             if (i >= TOTP_GENERATION_DEFAULTS.maxAttempts) {
@@ -1216,13 +1226,13 @@ describe('[ TOTP ]', () => {
 describe('[ Utils ]', () => {
   test('Should use the origin from the request for the magic-link.', async () => {
     const samples: Array<[string, string]> = [
-      ['http://localhost/login', 'http://localhost/magic-link\\?code='],
-      ['http://localhost:3000/login', 'http://localhost:3000/magic-link\\?code='],
-      ['http://127.0.0.1/login', 'http://127\\.0\\.0\\.1/magic-link\\?code='],
-      ['http://127.0.0.1:3000/login', 'http://127\\.0\\.0\\.1:3000/magic-link\\?code='],
-      ['http://localhost:8788/signin', 'http://localhost:8788/magic-link\\?code='],
-      ['https://host.com/login', 'https://host\\.com/magic-link\\?code='],
-      ['https://host.com:3000/login', 'https://host\\.com:3000/magic-link\\?code='],
+      ['http://localhost/login', 'http://localhost/magic-link\\?t='],
+      ['http://localhost:3000/login', 'http://localhost:3000/magic-link\\?t='],
+      ['http://127.0.0.1/login', 'http://127\\.0\\.0\\.1/magic-link\\?t='],
+      ['http://127.0.0.1:3000/login', 'http://127\\.0\\.0\\.1:3000/magic-link\\?t='],
+      ['http://localhost:8788/signin', 'http://localhost:8788/magic-link\\?t='],
+      ['https://host.com/login', 'https://host\\.com/magic-link\\?t='],
+      ['https://host.com:3000/login', 'https://host\\.com:3000/magic-link\\?t='],
     ]
 
     for (const [requestUrl, magicLinkBase] of samples) {
@@ -1253,7 +1263,7 @@ describe('[ Utils ]', () => {
       await strategy.authenticate(request).catch(() => {
         // We expect this to throw since it redirects.
         expect(capturedMagicLink).toBeDefined()
-        const regex = new RegExp(`^${magicLinkBase}[A-Za-z0-9]+$`)
+        const regex = new RegExp(`^${magicLinkBase}[A-Za-z0-9_\\-\\.]+$`)
         expect(capturedMagicLink).toMatch(regex)
       })
     }

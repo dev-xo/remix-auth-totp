@@ -12,12 +12,17 @@ export const SESSION_KEYS = {
 
 export const ERRORS = {
   // Customizable errors.
-  REQUIRED_EMAIL: 'Email is required.',
-  INVALID_EMAIL: 'Email is not valid.',
-  INVALID_TOTP: 'Code is not valid.',
-  EXPIRED_TOTP: 'Code has expired.',
+  REQUIRED_EMAIL: 'Please enter your email address to continue.',
+  INVALID_EMAIL:
+    "That doesn't look like a valid email address. Please check and try again.",
+  INVALID_TOTP:
+    "That code didn't work. Please check and try again, or request a new code.",
+  EXPIRED_TOTP: 'That code has expired. Please request a new one.',
   MISSING_SESSION_EMAIL:
-    'Missing email to verify. Check that same browser used for verification.',
+    "We couldn't find an email to verify. Please use the same browser you started with or restart from this browser.",
+  MISSING_SESSION_TOTP:
+    "We couldn't find an active verification session. Please request a new code.",
+  RATE_LIMIT_EXCEEDED: "Too many incorrect attempts. Please request a new code.",
 
   // Miscellaneous errors.
   REQUIRED_ENV_SECRET: 'Missing required .env secret.',

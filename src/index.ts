@@ -155,6 +155,11 @@ export interface CustomErrorsOptions {
   invalidTotp?: string
 
   /**
+   * The rate limit exceeded error message.
+   */
+  rateLimitExceeded?: string
+
+  /**
    * The expired TOTP error message.
    */
   expiredTotp?: string
@@ -163,6 +168,11 @@ export interface CustomErrorsOptions {
    * The missing session email error message.
    */
   missingSessionEmail?: string
+
+  /**
+   * The missing session totp error message.
+   */
+  missingSessionTotp?: string
 }
 
 /**
@@ -389,6 +399,14 @@ class TOTPStore {
   }
 }
 
+/**
+ * Interface for encrypted magic link parameters
+ */
+interface MagicLinkParams {
+  code: string
+  expires: number
+}
+
 export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   public name = STRATEGY_NAME
 
@@ -416,8 +434,10 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     requiredEmail: ERRORS.REQUIRED_EMAIL,
     invalidEmail: ERRORS.INVALID_EMAIL,
     invalidTotp: ERRORS.INVALID_TOTP,
+    rateLimitExceeded: ERRORS.RATE_LIMIT_EXCEEDED,
     expiredTotp: ERRORS.EXPIRED_TOTP,
     missingSessionEmail: ERRORS.MISSING_SESSION_EMAIL,
+    missingSessionTotp: ERRORS.MISSING_SESSION_TOTP,
   }
 
   constructor(
@@ -546,15 +566,20 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
         })
       }
 
-      // Get the TOTP code, either from form data or magic link.
-      const code = formDataCode ?? this._getMagicLinkCode(request)
+      // Get the TOTP code and expiry, either from form data or magic link.
+      const { code: linkCode, expires: linkExpires } = await this._getMagicLinkCode(
+        request,
+        sessionTotp,
+      )
+
+      const code = formDataCode ?? linkCode
 
       if (code) {
         if (!sessionEmail) throw new Error(this.customErrors.missingSessionEmail)
-        if (!sessionTotp) throw new Error(this.customErrors.expiredTotp)
+        if (!sessionTotp) throw new Error(this.customErrors.missingSessionTotp)
 
         // Validate the TOTP.
-        await this._validateTOTP({ code, sessionTotp, store })
+        await this._validateTOTP({ code, sessionTotp, store, urlExpires: linkExpires })
 
         // Clear TOTP data since user verified successfully.
         store.setEmail(undefined)
@@ -581,6 +606,12 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
         })
       }
       if (err instanceof Error) {
+        if (
+          err.message === this.customErrors.rateLimitExceeded ||
+          err.message === this.customErrors.expiredTotp
+        ) {
+          store.setTOTP(undefined)
+        }
         store.setError(err.message)
         throw redirect(this._failureRedirect, {
           headers: {
@@ -609,18 +640,29 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
    * @param code - The TOTP code.
    * @param sessionTotp - The TOTP session data.
    * @param store - The TOTP store.
+   * @param urlExpires - The TOTP code expiry date in milliseconds.
    */
   private async _validateTOTP({
     code,
     sessionTotp,
     store,
+    urlExpires,
   }: {
     code: string
     sessionTotp: TOTPCookieData
     store: TOTPStore
+    urlExpires?: number
   }) {
     try {
-      // https://github.com/panva/jose/blob/main/docs/functions/jwe_compact_decrypt.compactDecrypt.md
+      // Check if the TOTP is expired from the URL
+      if (urlExpires) {
+        const dateNow = Date.now()
+        if (dateNow > urlExpires) {
+          throw new Error(this.customErrors.expiredTotp)
+        }
+      }
+
+      // https://github.com/panva/jose/blob/main/docs/jwe/compact/decrypt/functions/compactDecrypt.md
       const { plaintext } = await jose.compactDecrypt(
         sessionTotp.jwe,
         asJweKey(this.secret),
@@ -628,7 +670,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       const totpData = JSON.parse(new TextDecoder().decode(plaintext))
       assertTOTPData(totpData)
 
-      // Check if the TOTP is expired.
+      // Check if the TOTP is expired from the Cookie.
       const dateNow = Date.now()
       const isExpired = dateNow - totpData.createdAt > this.totpGeneration.period * 1000
       if (isExpired) {
@@ -649,14 +691,9 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
         store.setTOTP(undefined)
         store.setError(this.customErrors.expiredTotp)
       } else {
-        sessionTotp.attempts += 1
-        // Check if the user has reached the max number of attempts.
-        if (sessionTotp.attempts >= this.totpGeneration.maxAttempts) {
-          store.setTOTP(undefined)
-        } else {
-          store.setTOTP(sessionTotp)
-        }
-        store.setError(this.customErrors.invalidTotp)
+        store.setError(
+          error instanceof Error ? error.message : this.customErrors.invalidTotp,
+        )
       }
 
       // Redirect to the failure URL with the updated store.
@@ -690,7 +727,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       .setProtectedHeader({ alg: 'dir', enc: 'A256GCM' })
       .encrypt(asJweKey(this.secret))
 
-    const magicLink = this._generateMagicLink({ code, request })
+    const magicLink = await this._generateMagicLink({ code, request })
 
     return {
       code,
@@ -700,14 +737,70 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   }
 
   /**
+   * Encrypts magic link parameters
+   * @param params - The parameters to encrypt
+   * @returns The encrypted JWE token
+   */
+  private async _encryptUrlParams(params: MagicLinkParams): Promise<string> {
+    const payload = new TextEncoder().encode(JSON.stringify(params))
+    return await new jose.CompactEncrypt(payload)
+      .setProtectedHeader({ alg: 'dir', enc: 'A256GCM' })
+      .encrypt(asJweKey(this.secret))
+  }
+
+  /**
+   * Decrypts and validates magic link parameters
+   * @param encrypted - The encrypted JWE token
+   * @returns The decrypted and validated parameters
+   */
+  private async _decryptUrlParams(
+    encrypted: string,
+    sessionTotp?: TOTPCookieData,
+  ): Promise<MagicLinkParams> {
+    try {
+      const { plaintext } = await jose.compactDecrypt(encrypted, asJweKey(this.secret))
+      const params = JSON.parse(new TextDecoder().decode(plaintext))
+
+      if (!params?.code || !params?.expires || typeof params.expires !== 'number') {
+        throw new Error('Invalid magic link format')
+      }
+
+      return params
+    } catch (error) {
+      if (!sessionTotp || sessionTotp.attempts < this.totpGeneration.maxAttempts) {
+        if (sessionTotp) {
+          sessionTotp.attempts += 1
+        }
+        throw new Error(this.customErrors.invalidTotp)
+      }
+
+      throw new Error(this.customErrors.rateLimitExceeded)
+    }
+  }
+
+  /**
    * Generates the magic link.
    * @param code - The TOTP code.
    * @param request - The request object.
    * @returns The magic link.
    */
-  private _generateMagicLink({ code, request }: { code: string; request: Request }) {
+  private async _generateMagicLink({
+    code,
+    request,
+  }: {
+    code: string
+    request: Request
+  }) {
     const url = new URL(this.magicLinkPath ?? '/', new URL(request.url).origin)
-    url.searchParams.set(this.codeFieldKey, code)
+
+    const params: MagicLinkParams = {
+      code,
+      expires: Date.now() + this.totpGeneration.period * 1000,
+    }
+
+    const encrypted = await this._encryptUrlParams(params)
+    url.searchParams.set('t', encrypted)
+
     return url.toString()
   }
 
@@ -716,17 +809,32 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
    * @param request - The request object.
    * @returns The magic link code.
    */
-  private _getMagicLinkCode(request: Request) {
+  private async _getMagicLinkCode(
+    request: Request,
+    sessionTotp?: TOTPCookieData,
+  ): Promise<{ code?: string; expires?: number }> {
     if (request.method === 'GET') {
       const url = new URL(request.url)
       if (url.pathname !== this.magicLinkPath) {
         throw new Error(ERRORS.INVALID_MAGIC_LINK_PATH)
       }
-      if (url.searchParams.has(this.codeFieldKey)) {
-        return decodeURIComponent(url.searchParams.get(this.codeFieldKey) ?? '')
+
+      const token = url.searchParams.get('t')
+      if (!token) {
+        return {}
+      }
+
+      try {
+        const params = await this._decryptUrlParams(token, sessionTotp)
+        return {
+          code: params.code,
+          expires: params.expires,
+        }
+      } catch (error) {
+        throw error
       }
     }
-    return undefined
+    return {}
   }
 
   /**
