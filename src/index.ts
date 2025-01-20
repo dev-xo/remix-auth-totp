@@ -52,7 +52,8 @@ export interface TOTPGenerationOptions {
    * The secret used to generate the TOTP.
    * It should be Base32 encoded (Feel free to use: https://npm.im/thirty-two).
    *
-   * @default random Base32 secret.
+   * Defaults to a random Base32 secret.
+   * @default random
    */
   secret?: string
 
@@ -119,7 +120,7 @@ export interface SendTOTPOptions {
 
 /**
  * The sender email method.
- * @param options The send TOTP options.
+ * @param options The SendTOTPOptions options.
  */
 export interface SendTOTP {
   (options: SendTOTPOptions): Promise<void>
@@ -127,7 +128,7 @@ export interface SendTOTP {
 
 /**
  * The validate email method.
- * This can be useful to ensure it's not a disposable email address.
+ * Useful to ensure it's not a disposable email address.
  *
  * @param email The email address to validate.
  */
@@ -247,7 +248,7 @@ export interface TOTPStrategyOptions {
 
 /**
  * The verify method callback.
- * Returns the user for the email to be stored in the session.
+ * Returns the email user to be stored in the session.
  */
 export interface TOTPVerifyParams {
   /**
@@ -264,6 +265,21 @@ export interface TOTPVerifyParams {
    * The Request object.
    */
   request: Request
+}
+
+/**
+ * The magic link parameters.
+ */
+interface MagicLinkParams {
+  /**
+   * The TOTP code.
+   */
+  code: string
+
+  /**
+   * The TOTP expiry date.
+   */
+  expires: number
 }
 
 /**
@@ -367,8 +383,9 @@ class TOTPStore {
 
   /**
    * Commits the current store state to a cookie string.
-   * @param maxAge - Optional maximum age of the cookie in seconds
-   * @returns A string representation of the cookie with all current values
+   *
+   * @param maxAge - Optional maximum age of the cookie in seconds.
+   * @returns A string representation of the cookie with its current values.
    */
   commit(maxAge?: number): string {
     const params = new URLSearchParams()
@@ -400,13 +417,8 @@ class TOTPStore {
 }
 
 /**
- * Interface for encrypted magic link parameters
+ * The TOTP Strategy.
  */
-interface MagicLinkParams {
-  code: string
-  expires: number
-}
-
 export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   public name = STRATEGY_NAME
 
@@ -424,8 +436,8 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   private _successRedirect: string
   private _failureRedirect: string
   private readonly _totpGenerationDefaults = {
-    algorithm: 'SHA-256', // More secure than SHA1.
-    charSet: 'abcdefghijklmnpqrstuvwxyzABCDEFGHIJKLMNPQRSTUVWXYZ123456789', // No O or 0
+    algorithm: 'SHA-256',
+    charSet: 'abcdefghijklmnpqrstuvwxyzABCDEFGHIJKLMNPQRSTUVWXYZ123456789', // Does not include O or 0.
     digits: 6,
     period: 60,
     maxAttempts: 3,
@@ -434,8 +446,8 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     requiredEmail: ERRORS.REQUIRED_EMAIL,
     invalidEmail: ERRORS.INVALID_EMAIL,
     invalidTotp: ERRORS.INVALID_TOTP,
-    rateLimitExceeded: ERRORS.RATE_LIMIT_EXCEEDED,
     expiredTotp: ERRORS.EXPIRED_TOTP,
+    rateLimitExceeded: ERRORS.RATE_LIMIT_EXCEEDED,
     missingSessionEmail: ERRORS.MISSING_SESSION_EMAIL,
     missingSessionTotp: ERRORS.MISSING_SESSION_TOTP,
   }
@@ -465,12 +477,12 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     }
   }
 
-  // Getter for emailSentRedirect
+  /** Gets the email sent redirect URL. */
   get emailSentRedirect(): string {
     return this._emailSentRedirect
   }
 
-  // Setter for emailSentRedirect
+  /** Sets the email sent redirect URL. */
   set emailSentRedirect(url: string) {
     if (!url) {
       throw new Error(ERRORS.REQUIRED_EMAIL_SENT_REDIRECT_URL)
@@ -478,12 +490,12 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     this._emailSentRedirect = url
   }
 
-  // Getter for successRedirect
+  /** Gets the success redirect URL. */
   get successRedirect(): string {
     return this._successRedirect
   }
 
-  // Setter for successRedirect
+  /** Sets the success redirect URL. */
   set successRedirect(url: string) {
     if (!url) {
       throw new Error(ERRORS.REQUIRED_SUCCESS_REDIRECT_URL)
@@ -491,12 +503,12 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     this._successRedirect = url
   }
 
-  // Getter for failureRedirect
+  /** Gets the failure redirect URL. */
   get failureRedirect(): string {
     return this._failureRedirect
   }
 
-  // Setter for failureRedirect
+  /** Sets the failure redirect URL. */
   set failureRedirect(url: string) {
     if (!url) {
       throw new Error(ERRORS.REQUIRED_FAILURE_REDIRECT_URL)
@@ -506,19 +518,16 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
 
   /**
    * Authenticates a user using TOTP.
-   *
    * If the user is already authenticated, simply returns the user.
    *
    * | Method | Email | Code | Sess. Email | Sess. TOTP | Action/Logic                             |
    * |--------|-------|------|-------------|------------|------------------------------------------|
-   * | POST   | ✓     | -    | -           | -          | Generate/send TOTP using form email.     |
-   * | POST   | ✗     | ✗    | ✓           | -          | Generate/send TOTP using session email.  |
+   * | POST   | ✓     | -    | -           | -          | Generate/Send TOTP using form email.     |
+   * | POST   | ✗     | ✗    | ✓           | -          | Generate/Send TOTP using session email.  |
    * | POST   | ✗     | ✓    | ✓           | ✓          | Validate form TOTP code.                 |
-   * | GET    | -     | -    | ✓           | ✓          | Validate magic link TOTP.                |
+   * | GET    | -     | -    | ✓           | ✓          | Validate magic-link TOTP.                |
    *
    * @param {Request} request - The request object.
-   * @param {SessionStorage} sessionStorage - The session storage instance.
-   * @param {AuthenticateOptions} options - The authentication options. successRedirect is required.
    * @returns {Promise<User>} The authenticated user.
    */
   async authenticate(request: Request): Promise<User> {
@@ -535,10 +544,16 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     const formDataCode = coerceToOptionalNonEmptyString(formData.get(this.codeFieldKey))
     const sessionEmail = coerceToOptionalString(store.getEmail())
     const sessionTotp = coerceToOptionalTotpSessionData(store.getTOTP())
-    const email =
-      request.method === 'POST'
-        ? formDataEmail ?? (!formDataCode ? sessionEmail : null)
-        : null
+
+    let email = null
+
+    if (request.method === 'POST') {
+      if (formDataEmail) {
+        email = formDataEmail
+      } else if (sessionEmail && !formDataCode) {
+        email = sessionEmail
+      }
+    }
 
     try {
       if (email) {
@@ -554,11 +569,13 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
           request,
         })
 
+        // Set the TOTP data in the store.
         const totpData: TOTPCookieData = { jwe, attempts: 0 }
         store.setEmail(email)
         store.setTOTP(totpData)
         store.setError(undefined)
 
+        // Redirect to the email sent URL.
         throw redirect(this._emailSentRedirect, {
           headers: {
             'Set-Cookie': store.commit(this.maxAge),
@@ -566,12 +583,11 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
         })
       }
 
-      // Get the TOTP code and expiry, either from form data or magic link.
+      // Try to get the TOTP code either from the form data or the magic link.
       const { code: linkCode, expires: linkExpires } = await this._getMagicLinkCode(
         request,
         sessionTotp,
       )
-
       const code = formDataCode ?? linkCode
 
       if (code) {
@@ -586,14 +602,18 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
         store.setTOTP(undefined)
         store.setError(undefined)
 
+        // Call the verify method, allowing developers to handle the user.
         await this.verify({ email: sessionEmail, formData, request })
 
+        // Redirect to the success URL.
         throw redirect(this._successRedirect, {
           headers: {
             'Set-Cookie': store.commit(this.maxAge),
           },
         })
       }
+
+      // If no email was provided, throw an error.
       throw new Error(this.customErrors.requiredEmail)
     } catch (err: unknown) {
       if (err instanceof Response) {
@@ -654,7 +674,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     urlExpires?: number
   }) {
     try {
-      // Check if the TOTP is expired from the URL
+      // Check if the TOTP is expired from the URL.
       if (urlExpires) {
         const dateNow = Date.now()
         if (dateNow > urlExpires) {
@@ -662,6 +682,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
         }
       }
 
+      // Decrypt the TOTP data from the Cookie.
       // https://github.com/panva/jose/blob/main/docs/jwe/compact/decrypt/functions/compactDecrypt.md
       const { plaintext } = await jose.compactDecrypt(
         sessionTotp.jwe,
@@ -673,6 +694,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       // Check if the TOTP is expired from the Cookie.
       const dateNow = Date.now()
       const isExpired = dateNow - totpData.createdAt > this.totpGeneration.period * 1000
+
       if (isExpired) {
         throw new Error(this.customErrors.expiredTotp)
       }
@@ -683,6 +705,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
         secret: totpData.secret,
         otp: code,
       })
+
       if (!isValid) {
         throw new Error(this.customErrors.invalidTotp)
       }
@@ -737,9 +760,9 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   }
 
   /**
-   * Encrypts magic link parameters
-   * @param params - The parameters to encrypt
-   * @returns The encrypted JWE token
+   * Encrypts magic link parameters.
+   * @param params - The parameters to encrypt.
+   * @returns The encrypted JWE token.
    */
   private async _encryptUrlParams(params: MagicLinkParams): Promise<string> {
     const payload = new TextEncoder().encode(JSON.stringify(params))
@@ -749,9 +772,9 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   }
 
   /**
-   * Decrypts and validates magic link parameters
-   * @param encrypted - The encrypted JWE token
-   * @returns The decrypted and validated parameters
+   * Decrypts and validates magic link parameters.
+   * @param encrypted - The encrypted JWE token.
+   * @returns The decrypted and validated parameters.
    */
   private async _decryptUrlParams(
     encrypted: string,
@@ -762,7 +785,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       const params = JSON.parse(new TextDecoder().decode(plaintext))
 
       if (!params?.code || !params?.expires || typeof params.expires !== 'number') {
-        throw new Error('Invalid magic link format')
+        throw new Error('Invalid magic-link format.')
       }
 
       return params
