@@ -409,10 +409,10 @@ class TOTPStore {
       name: TOTPStore.COOKIE_NAME,
       value: params.toString(),
       httpOnly: true,
-      secure: true,
+      // secure: true,
       path: '/',
       sameSite: 'Lax',
-      maxAge: maxAge,
+      maxAge: maxAge || 60 * 5, // 5 minutes in seconds.
     })
 
     return setCookie.toString()
