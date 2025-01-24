@@ -2,25 +2,6 @@
 
 The Strategy includes a few options that can be customized.
 
-## Passing a pre-read FormData Object
-
-Because you may want to do validations or read values from the FormData before calling `authenticate`, `remix-auth-totp` allows you to pass a FormData object as part of the optional context.
-
-```ts
-export async function action({ request }: ActionFunctionArgs) {
-  const formData = await request.formData()
-  await authenticator.authenticate(type, request, {
-    successRedirect: formData.get('redirectTo'),
-    failureRedirect: '/login',
-    context: { formData }, // Pass pre-read formData.
-  })
-}
-```
-
-This way, you don't need to clone the request yourself.
-
-See https://github.com/sergiodxa/remix-auth-form?tab=readme-ov-file#passing-a-pre-read-formdata-object
-
 ## Email Validation
 
 The email validation will match by default against a basic RegEx email pattern.
@@ -46,36 +27,43 @@ The TOTP generation can customized by passing an object called `totpGeneration` 
 ```ts
 export interface TOTPGenerationOptions {
   /**
-   * The secret used to generate the OTP.
+   * The secret used to generate the TOTP.
    * It should be Base32 encoded (Feel free to use: https://npm.im/thirty-two).
-   * @default Random Base32 secret.
+   *
+   * Defaults to a random Base32 secret.
+   * @default random
    */
   secret?: string
+
   /**
-   * The algorithm used to generate the OTP.
+   * The algorithm used to generate the TOTP.
    * @default 'SHA1'
    */
   algorithm?: string
+
   /**
-   * The character set used to generate the OTP.
+   * The character set used to generate the TOTP.
    * @default 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
    */
   charSet?: string
+
   /**
-   * The number of digits the OTP will have.
+   * The number of digits used to generate the TOTP.
    * @default 6
    */
   digits?: number
+
   /**
-   * The number of seconds the OTP will be valid.
+   * The number of seconds the TOTP will be valid.
    * @default 60
    */
   period?: number
+
   /**
-   * The number of attempts the user has to verify the OTP.
+   * The max number of attempts the user can try to verify the TOTP.
    * @default 3
    */
-  maxAttempts: number
+  maxAttempts?: number
 }
 
 authenticator.use(
@@ -99,22 +87,36 @@ export interface CustomErrorsOptions {
    * The required email error message.
    */
   requiredEmail?: string
+
   /**
    * The invalid email error message.
    */
   invalidEmail?: string
+
   /**
    * The invalid TOTP error message.
    */
   invalidTotp?: string
+
+  /**
+   * The rate limit exceeded error message.
+   */
+  rateLimitExceeded?: string
+
   /**
    * The expired TOTP error message.
    */
   expiredTotp?: string
+
   /**
    * The missing session email error message.
    */
   missingSessionEmail?: string
+
+  /**
+   * The missing session totp error message.
+   */
+  missingSessionTotp?: string
 }
 
 authenticator.use(
@@ -126,46 +128,76 @@ authenticator.use(
 )
 ```
 
-## More Options
+## Strategy Options
 
 The Strategy includes a few more options that can be customized.
 
 ```ts
-export interface TOTPStrategyOptions<User> {
+export interface TOTPStrategyOptions {
   /**
-   * The secret used to encrypt the session.
+   * The secret used to encrypt the TOTP data.
+   * Must be string of 64 hexadecimal characters.
    */
   secret: string
+
   /**
-   * The maximum age of the session in seconds.
+   * The optional cookie options.
    * @default undefined
    */
-  maxAge?: number
+  cookieOptions?: Omit<SetCookieInit, 'name' | 'value'>
+
   /**
-   * The form input name used to get the email address.
-   * @default "email"
+   * The TOTP generation configuration.
    */
-  emailFieldKey?: string
-  /**
-   * The form input name used to get the TOTP.
-   * @default "code"
-   */
-  codeFieldKey?: string
-  /**
-   * The session key that stores the email address.
-   * @default "auth:email"
-   */
-  sessionEmailKey?: string
-  /**
-   * The session key that stores the TOTP data.
-   * @default "auth:totp"
-   */
-  sessionTotpKey?: string
+  totpGeneration?: TOTPGenerationOptions
+
   /**
    * The URL path for the Magic Link.
    * @default '/magic-link'
    */
   magicLinkPath?: string
+
+  /**
+   * The custom errors configuration.
+   */
+  customErrors?: CustomErrorsOptions
+
+  /**
+   * The form input name used to get the email address.
+   * @default "email"
+   */
+  emailFieldKey?: string
+
+  /**
+   * The form input name used to get the TOTP.
+   * @default "code"
+   */
+  codeFieldKey?: string
+
+  /**
+   * The send TOTP method.
+   */
+  sendTOTP: SendTOTP
+
+  /**
+   * The validate email method.
+   */
+  validateEmail?: ValidateEmail
+
+  /**
+   * The redirect URL thrown after sending email.
+   */
+  emailSentRedirect: string
+
+  /**
+   * The redirect URL thrown after verification success.
+   */
+  successRedirect: string
+
+  /**
+   * The redirect URL thrown after verification failure.
+   */
+  failureRedirect: string
 }
 ```
 
