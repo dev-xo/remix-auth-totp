@@ -39,15 +39,14 @@
   ],
   "dependencies": {
     "@epic-web/totp": "^2.0.0",
+    "@mjackson/headers": "^0.8.0",
     "base32-encode": "^2.0.0",
     "jose": "^5.8.0"
   },
   "peerDependencies": {
-    "remix-auth": "^3.6.0"
+    "remix-auth": "^4.1.0"
   },
   "devDependencies": {
-    "@remix-run/node": "^2.11.2",
-    "@remix-run/server-runtime": "^2.11.2",
     "@types/node": "^20.16.2",
     "@typescript-eslint/eslint-plugin": "^5.62.0",
     "@typescript-eslint/parser": "^5.62.0",
@@ -57,7 +56,6 @@
     "eslint-plugin-prettier": "^4.2.1",
     "husky": "^8.0.3",
     "prettier": "^2.8.8",
-    "tiny-invariant": "^1.3.3",
     "typescript": "^5.5.4",
     "vite": "^4.5.3",
     "vite-tsconfig-paths": "^4.3.2",

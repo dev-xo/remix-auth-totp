@@ -8,7 +8,6 @@ Welcome to the Remix Auth TOTP Documentation!
 - [Getting Started](https://github.com/dev-xo/remix-auth-totp/tree/main/docs#getting-started) - A quick start guide to get you up and running.
 - [Examples](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/examples.md) - A list of community examples using Remix Auth TOTP.
 - [Customization](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/customization.md) - A detailed guide of all the available options and customizations.
-- [Migration](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/migration.md) - A `v2` to `v3` migration guide.
 - [Cloudflare](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/cloudflare.md) - A guide to using Remix Auth TOTP with Cloudflare Workers.
 
 ## Getting Started
@@ -54,18 +53,20 @@ export async function sendEmail(body: SendEmailBody) {
 }
 ```
 
-In the [Starter Example](https://github.com/dev-xo/totp-starter-example) project, we can find a straightforward `sendEmail` implementation using [Resend](https://resend.com).
+In the [Starter Example](https://github.com/dev-xo/totp-starter-example/blob/main/app/modules/email/email.server.ts) project, we can find a straightforward `sendEmail` implementation using [Resend](https://resend.com).
 
 ## Session Storage
 
-We'll require to initialize a new Cookie Session Storage to work with. This Session will store user data and everything related to authentication.
+We'll require to initialize a new Session Storage to work with. This Session will store user data and everything related to authentication.
 
 Create a file called `session.server.ts` wherever you want.<br />
 Implement the following code and replace the `secrets` property with a strong string into your `.env` file.
 
+Same applies for Remix or React Router v7.
+
 ```ts
 // app/modules/auth/session.server.ts
-import { createCookieSessionStorage } from '@remix-run/node'
+import { createCookieSessionStorage } from '@remix-run/node' // Or 'react-router'.
 
 export const sessionStorage = createCookieSessionStorage({
   cookie: {
@@ -114,6 +115,10 @@ authenticator.use(
   new TOTPStrategy(
     {
       secret: process.env.ENCRYPTION_SECRET || 'NOT_A_STRONG_SECRET',
+      emailSentRedirect: '/verify',
+      magicLinkPath: '/verify',
+      successRedirect: '/dashboard',
+      failureRedirect: '/verify',
       sendTOTP: async ({ email, code, magicLink }) => {},
     },
     async ({ email }) => {},
@@ -122,7 +127,7 @@ authenticator.use(
 ```
 
 > [!TIP]
-> You can specify session duration with `maxAge` in seconds. Default is `undefined`, persisting across browser restarts.
+> You can customize the cookie behavior by passing `cookieOptions` to the `sessionStorage` instance. Check [Customization](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/customization.md) to learn more.
 
 ### 2: Implementing the Strategy Logic.
 
@@ -132,8 +137,7 @@ The Strategy Instance requires the following method: `sendTOTP`.
 authenticator.use(
   new TOTPStrategy(
     {
-      secret: process.env.ENCRYPTION_SECRET,
-
+      ...
       sendTOTP: async ({ email, code, magicLink }) => {
         // Send the TOTP code to the user.
         await sendEmail({ email, code, magicLink })
@@ -146,7 +150,7 @@ authenticator.use(
 
 ### 3. Creating and Storing the User.
 
-The Strategy returns a `verify` method that allows handling our own logic. This includes creating the user, updating the user, etc.<br />
+The Strategy returns a `verify` method that allows handling our own logic. This includes creating the user, updating the session, etc.<br />
 
 This should return the user data that will be stored in Session.
 
@@ -154,22 +158,35 @@ This should return the user data that will be stored in Session.
 authenticator.use(
   new TOTPStrategy(
     {
-      // createTOTP: async (data) => {},
-      // ...
+      ...
+      sendTOTP: async ({ email, code, magicLink }) => {}
     },
     async ({ email }) => {
       // Get user from database.
       let user = await db.user.findFirst({
         where: { email },
       })
+
       // Create a new user if it doesn't exist.
       if (!user) {
         user = await db.user.create({
           data: { email },
         })
       }
-      // Return user as Session.
-      return user
+
+      // Store user in session.
+      const session = await getSession(request.headers.get("Cookie"));
+      session.set("user", user);
+
+      // Commit session.
+      const sessionCookie = await commitSession(session);
+
+      // Redirect to your authenticated route.
+      throw redirect("/dashboard", {
+        headers: {
+          "Set-Cookie": sessionCookie,
+        },
+      });
     },
   ),
 )
@@ -183,56 +200,62 @@ Last but not least, we'll require to create the routes that will handle the auth
 
 ```tsx
 // app/routes/login.tsx
-import type { LoaderFunctionArgs, ActionFunctionArgs } from '@remix-run/node'
-import { json } from '@remix-run/node'
-import { Form, useLoaderData } from '@remix-run/react'
-import { authenticator } from '~/modules/auth/auth.server'
-import { getSession, commitSession } from '~/modules/auth/session.server'
+import { redirect } from 'react-router'
+import { useFetcher } from 'react-router'
+import { getSession } from '~/lib/session.server'
+import { authenticator } from '~/lib/auth.server'
 
-export async function loader({ request }: LoaderFunctionArgs) {
-  await authenticator.isAuthenticated(request, {
-    successRedirect: '/account',
-  })
+export async function loader({ request }: Route.LoaderArgs) {
+  // Check for existing session.
   const session = await getSession(request.headers.get('Cookie'))
-  const authError = session.get(authenticator.sessionErrorKey)
+  const user = session.get('user')
 
-  // Commit session to clear any `flash` error message.
-  return json(
-    { authError },
-    {
-      headers: {
-        'set-cookie': await commitSession(session),
-      },
-    },
-  )
+  // If the user is already authenticated, redirect to dashboard.
+  if (user) return redirect('/dashboard')
+
+  return null
 }
 
-export async function action({ request }: ActionFunctionArgs) {
-  await authenticator.authenticate('TOTP', request, {
-    // The `successRedirect` route will be used to verify the OTP code.
-    // This could be the current pathname or any other route that renders the verification form.
-    successRedirect: '/verify',
+export async function action({ request }: Route.ActionArgs) {
+  try {
+    // Authenticate the user via TOTP (Form submission).
+    return await authenticator.authenticate('TOTP', request)
+  } catch (error) {
+    console.log('error', error)
 
-    // The `failureRedirect` route will be used to render any possible error.
-    // This could be the current pathname or any other route that renders the login form.
-    failureRedirect: '/login',
-  })
+    // The error from TOTP includes the redirect Response with the cookie.
+    if (error instanceof Response) {
+      return error
+    }
+
+    // For other errors, return with error message.
+    return {
+      error: 'An error occurred during login. Please try again.',
+    }
+  }
 }
 
 export default function Login() {
-  let { authError } = useLoaderData<typeof loader>()
+  const fetcher = useFetcher()
+  const isSubmitting = fetcher.state !== 'idle' || fetcher.formData != null
+  const errors = fetcher.data?.error
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
-      {/* Login Form. */}
-      <Form method="POST">
-        <label htmlFor="email">Email</label>
-        <input type="email" name="email" placeholder="Insert email .." required />
+      {/* Form. */}
+      <fetcher.Form method="POST">
+        <input
+          type="email"
+          name="email"
+          placeholder="Insert email .."
+          disabled={isSubmitting}
+          required
+        />
         <button type="submit">Send Code</button>
-      </Form>
+      </fetcher.Form>
 
-      {/* Login Errors Handling. */}
-      <span>{authError?.message}</span>
+      {/* Errors Handling. */}
+      {errors && <p>{errors}</p>}
     </div>
   )
 }
@@ -242,82 +265,136 @@ export default function Login() {
 
 ```tsx
 // app/routes/verify.tsx
-import type { LoaderFunctionArgs, ActionFunctionArgs } from '@remix-run/node'
-import { json, redirect } from '@remix-run/node'
-import { Form, useLoaderData } from '@remix-run/react'
-import { authenticator } from '~/modules/auth/auth.server.ts'
-import { getSession, commitSession } from '~/modules/auth/auth-session.server.ts'
+import { redirect, useLoaderData } from 'react-router'
+import { Cookie } from '@mjackson/headers'
+import { Link, useFetcher } from 'react-router'
+import { useState } from 'react'
+import { getSession } from '~/lib/session.server'
+import { authenticator } from '~/lib/auth.server'
 
-export async function loader({ request }: LoaderFunctionArgs) {
-  await authenticator.isAuthenticated(request, {
-    successRedirect: '/account',
-  })
+/**
+ * Loader function that checks if the user is already authenticated.
+ * - If the user is already authenticated, redirect to dashboard.
+ * - If the user is not authenticated, check if the intent is to verify via magic-link URL.
+ */
+export async function loader({ request }: Route.LoaderArgs) {
+  // Check for existing session.
+  const session = await getSession(request.headers.get('Cookie'))
+  const user = session.get('user')
 
-  const session = await getSession(request.headers.get('cookie'))
-  const authEmail = session.get('auth:email')
-  const authError = session.get(authenticator.sessionErrorKey)
-  if (!authEmail) return redirect('/login')
+  // If the user is already authenticated, redirect to dashboard.
+  if (user) return redirect('/dashboard')
 
-  // Commit session to clear any `flash` error message.
-  return json(
-    { authError },
-    {
-      headers: {
-        'set-cookie': await commitSession(session),
-      },
-    },
-  )
+  // Get the TOTP cookie and the token from the URL.
+  const cookie = new Cookie(request.headers.get('Cookie') || '')
+  const totpCookie = cookie.get('_totp')
+
+  const url = new URL(request.url)
+  const token = url.searchParams.get('t')
+
+  // Authenticate the user via magic-link URL.
+  if (token) {
+    try {
+      return await authenticator.authenticate('TOTP', request)
+    } catch (error) {
+      if (error instanceof Response) return error
+      if (error instanceof Error) return { error: error.message }
+      return { error: 'Invalid TOTP' }
+    }
+  }
+
+  // Get the email from the TOTP cookie.
+  let email = null
+  if (totpCookie) {
+    const params = new URLSearchParams(totpCookie)
+    email = params.get('email')
+  }
+
+  // If no email is found, redirect to login.
+  if (!email) return redirect('/auth/login')
+
+  return { email }
 }
 
-export async function action({ request }: ActionFunctionArgs) {
-  const url = new URL(request.url)
-  const currentPath = url.pathname
+/**
+ * Action function that handles the TOTP verification form submission.
+ * - Authenticates the user via TOTP (Form submission).
+ */
+export async function action({ request }: Route.ActionArgs) {
+  try {
+    // Authenticate the user via TOTP (Form submission).
+    return await authenticator.authenticate('TOTP', request)
+  } catch (error) {
+    if (error instanceof Response) {
+      const cookie = new Cookie(error.headers.get('Set-Cookie') || '')
+      const totpCookie = cookie.get('_totp')
+      if (totpCookie) {
+        const params = new URLSearchParams(totpCookie)
+        return { error: params.get('error') }
+      }
 
-  await authenticator.authenticate('TOTP', request, {
-    successRedirect: currentPath,
-    failureRedirect: currentPath,
-  })
+      throw error
+    }
+    return { error: 'Invalid TOTP' }
+  }
 }
 
 export default function Verify() {
-  const { authError } = useLoaderData<typeof loader>()
+  const loaderData = useLoaderData<typeof loader>()
+
+  const [value, setValue] = useState('')
+  const fetcher = useFetcher()
+  const isSubmitting = fetcher.state !== 'idle' || fetcher.formData != null
+
+  const code = 'code' in loaderData ? loaderData.code : undefined
+  const email = 'email' in loaderData ? loaderData.email : undefined
+  const error = 'error' in loaderData ? loaderData.error : null
+  const errors = fetcher.data?.error || error
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       {/* Code Verification Form */}
-      <Form method="POST">
-        <label htmlFor="code">Code</label>
-        <input type="text" name="code" placeholder="Insert code .." required />
+      <fetcher.Form method="POST">
+        <input
+          required
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          disabled={isSubmitting}
+          placeholder="Enter the 6-digit code"
+        />
         <button type="submit">Continue</button>
-      </Form>
+      </fetcher.Form>
 
       {/* Renders the form that requests a new code. */}
       {/* Email input is not required, it's already stored in Session. */}
-      <Form method="POST">
+      <fetcher.Form method="POST" action="/auth/login">
         <button type="submit">Request new Code</button>
-      </Form>
+      </fetcher.Form>
 
       {/* Errors Handling. */}
-      <span>{authError?.message}</span>
+      {errors && <p>{errors}</p>}
     </div>
   )
 }
 ```
 
-### `account.tsx`
+### `dashboard.tsx`
 
 ```tsx
-// app/routes/account.tsx
-import type { LoaderFunctionArgs } from '@remix-run/node'
-import { json } from '@remix-run/node'
-import { Form, useLoaderData } from '@remix-run/react'
-import { authenticator } from '~/modules/auth/auth.server'
+// app/routes/dashboard.tsx
+import { Link } from 'react-router'
+import { getSession } from '../lib/session.server'
+import { redirect } from 'react-router'
+import { useLoaderData } from 'react-router'
 
-export async function loader({ request }: LoaderFunctionArgs) {
-  const user = await authenticator.isAuthenticated(request, {
-    failureRedirect: '/',
-  })
-  return json({ user })
+export async function loader({ request }: Route.LoaderArgs) {
+  const session = await getSession(request.headers.get('Cookie'))
+  const user = session.get('user')
+
+  if (!user) return redirect('/auth/login')
+  console.log('Dashboard user', user)
+
+  return { user }
 }
 
 export default function Account() {
@@ -326,26 +403,11 @@ export default function Account() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       <h1>{user && `Welcome ${user.email}`}</h1>
-      <Form action="/logout" method="POST">
-        <button>Log out</button>
-      </Form>
+
+      {/* Log out */}
+      <Link to="/auth/logout">Log out</Link>
     </div>
   )
-}
-```
-
-### `magic-link.tsx`
-
-```tsx
-// app/routes/magic-link.tsx
-import type { LoaderFunctionArgs } from '@remix-run/node'
-import { authenticator } from '~/modules/auth/auth.server'
-
-export async function loader({ request }: LoaderFunctionArgs) {
-  await authenticator.authenticate('TOTP', request, {
-    successRedirect: '/account',
-    failureRedirect: '/login',
-  })
 }
 ```
 
@@ -353,17 +415,23 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 ```tsx
 // app/routes/logout.tsx
-import type { ActionFunctionArgs } from '@remix-run/node'
-import { authenticator } from '~/modules/auth/auth.server'
+import { sessionStorage } from '~/lib/session.server'
+import { redirect } from 'react-router'
 
-export async function action({ request }: ActionFunctionArgs) {
-  return await authenticator.logout(request, {
-    redirectTo: '/',
+export async function loader({ request }: Route.LoaderArgs) {
+  // Get the session.
+  const session = await sessionStorage.getSession(request.headers.get('Cookie'))
+
+  // Destroy the session and redirect to login.
+  return redirect('/auth/login', {
+    headers: {
+      'Set-Cookie': await sessionStorage.destroySession(session),
+    },
   })
 }
 ```
 
-Done! 🎉 Feel free to check the [Starter Example](https://github.com/dev-xo/totp-starter-example) for a detailed implementation.
+Done! 🎉 Feel free to check the [Starter Example for React Router v7](https://github.com/dev-xo/remix-auth-totp-v4-starter) for a detailed implementation.
 
 ## [Options and Customization](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/customization.md)
 

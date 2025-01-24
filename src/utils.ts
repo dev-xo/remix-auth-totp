@@ -1,27 +1,13 @@
-import type { TOTPData, TOTPSessionData } from './index.js'
-import type { AuthenticateOptions } from 'remix-auth'
-import { ERRORS } from './constants.js'
+import type { TOTPData, TOTPCookieData } from './index.js'
 import base32Encode from 'base32-encode'
 
 /**
  * TOTP Generation.
  */
 export function generateSecret() {
-  const randomBytes = new Uint8Array(32);
-  crypto.getRandomValues(randomBytes);
+  const randomBytes = new Uint8Array(32)
+  crypto.getRandomValues(randomBytes)
   return base32Encode(randomBytes, 'RFC4648').toString() as string
-}
-
-export function generateMagicLink(options: {
-  code: string
-  magicLinkPath: string
-  param: string
-  request: Request
-}) {
-  const url = new URL(options.magicLinkPath ?? '/', new URL(options.request.url).origin)
-  url.searchParams.set(options.param, options.code)
-
-  return url.toString()
 }
 
 // https://github.com/sindresorhus/uint8array-extras/blob/main/index.js#L222
@@ -48,27 +34,51 @@ const hexToDecimalLookupTable = {
   D: 13,
   E: 14,
   F: 15,
-};
+}
 function hexToUint8Array(hexString: string) {
   if (hexString.length % 2 !== 0) {
-    throw new Error('Invalid Hex string length.');
+    throw new Error('Invalid Hex string length.')
   }
 
-  const resultLength = hexString.length / 2;
-  const bytes = new Uint8Array(resultLength);
+  const resultLength = hexString.length / 2
+  const bytes = new Uint8Array(resultLength)
 
   for (let index = 0; index < resultLength; index++) {
-    const highNibble = hexToDecimalLookupTable[hexString[index * 2] as keyof typeof hexToDecimalLookupTable];
-    const lowNibble = hexToDecimalLookupTable[hexString[(index * 2) + 1] as keyof typeof hexToDecimalLookupTable];
+    const highNibble =
+      hexToDecimalLookupTable[
+        hexString[index * 2] as keyof typeof hexToDecimalLookupTable
+      ]
+    const lowNibble =
+      hexToDecimalLookupTable[
+        hexString[index * 2 + 1] as keyof typeof hexToDecimalLookupTable
+      ]
 
     if (highNibble === undefined || lowNibble === undefined) {
-      throw new Error(`Invalid Hex character encountered at position ${index * 2}`);
+      throw new Error(`Invalid Hex character encountered at position ${index * 2}`)
     }
 
-    bytes[index] = (highNibble << 4) | lowNibble;
+    bytes[index] = (highNibble << 4) | lowNibble
   }
 
-  return bytes;
+  return bytes
+}
+
+/**
+ * Redirect.
+ */
+export function redirect(url: string, init: ResponseInit | number = 302) {
+  let responseInit = init
+
+  if (typeof responseInit === 'number') {
+    responseInit = { status: responseInit }
+  } else if (typeof responseInit.status === 'undefined') {
+    responseInit.status = 302
+  }
+
+  const headers = new Headers(responseInit.headers)
+  headers.set('Location', url)
+
+  return new Response(null, { ...responseInit, headers })
 }
 
 /**
@@ -102,7 +112,7 @@ export function coerceToOptionalTotpSessionData(value: unknown) {
     'attempts' in value &&
     typeof (value as { attempts: unknown }).attempts === 'number'
   ) {
-    return value as TOTPSessionData
+    return value as TOTPCookieData
   }
   return undefined
 }
@@ -117,21 +127,5 @@ export function assertTOTPData(obj: unknown): asserts obj is TOTPData {
     typeof (obj as { createdAt: unknown }).createdAt !== 'number'
   ) {
     throw new Error('Invalid totp data.')
-  }
-}
-
-export type RequiredAuthenticateOptions = Required<
-  Pick<AuthenticateOptions, 'failureRedirect' | 'successRedirect'>
-> &
-  Omit<AuthenticateOptions, 'failureRedirect' | 'successRedirect'>
-
-export function assertIsRequiredAuthenticateOptions(
-  options: AuthenticateOptions,
-): asserts options is RequiredAuthenticateOptions {
-  if (options.successRedirect === undefined) {
-    throw new Error(ERRORS.REQUIRED_SUCCESS_REDIRECT_URL)
-  }
-  if (options.failureRedirect === undefined) {
-    throw new Error(ERRORS.REQUIRED_FAILURE_REDIRECT_URL)
   }
 }
