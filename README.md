@@ -51,7 +51,7 @@ Please, read the [Getting Started Documentation](https://github.com/dev-xo/remix
 
 ## Support
 
-If you found **Remix Auth TOTP** helpful, please consider supporting it with a ⭐ [Star](https://github.com/dev-xo/remix-auth-totp)!.
+If you found **Remix Auth TOTP** helpful, please consider supporting it with a ⭐ [Star](https://github.com/dev-xo/remix-auth-totp).
 
 ### Acknowledgments
 
