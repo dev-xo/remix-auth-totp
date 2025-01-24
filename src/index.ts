@@ -403,7 +403,7 @@ class TOTPStore {
     }
 
     // Calculate expires date if maxAge is provided.
-    const expires = maxAge ? new Date(Date.now() + maxAge * 1000) : undefined
+    // const expires = maxAge ? new Date(Date.now() + maxAge * 1000) : undefined
 
     const setCookie = new SetCookie({
       name: TOTPStore.COOKIE_NAME,
@@ -411,9 +411,8 @@ class TOTPStore {
       httpOnly: true,
       secure: true,
       path: '/',
-      sameSite: 'Strict', // Changed from 'Lax' to 'Strict' (targeting Safari).
+      sameSite: 'Lax',
       maxAge: maxAge,
-      expires: expires,
     })
 
     return setCookie.toString()
