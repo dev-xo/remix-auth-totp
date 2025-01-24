@@ -4,7 +4,7 @@
 
 <div align="center">
   <p>
-    A <strong>Time-Based One-Time Password (TOTP) Authentication Strategy</strong> for <a href="https://github.com/sergiodxa/remix-auth">Remix Auth</a> that implements <strong>Email-Code Verification & Magic-Link Authentication</strong> in your application.
+    A <strong>Time-Based One-Time Password (TOTP) Authentication Strategy</strong> for <a href="https://github.com/sergiodxa/remix-auth">Remix Auth</a> that implements <strong>Email-Code & Magic-Link Authentication</strong> in your application.
   </p>
 </div>
 
@@ -30,7 +30,7 @@ npm install remix-auth-totp
 
 ## Features
 
-- **⭐ Support for Remix and React Router v7** - Out of the box.
+- **⭐ Remix & React Router v7** - Out of the box support.
 - **📧 Built-In Magic Link** - Authenticate users with a Click.
 - **⛅ Cloudflare Support** - Works with Cloudflare Pages.
 - **🔐 Secure** - Encrypted Time-Based Codes.
@@ -51,7 +51,7 @@ Please, read the [Getting Started Documentation](https://github.com/dev-xo/remix
 
 ## Support
 
-If you found **Remix Auth TOTP** helpful, please consider supporting it with a ⭐ [Star](https://github.com/dev-xo/remix-auth-totp). It helps the repository grow and provides the required motivation to continue maintaining the project.
+If you found **Remix Auth TOTP** helpful, please consider supporting it with a ⭐ [Star](https://github.com/dev-xo/remix-auth-totp)!.
 
 ### Acknowledgments
 
