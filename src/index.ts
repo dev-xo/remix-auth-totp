@@ -411,7 +411,7 @@ class TOTPStore {
       httpOnly: true,
       secure: true,
       path: '/',
-      sameSite: 'Lax', // Changed from 'Lax' to 'Strict' (targeting Safari).
+      sameSite: 'Strict', // Changed from 'Lax' to 'Strict' (targeting Safari).
       maxAge: maxAge,
       expires: expires,
     })
