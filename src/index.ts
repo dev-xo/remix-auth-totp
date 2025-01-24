@@ -1,6 +1,6 @@
 import { Strategy } from 'remix-auth/strategy'
 import { generateTOTP, verifyTOTP } from '@epic-web/totp'
-import { Cookie, SetCookie } from '@mjackson/headers'
+import { Cookie, SetCookie, type SetCookieInit } from '@mjackson/headers'
 import * as jose from 'jose'
 import { redirect } from './utils.js'
 import {
@@ -187,10 +187,10 @@ export interface TOTPStrategyOptions {
   secret: string
 
   /**
-   * The maximum age the session can live.
+   * The optional cookie options.
    * @default undefined
    */
-  maxAge?: number
+  cookieOptions?: Omit<SetCookieInit, 'name' | 'value'>
 
   /**
    * The TOTP generation configuration.
@@ -384,10 +384,10 @@ class TOTPStore {
   /**
    * Commits the current store state to a cookie string.
    *
-   * @param maxAge - Optional maximum age of the cookie in seconds.
+   * @param options - Optional SetCookie configuration options.
    * @returns A string representation of the cookie with its current values.
    */
-  commit(maxAge?: number): string {
+  commit(options: Omit<SetCookieInit, 'name' | 'value'> = {}): string {
     const params = new URLSearchParams()
 
     if (this.email) {
@@ -402,17 +402,15 @@ class TOTPStore {
       params.set('error', this.error.message)
     }
 
-    // Calculate expires date if maxAge is provided.
-    // const expires = maxAge ? new Date(Date.now() + maxAge * 1000) : undefined
-
     const setCookie = new SetCookie({
       name: TOTPStore.COOKIE_NAME,
       value: params.toString(),
       httpOnly: true,
-      // secure: true,
       path: '/',
       sameSite: 'Lax',
-      maxAge: maxAge || 60 * 5, // 5 minutes in seconds.
+      maxAge: options.maxAge || 60 * 5, // 5 minutes in seconds.
+      // `secure` may be passed in options, depending on environment.
+      ...options,
     })
 
     return setCookie.toString()
@@ -426,7 +424,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   public name = STRATEGY_NAME
 
   private readonly secret: string
-  private readonly maxAge: number | undefined
+  private readonly cookieOptions: Omit<SetCookieInit, 'name' | 'value'> | undefined
   private readonly totpGeneration: Pick<TOTPGenerationOptions, 'secret'> &
     Required<Omit<TOTPGenerationOptions, 'secret'>>
   private readonly magicLinkPath: string
@@ -461,7 +459,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
   ) {
     super(verify)
     this.secret = options.secret
-    this.maxAge = options.maxAge
+    this.cookieOptions = options.cookieOptions || {}
     this.magicLinkPath = options.magicLinkPath ?? '/magic-link'
     this.emailFieldKey = options.emailFieldKey ?? FORM_FIELDS.EMAIL
     this.codeFieldKey = options.codeFieldKey ?? FORM_FIELDS.CODE
@@ -581,7 +579,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
         // Redirect to the email sent URL.
         throw redirect(this._emailSentRedirect, {
           headers: {
-            'Set-Cookie': store.commit(this.maxAge),
+            'Set-Cookie': store.commit(this.cookieOptions),
           },
         })
       }
@@ -611,7 +609,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
         // Redirect to the success URL.
         throw redirect(this._successRedirect, {
           headers: {
-            'Set-Cookie': store.commit(this.maxAge),
+            'Set-Cookie': store.commit(this.cookieOptions),
           },
         })
       }
@@ -621,7 +619,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
     } catch (err: unknown) {
       if (err instanceof Response) {
         const headers = new Headers(err.headers)
-        headers.append('Set-Cookie', store.commit(this.maxAge))
+        headers.append('Set-Cookie', store.commit(this.cookieOptions))
         throw new Response(err.body, {
           status: err.status,
           headers: headers,
@@ -638,7 +636,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
         store.setError(err.message)
         throw redirect(this._failureRedirect, {
           headers: {
-            'Set-Cookie': store.commit(this.maxAge),
+            'Set-Cookie': store.commit(this.cookieOptions),
           },
         })
       }
@@ -725,7 +723,7 @@ export class TOTPStrategy<User> extends Strategy<User, TOTPVerifyParams> {
       // Redirect to the failure URL with the updated store.
       throw redirect(this._failureRedirect, {
         headers: {
-          'Set-Cookie': store.commit(this.maxAge),
+          'Set-Cookie': store.commit(this.cookieOptions),
         },
       })
     }
