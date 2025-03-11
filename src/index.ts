@@ -59,7 +59,7 @@ export interface TOTPGenerationOptions {
 
   /**
    * The algorithm used to generate the TOTP.
-   * @default 'SHA1'
+   * @default 'SHA-256'
    */
   algorithm?: string
 

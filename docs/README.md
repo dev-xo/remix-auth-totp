@@ -19,19 +19,21 @@ Remix Auth TOTP exports one required method:
 Here's a basic overview of the authentication flow.
 
 1. Users Sign Up or Log In via email.
-2. The Strategy generates and securely sends a Time-based One-Time Password (TOTP) to the user.
-3. Users submit the Code through a Form or Magic Link.
+2. The Strategy generates and securely sends a Time-Based One-Time Password (TOTP) to the user.
+3. The user submits the Code through a Form or Magic Link.
 4. The Strategy validates the TOTP Code, ensuring a secure authentication process.
    <br />
 
 > [!NOTE]
-> Remix Auth TOTP is only Remix v2.0+ compatible.
+> Remix Auth TOTP is Remix v2.0+ and React Router v7 compatible.
 
 Let's see how we can implement the Strategy into our Remix App.
 
 ## Email Service
 
-We'll require an Email Service to send the codes to our users. Feel free to use any service of choice, such as [Resend](https://resend.com), [Mailgun](https://www.mailgun.com), [Sendgrid](https://sendgrid.com), etc. The goal is to have a sender function similar to the following one.
+We'll require an Email Service to send the codes to our users.
+
+Feel free to use any service of choice, such as [Resend](https://resend.com), [Mailgun](https://www.mailgun.com), [Sendgrid](https://sendgrid.com), etc. The goal is to have a sender function similar to the following one.
 
 ```ts
 export type SendEmailBody = {
@@ -53,7 +55,9 @@ export async function sendEmail(body: SendEmailBody) {
 }
 ```
 
-In the [Starter Example](https://github.com/dev-xo/totp-starter-example/blob/main/app/modules/email/email.server.ts) project, we can find a straightforward `sendEmail` implementation using [Resend](https://resend.com).
+For a simple implementation, check out the [Remix Starter Example](https://github.com/dev-xo/totp-starter-example/blob/main/app/modules/email/email.server.ts), which provides a clean and straightforward `sendEmail` function using [Resend](https://resend.com).
+
+This implementation works with both Remix and React Router v7 applications.
 
 ## Session Storage
 
@@ -74,7 +78,7 @@ export const sessionStorage = createCookieSessionStorage({
     sameSite: 'lax',
     path: '/',
     httpOnly: true,
-    secrets: [process.env.SESSION_SECRET || 'NOT_A_STRONG_SECRET'],
+    secrets: [process.env.SESSION_SECRET || 'MY_STRONG_SECRET'],
     secure: process.env.NODE_ENV === 'production',
   },
 })
@@ -114,7 +118,7 @@ export let authenticator = new Authenticator<User>(sessionStorage)
 authenticator.use(
   new TOTPStrategy(
     {
-      secret: process.env.ENCRYPTION_SECRET || 'NOT_A_STRONG_SECRET',
+      secret: process.env.ENCRYPTION_SECRET || 'MY_64_HEX_SECRET',
       emailSentRedirect: '/verify',
       magicLinkPath: '/verify',
       successRedirect: '/dashboard',
@@ -305,6 +309,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   // Get the email from the TOTP cookie.
   let email = null
+
   if (totpCookie) {
     const params = new URLSearchParams(totpCookie)
     email = params.get('email')
@@ -357,9 +362,9 @@ export default function Verify() {
       <fetcher.Form method="POST">
         <input
           required
+          name="code"
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          disabled={isSubmitting}
           placeholder="Enter the 6-digit code"
         />
         <button type="submit">Continue</button>
