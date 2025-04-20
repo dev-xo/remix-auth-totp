@@ -145,8 +145,8 @@ authenticator.use(
     {
       ...
       sendTOTP: async ({ email, code, magicLink }) => {
-				// Send email with TOTP code.
-				await sendAuthEmail({ email, code, magicLink })
+	// Send email with TOTP code.
+	await sendAuthEmail({ email, code, magicLink })
       },
     },
     async ({ email }) => {},
