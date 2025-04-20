@@ -202,6 +202,8 @@ authenticator.use(
 
 ## Auth Routes
 
+Last but not least, we need to create the routes for the authentication flow.
+
 ### `login.tsx`
 
 ```tsx
