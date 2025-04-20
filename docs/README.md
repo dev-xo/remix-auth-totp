@@ -4,11 +4,11 @@ Welcome to the Remix Auth TOTP Documentation!
 
 ## List of Contents
 
-- [Live Demo](https://totp.devxo.workers.dev) - A live demo that displays the authentication flow.
-- [Getting Started](https://github.com/dev-xo/remix-auth-totp/tree/main/docs#getting-started) - A quick start guide to get you up and running.
-- [Examples](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/examples.md) - A list of community examples using Remix Auth TOTP.
-- [Customization](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/customization.md) - A detailed guide of all the available options and customizations.
-- [Cloudflare](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/cloudflare.md) - A guide to using Remix Auth TOTP with Cloudflare Workers.
+- [Live Demo](https://totp.devxo.workers.dev) - See it in action.
+- [Getting Started](https://github.com/dev-xo/remix-auth-totp/tree/main/docs#getting-started) - Quick setup guide.
+- [Examples](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/examples.md) - Community examples.
+- [Customization](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/customization.md) - Configuration options.
+- [Cloudflare](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/cloudflare.md) - Cloudflare Workers setup.
 
 ## Getting Started
 
@@ -16,16 +16,16 @@ Remix Auth TOTP exports one required method:
 
 - `sendTOTP` - Sends the TOTP code to the user via email or any other method.
 
-Here's a basic overview of the authentication flow.
+The authentication flow is simple:
 
-1. Users Sign Up or Log In via email.
-2. The Strategy generates and securely sends a Time-Based One-Time Password (TOTP) to the user.
-3. The user submits the Code through a Form or Magic Link.
-4. The Strategy validates the TOTP Code, ensuring a secure authentication process.
+1. User enters their email.
+2. User receives a one-time code via email.
+3. User submits the code or clicks magic link.
+4. Code is validated and user is authenticated.
    <br />
 
 > [!NOTE]
-> Remix Auth TOTP is Remix v2.0+ and React Router v7 compatible.
+> Remix Auth TOTP is compatible with Remix v2.0+ and React Router v7.
 
 Let's see how we can implement the Strategy into our Remix App.
 
@@ -37,40 +37,45 @@ Feel free to use any service of choice, such as [Resend](https://resend.com), [M
 
 ```ts
 export type SendEmailBody = {
-  to: string | string[]
+  sender: {
+    name: string
+    email: string
+  }
+  to: {
+    name?: string
+    email: string
+  }[]
   subject: string
-  html: string
-  text?: string
+  htmlContent: string
 }
 
 export async function sendEmail(body: SendEmailBody) {
+  const sender = {
+    name: 'Your Name',
+    email: 'your-email@example.com',
+  }
+
   return fetch(`https://any-email-service.com`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${process.env.EMAIL_PROVIDER_API_KEY}`,
-      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      'content-type': 'application/json',
+      'api-key': process.env.EMAIL_API_KEY as string,
     },
     body: JSON.stringify({ ...body }),
   })
 }
 ```
 
-For a simple implementation, check out the [Remix Starter Example](https://github.com/dev-xo/totp-starter-example/blob/main/app/modules/email/email.server.ts), which provides a clean and straightforward `sendEmail` function using [Resend](https://resend.com).
-
-This implementation works with both Remix and React Router v7 applications.
+For a working example, see the [Remix Saas - Email](https://github.com/dev-xo/remix-saas/blob/main/app/lib/email/email.server.ts) implementation using Resend API.
 
 ## Session Storage
 
-We'll require to initialize a new Session Storage to work with. This Session will store user data and everything related to authentication.
-
-Create a file called `session.server.ts` wherever you want.<br />
-Implement the following code and replace the `secrets` property with a strong string into your `.env` file.
-
-Same applies for Remix or React Router v7.
+We'll require to initialize a new Session Storage to work with. This Session will store user data and everything related to the TOTP authentication.
 
 ```ts
-// app/modules/auth/session.server.ts
-import { createCookieSessionStorage } from '@remix-run/node' // Or 'react-router'.
+// app/lib/auth-session.server.ts
+import { createCookieSessionStorage } from 'react-router' // Or '@remix-run'.
 
 export const sessionStorage = createCookieSessionStorage({
   cookie: {
@@ -78,7 +83,7 @@ export const sessionStorage = createCookieSessionStorage({
     sameSite: 'lax',
     path: '/',
     httpOnly: true,
-    secrets: [process.env.SESSION_SECRET || 'MY_STRONG_SECRET'],
+    secrets: [process.env.SESSION_SECRET],
     secure: process.env.NODE_ENV === 'production',
   },
 })
@@ -92,28 +97,25 @@ Now that we have everything set up, we can start implementing the Strategy Insta
 
 ### 1. Implementing the Strategy Instance.
 
-Create a file called `auth.server.ts` wherever you want. <br />
-
 > [!IMPORTANT]
-> A random 64-character hexadecimal string is required to generate the TOTP codes. This string should be stored securely and not shared with anyone.
+> A random 64-character hexadecimal string is required to generate the TOTP codes.
 > You can use a site like https://www.grc.com/passwords.htm to generate a strong secret.
 
-Implement the following code and replace the `secret` property with a string containing exactly 64 random hexadecimal characters (0-9 and A-F) into your `.env` file. An example is `928F416BAFC49B969E62052F00450B6E974B03E86DC6984D1FA787B7EA533227`.
+Add a 64-character hex string (0-9, A-F) as the `secret` property in your `.env` file. Example:
+`ENCRYPTION_SECRET=928F416BAFC49B969E62052F00450B6E974B03E86DC6984D1FA787B7EA533227`
 
 ```ts
-// app/modules/auth/auth.server.ts
+// app/lib/auth.server.ts
 import { Authenticator } from 'remix-auth'
 import { TOTPStrategy } from 'remix-auth-totp'
-import { sessionStorage } from './session.server'
-import { sendEmail } from './email.server'
-import { db } from '~/db'
+import { redirect } from 'react-router'
+import { getSession, commitSession } from '~/lib/auth-session.server'
 
 type User = {
-  id: string
   email: string
 }
 
-export let authenticator = new Authenticator<User>(sessionStorage)
+export const authenticator = new Authenticator<User>()
 
 authenticator.use(
   new TOTPStrategy(
@@ -131,7 +133,7 @@ authenticator.use(
 ```
 
 > [!TIP]
-> You can customize the cookie behavior by passing `cookieOptions` to the `sessionStorage` instance. Check [Customization](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/customization.md) to learn more.
+> You can customize the cookie behavior by passing `cookieOptions` to the `TOTPStrategy` instance. Check [Customization](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/customization.md) to learn more.
 
 ### 2: Implementing the Strategy Logic.
 
@@ -143,8 +145,8 @@ authenticator.use(
     {
       ...
       sendTOTP: async ({ email, code, magicLink }) => {
-        // Send the TOTP code to the user.
-        await sendEmail({ email, code, magicLink })
+				// Send email with TOTP code.
+				await sendAuthEmail({ email, code, magicLink })
       },
     },
     async ({ email }) => {},
@@ -155,6 +157,8 @@ authenticator.use(
 ### 3. Creating and Storing the User.
 
 The Strategy returns a `verify` method that allows handling our own logic. This includes creating the user, updating the session, etc.<br />
+
+When using Cloudflare D1, you may want to perform the lookup in `action` or `loader` after committing the session, by passing the `context` binding to a `findOrCreateUserByEmail` function.
 
 This should return the user data that will be stored in Session.
 
@@ -198,23 +202,21 @@ authenticator.use(
 
 ## Auth Routes
 
-Last but not least, we'll require to create the routes that will handle the authentication flow. Create the following files inside the `app/routes` folder.
-
 ### `login.tsx`
 
 ```tsx
 // app/routes/login.tsx
 import { redirect } from 'react-router'
 import { useFetcher } from 'react-router'
-import { getSession } from '~/lib/session.server'
-import { authenticator } from '~/lib/auth.server'
+import { getSession } from '~/lib/auth-session.server'
+import { authenticator } from '~/lib/auth-server'
 
 export async function loader({ request }: Route.LoaderArgs) {
   // Check for existing session.
   const session = await getSession(request.headers.get('Cookie'))
   const user = session.get('user')
 
-  // If the user is already authenticated, redirect to dashboard.
+  // If the user is already authenticated, redirect to your authenticated route.
   if (user) return redirect('/dashboard')
 
   return null
@@ -225,14 +227,14 @@ export async function action({ request }: Route.ActionArgs) {
     // Authenticate the user via TOTP (Form submission).
     return await authenticator.authenticate('TOTP', request)
   } catch (error) {
-    console.log('error', error)
-
     // The error from TOTP includes the redirect Response with the cookie.
     if (error instanceof Response) {
       return error
     }
 
     // For other errors, return with error message.
+    console.log('error', error)
+
     return {
       error: 'An error occurred during login. Please try again.',
     }
@@ -267,13 +269,15 @@ export default function Login() {
 
 ### `verify.tsx`
 
+For the verify route, we are leveraging `@mjackson/headers` to parse the cookie. Created by Michael Jackson, the CO-Founder of Remix/React Router.
+
 ```tsx
 // app/routes/verify.tsx
 import { redirect, useLoaderData } from 'react-router'
 import { Cookie } from '@mjackson/headers'
 import { Link, useFetcher } from 'react-router'
 import { useState } from 'react'
-import { getSession } from '~/lib/session.server'
+import { getSession } from '~/lib/auth-session.server'
 import { authenticator } from '~/lib/auth.server'
 
 /**
@@ -300,7 +304,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   if (token) {
     try {
       return await authenticator.authenticate('TOTP', request)
-    } catch (error) {
+    } catch (error: unknown) {
       if (error instanceof Response) return error
       if (error instanceof Error) return { error: error.message }
       return { error: 'Invalid TOTP' }
@@ -333,6 +337,7 @@ export async function action({ request }: Route.ActionArgs) {
     if (error instanceof Response) {
       const cookie = new Cookie(error.headers.get('Set-Cookie') || '')
       const totpCookie = cookie.get('_totp')
+
       if (totpCookie) {
         const params = new URLSearchParams(totpCookie)
         return { error: params.get('error') }
@@ -351,7 +356,6 @@ export default function Verify() {
   const fetcher = useFetcher()
   const isSubmitting = fetcher.state !== 'idle' || fetcher.formData != null
 
-  const code = 'code' in loaderData ? loaderData.code : undefined
   const email = 'email' in loaderData ? loaderData.email : undefined
   const error = 'error' in loaderData ? loaderData.error : null
   const errors = fetcher.data?.error || error
@@ -388,7 +392,7 @@ export default function Verify() {
 ```tsx
 // app/routes/dashboard.tsx
 import { Link } from 'react-router'
-import { getSession } from '../lib/session.server'
+import { getSession } from '~/lib/auth-session.server'
 import { redirect } from 'react-router'
 import { useLoaderData } from 'react-router'
 
@@ -420,7 +424,7 @@ export default function Account() {
 
 ```tsx
 // app/routes/logout.tsx
-import { sessionStorage } from '~/lib/session.server'
+import { sessionStorage } from '~/lib/auth-session.server'
 import { redirect } from 'react-router'
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -436,10 +440,16 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 ```
 
-Done! 🎉 Feel free to check the [Starter Example for React Router v7](https://github.com/dev-xo/remix-auth-totp-v4-starter) for a detailed implementation.
+## Next Steps
 
-## [Options and Customization](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/customization.md)
+🎉 Done! You've completed the basic setup.
 
-The Strategy includes a few options that can be customized.
+For a complete implementation example, check out the [React Router v7 Starter Template](https://github.com/dev-xo/remix-auth-totp-v4-starter).
 
-You can find a detailed list of all the available options in the [customization](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/customization.md) documentation.
+## Configuration Options
+
+The TOTP Strategy can be customized with various options to fit your needs. See the [customization documentation](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/customization.md) for:
+
+## Support
+
+If you found **Remix Auth TOTP** helpful, please consider supporting it with a ⭐ [Star](https://github.com/dev-xo/remix-auth-totp).
