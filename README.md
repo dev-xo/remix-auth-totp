@@ -63,7 +63,7 @@ Special thanks to some amazing contributors:
 
 ## Sponsors
 
-Huge thanks to our sponsors who makes it possible to maintain and improve Remix SaaS! 🙌
+Huge thanks to our sponsors who makes it possible to maintain and improve Remix Auth TOTP! 🙌
 
 <table width="100%">
   <tr height="187px">
