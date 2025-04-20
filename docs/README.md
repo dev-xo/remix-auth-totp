@@ -4,7 +4,7 @@ Welcome to the Remix Auth TOTP Documentation!
 
 ## List of Contents
 
-- [Live Demo](https://totp.fly.dev) - A live demo that displays the authentication flow.
+- [Live Demo](https://totp.devxo.workers.dev) - A live demo that displays the authentication flow.
 - [Getting Started](https://github.com/dev-xo/remix-auth-totp/tree/main/docs#getting-started) - A quick start guide to get you up and running.
 - [Examples](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/examples.md) - A list of community examples using Remix Auth TOTP.
 - [Customization](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/customization.md) - A detailed guide of all the available options and customizations.
