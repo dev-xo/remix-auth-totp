@@ -4,11 +4,11 @@ Welcome to the Remix Auth TOTP Documentation!
 
 ## List of Contents
 
-- [Live Demo](https://totp.devxo.workers.dev) - See it in action.
-- [Getting Started](https://github.com/dev-xo/remix-auth-totp/tree/main/docs#getting-started) - Quick setup guide.
-- [Examples](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/examples.md) - Community examples.
-- [Customization](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/customization.md) - Configuration options.
-- [Cloudflare](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/cloudflare.md) - Cloudflare Workers setup.
+- 🚀 [Live Demo](https://totp.devxo.workers.dev) - See it in action.
+- 🏁 [Getting Started](https://github.com/dev-xo/remix-auth-totp/tree/main/docs#getting-started) - Quick setup guide.
+- 🎯 [Examples](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/examples.md) - Community examples.
+- ⚙️ [Customization](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/customization.md) - Configuration options.
+- ☁️ [Cloudflare](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/cloudflare.md) - Cloudflare Workers setup.
 
 ## Getting Started
 
@@ -27,7 +27,7 @@ The authentication flow is simple:
 > [!NOTE]
 > Remix Auth TOTP is compatible with Remix v2.0+ and React Router v7.
 
-Let's see how we can implement the Strategy into our Remix App.
+Let's see how we can implement the Strategy into our app.
 
 ## Email Service
 
