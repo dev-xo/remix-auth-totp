@@ -31,12 +31,12 @@ npm install remix-auth-totp
 ## Features
 
 - **⭐ Remix & React Router v7** - Out of the box support.
-- **📧 Built-In Magic Link** - Authenticate users with a Click.
-- **⛅ Cloudflare Support** - Works with Cloudflare Pages.
-- **🔐 Secure** - Encrypted Time-Based Codes.
+- **📧 Built-In Magic Links** - One-click authentication.
+- **⛅ Cloudflare Support** - Cloudflare compatibility.
+- **🔐 Secure** - Time-based encrypted codes.
 - **🛡 Bulletproof** - Crafted in strict TypeScript with high test coverage.
-- **😌 Easy to Set Up** - Start with one of the Official Starters.
-- **🚀 Remix Auth Foundation** - An amazing authentication library for Remix.
+- **😌 Easy to Set Up** - Official starter templates.
+- **🚀 Remix Auth Foundation** - Built on a solid foundation.
 
 ## [Live Demo](https://totp.devxo.workers.dev/)
 
@@ -51,7 +51,7 @@ Please, read the [Getting Started Documentation](https://github.com/dev-xo/remix
 
 ## Support
 
-If you found **Remix Auth TOTP** helpful, please consider supporting it with a ⭐ [Star](https://github.com/dev-xo/remix-auth-totp).
+If you found **Remix Auth TOTP** helpful, consider supporting it with a ⭐ [Star](https://github.com/dev-xo/remix-auth-totp).
 
 ### Acknowledgments
 
