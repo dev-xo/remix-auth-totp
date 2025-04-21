@@ -460,7 +460,7 @@ export default function Account() {
 
 🎉 Done! You've completed the basic setup.
 
-For a complete implementation example, check out the [React Router v7 Starter Template](https://github.com/dev-xo/remix-auth-totp-v4-starter).
+For a complete implementation example, check out the [React Router v7 Starter Template](https://github.com/dev-xo/remix-auth-totp-starter).
 
 ## Configuration Options
 

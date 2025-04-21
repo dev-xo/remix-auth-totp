@@ -4,7 +4,7 @@ A list of community examples using Remix Auth TOTP.
 
 ## v4.0 Examples
 
-- [React Router v7 - Starter](https://github.com/dev-xo/remix-auth-totp-v4-starter) by [@dev-xo](https://github.com/dev-xo): A straightforward database-less example App. It can also serve as a foundation for your RR7 App or other projects.
+- [React Router v7 - Starter](https://github.com/dev-xo/remix-auth-totp-starter) by [@dev-xo](https://github.com/dev-xo): A straightforward database-less example App. It can also serve as a foundation for your RR7 App or other projects.
 - [React Router v7 - Drizzle ORM](https://github.com/CyrusVorwald/react-router-playground) by [@CyrusVorwald](https://github.com/CyrusVorwald): A simple to start, Drizzle + PostgreSQL example, that aims to be a playground for your React Router v7 app.
 
 ## v3.0 Examples
