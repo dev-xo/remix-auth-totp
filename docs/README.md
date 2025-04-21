@@ -95,7 +95,7 @@ export const { getSession, commitSession, destroySession } = sessionStorage
 
 Now that we have everything set up, we can start implementing the Strategy Instance.
 
-### 1. Implementing the Strategy Instance.
+### 1. Implementing Strategy Instance
 
 > [!IMPORTANT]
 > A random 64-character hexadecimal string is required to generate the TOTP codes.
@@ -120,7 +120,7 @@ export const authenticator = new Authenticator<User>()
 authenticator.use(
   new TOTPStrategy(
     {
-      secret: process.env.ENCRYPTION_SECRET || 'MY_64_HEX_SECRET',
+      secret: process.env.ENCRYPTION_SECRET,
       emailSentRedirect: '/verify',
       magicLinkPath: '/verify',
       successRedirect: '/dashboard',
@@ -133,9 +133,9 @@ authenticator.use(
 ```
 
 > [!TIP]
-> You can customize the cookie behavior by passing `cookieOptions` to the `TOTPStrategy` instance. Check [Customization](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/customization.md) to learn more.
+> You can customize the cookie behavior by passing a `cookieOptions` property to the `TOTPStrategy` instance. Check [Customization](https://github.com/dev-xo/remix-auth-totp/blob/main/docs/customization.md) to learn more.
 
-### 2: Implementing the Strategy Logic.
+### 2: Implementing Strategy Logic
 
 The Strategy Instance requires the following method: `sendTOTP`.
 
@@ -154,11 +154,12 @@ authenticator.use(
 )
 ```
 
-### 3. Creating and Storing the User.
+### 3. Handling User Creation
 
 The Strategy returns a `verify` method that allows handling our own logic. This includes creating the user, updating the session, etc.<br />
 
-When using Cloudflare D1, you may want to perform the lookup in `action` or `loader` after committing the session, by passing the `context` binding to a `findOrCreateUserByEmail` function.
+> [!TIP]
+> When using Cloudflare D1, consider performing user lookups in the `action` or `loader` functions after committing the session. You can pass the `context` binding to a `findOrCreateUserByEmail` function to handle database operations.
 
 This should return the user data that will be stored in Session.
 
@@ -171,11 +172,9 @@ authenticator.use(
     },
     async ({ email }) => {
       // Get user from database.
-      let user = await db.user.findFirst({
-        where: { email },
-      })
+      let user = await db.user.findFirst({ where: { email } })
 
-      // Create a new user if it doesn't exist.
+      // Create a new user (if it doesn't exist).
       if (!user) {
         user = await db.user.create({
           data: { email },
@@ -204,7 +203,16 @@ authenticator.use(
 
 Last but not least, we need to create the routes for the authentication flow.
 
+We'll require the following routes:
+
+- `login.tsx` - Handles the login form submission.
+- `verify.tsx` - Handles the TOTP verification form submission.
+- `logout.tsx` - Handles the logout.
+- `dashboard.tsx` - Handles the authenticated route (optional).
+
 ### `login.tsx`
+
+This route is used to handle the login form submission.
 
 ```tsx
 // app/routes/login.tsx
@@ -270,6 +278,8 @@ export default function Login() {
 ```
 
 ### `verify.tsx`
+
+This route is used to handle the TOTP verification form submission.
 
 For the verify route, we are leveraging `@mjackson/headers` to parse the cookie. Created by Michael Jackson, the CO-Founder of Remix/React Router.
 
@@ -389,7 +399,31 @@ export default function Verify() {
 }
 ```
 
+### `logout.tsx`
+
+This route is used to destroy the session and redirect to the login page.
+
+```tsx
+// app/routes/logout.tsx
+import { sessionStorage } from '~/lib/auth-session.server'
+import { redirect } from 'react-router'
+
+export async function loader({ request }: Route.LoaderArgs) {
+  // Get the session.
+  const session = await sessionStorage.getSession(request.headers.get('Cookie'))
+
+  // Destroy the session and redirect to login.
+  return redirect('/auth/login', {
+    headers: {
+      'Set-Cookie': await sessionStorage.destroySession(session),
+    },
+  })
+}
+```
+
 ### `dashboard.tsx`
+
+This route is used to display the authenticated user's dashboard (optional).
 
 ```tsx
 // app/routes/dashboard.tsx
@@ -419,26 +453,6 @@ export default function Account() {
       <Link to="/auth/logout">Log out</Link>
     </div>
   )
-}
-```
-
-### `logout.tsx`
-
-```tsx
-// app/routes/logout.tsx
-import { sessionStorage } from '~/lib/auth-session.server'
-import { redirect } from 'react-router'
-
-export async function loader({ request }: Route.LoaderArgs) {
-  // Get the session.
-  const session = await sessionStorage.getSession(request.headers.get('Cookie'))
-
-  // Destroy the session and redirect to login.
-  return redirect('/auth/login', {
-    headers: {
-      'Set-Cookie': await sessionStorage.destroySession(session),
-    },
-  })
 }
 ```
 
