@@ -67,7 +67,7 @@ export async function sendEmail(body: SendEmailBody) {
 }
 ```
 
-For a working example, see the [Remix Saas - Email](https://github.com/dev-xo/remix-saas/blob/main/app/lib/email/email.server.ts) implementation using Resend API.
+For a working example, see the [Remix Saas - Email](https://github.com/dev-xo/remix-saas/blob/main/app/modules/email/email.server.ts) implementation using Resend API.
 
 ## Session Storage
 
