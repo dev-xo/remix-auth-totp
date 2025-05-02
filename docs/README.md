@@ -303,12 +303,9 @@ export async function loader({ request }: Route.LoaderArgs) {
   const user = session.get('user')
 
   // If the user is already authenticated, redirect to dashboard.
-  if (user) return redirect('/dashboard')
+  if (user) return redirect('/profile')
 
-  // Get the TOTP cookie and the token from the URL.
-  const cookie = new Cookie(request.headers.get('Cookie') || '')
-  const totpCookie = cookie.get('_totp')
-
+  // Get token from the URL.
   const url = new URL(request.url)
   const token = url.searchParams.get('t')
 
@@ -316,25 +313,30 @@ export async function loader({ request }: Route.LoaderArgs) {
   if (token) {
     try {
       return await authenticator.authenticate('TOTP', request)
-    } catch (error: unknown) {
+    } catch (error) {
       if (error instanceof Response) return error
-      if (error instanceof Error) return { error: error.message }
-      return { error: 'Invalid TOTP' }
+      if (error instanceof Error) {
+        console.error(error)
+        return { authError: error.message }
+      }
+      return { authError: 'Invalid TOTP' }
     }
   }
 
-  // Get the email from the TOTP cookie.
-  let email = null
+  // Get TOTP cookie values.
+  const cookie = new Cookie(request.headers.get('Cookie') || '')
+  const totpCookieValue = cookie.get('_totp')
 
-  if (totpCookie) {
-    const params = new URLSearchParams(totpCookie)
-    email = params.get('email')
+  if (totpCookieValue) {
+    const params = new URLSearchParams(totpCookieValue)
+    return {
+      authEmail: params.get('email'),
+      authError: params.get('error'),
+    }
   }
 
-  // If no email is found, redirect to login.
-  if (!email) return redirect('/auth/login')
-
-  return { email }
+  // If the TOTP cookie is not found, redirect to the login page.
+  throw redirect('/auth/login')
 }
 
 /**
@@ -363,18 +365,20 @@ export async function action({ request }: Route.ActionArgs) {
 
 export default function Verify() {
   const loaderData = useLoaderData<typeof loader>()
-
   const [value, setValue] = useState('')
+
+  const authEmail = 'authEmail' in loaderData ? loaderData.authEmail : undefined
+  const authError = 'authError' in loaderData ? loaderData.authError : null
+
   const fetcher = useFetcher()
   const isSubmitting = fetcher.state !== 'idle' || fetcher.formData != null
 
-  const email = 'email' in loaderData ? loaderData.email : undefined
-  const error = 'error' in loaderData ? loaderData.error : null
-  const errors = fetcher.data?.error || error
+  // Either get the error from the fetcher (action) or the loader.
+  const errors = fetcher.data?.authError || authError
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
-      {/* Code Verification Form */}
+      {/* Code Verification Form. */}
       <fetcher.Form method="POST">
         <input
           required
@@ -386,7 +390,7 @@ export default function Verify() {
         <button type="submit">Continue</button>
       </fetcher.Form>
 
-      {/* Renders the form that requests a new code. */}
+      {/* Request New Code. */}
       {/* Email input is not required, it's already stored in Session. */}
       <fetcher.Form method="POST" action="/auth/login">
         <button type="submit">Request new Code</button>
@@ -412,7 +416,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   // Get the session.
   const session = await sessionStorage.getSession(request.headers.get('Cookie'))
 
-  // Destroy the session and redirect to login.
+  // Destroy the session and redirect to any route of your choice.
   return redirect('/auth/login', {
     headers: {
       'Set-Cookie': await sessionStorage.destroySession(session),
